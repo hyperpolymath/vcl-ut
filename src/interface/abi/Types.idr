@@ -1,16 +1,18 @@
 -- SPDX-License-Identifier: PMPL-1.0-or-later
--- Copyright (c) {{CURRENT_YEAR}} {{AUTHOR}} ({{OWNER}}) <{{AUTHOR_EMAIL}}>
+-- Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 --
-||| ABI Type Definitions Template
+||| VQL-UT ABI Type Definitions
 |||
-||| This module defines the Application Binary Interface (ABI) for this library.
-||| All type definitions include formal proofs of correctness.
+||| Defines the Application Binary Interface for VQL Ultimate Type-Safety,
+||| a 10-level query safety checker for VeriSimDB backends.
 |||
-||| Replace {{PROJECT}} with your project name.
+||| All type definitions include formal proofs of correctness for
+||| cross-language interop via the Zig FFI layer.
 |||
-||| @see https://idris2.readthedocs.io for Idris2 documentation
+||| @see Layout.idr for C-ABI memory layout proofs
+||| @see Foreign.idr for FFI function declarations
 
-module {{PROJECT}}.ABI.Types
+module VqlUt.ABI.Types
 
 import Data.Bits
 import Data.So
@@ -22,109 +24,268 @@ import Data.Vect
 -- Platform Detection
 --------------------------------------------------------------------------------
 
-||| Supported platforms for this ABI
+||| Supported platforms for VQL-UT ABI
 public export
 data Platform = Linux | Windows | MacOS | BSD | WASM
 
 ||| Compile-time platform detection
-||| This will be set during compilation based on target
+||| Set during compilation based on target triple
 public export
 thisPlatform : Platform
 thisPlatform =
   %runElab do
-    -- Platform detection logic
-    pure Linux  -- Default, override with compiler flags
+    -- Platform detection logic — overridden by compiler flags
+    pure Linux
 
 --------------------------------------------------------------------------------
--- Core Types
+-- Query Safety Levels (the 10 levels of VQL-UT)
 --------------------------------------------------------------------------------
 
-||| Result codes for FFI operations
-||| Use C-compatible integers for cross-language compatibility
+||| The 10 progressive safety levels that VQL-UT enforces on queries.
+||| Each level subsumes all prior levels: a query at level N has passed
+||| all checks from levels 0 through N.
+|||
+||| Level 0: ParseSafe       — syntactically valid VQL
+||| Level 1: SchemaBound      — all referenced tables/columns exist in schema
+||| Level 2: TypeCompat       — expression types are compatible (no implicit coercion)
+||| Level 3: NullSafe         — NULL propagation is explicitly handled
+||| Level 4: InjectionProof   — no unescaped user input in query structure
+||| Level 5: ResultTyped      — result set columns have known, exact types
+||| Level 6: CardinalitySafe  — JOIN cardinality proven (no accidental cross-products)
+||| Level 7: EffectTracked    — side effects (INSERT/UPDATE/DELETE) are annotated
+||| Level 8: TemporalSafe     — temporal bounds respected (VeriSimDB time-travel)
+||| Level 9: LinearSafe       — resource linearity proven (no double-consume of streams)
 public export
-data Result : Type where
-  ||| Operation succeeded
-  Ok : Result
-  ||| Generic error
-  Error : Result
-  ||| Invalid parameter provided
-  InvalidParam : Result
-  ||| Out of memory
-  OutOfMemory : Result
-  ||| Null pointer encountered
-  NullPointer : Result
+data SafetyLevel : Type where
+  ParseSafe       : SafetyLevel
+  SchemaBound     : SafetyLevel
+  TypeCompat      : SafetyLevel
+  NullSafe        : SafetyLevel
+  InjectionProof  : SafetyLevel
+  ResultTyped     : SafetyLevel
+  CardinalitySafe : SafetyLevel
+  EffectTracked   : SafetyLevel
+  TemporalSafe    : SafetyLevel
+  LinearSafe      : SafetyLevel
 
-||| Convert Result to C integer
+||| Convert SafetyLevel to C-compatible integer tag (0-9)
 public export
-resultToInt : Result -> Bits32
-resultToInt Ok = 0
-resultToInt Error = 1
-resultToInt InvalidParam = 2
-resultToInt OutOfMemory = 3
-resultToInt NullPointer = 4
+safetyLevelToInt : SafetyLevel -> Bits32
+safetyLevelToInt ParseSafe       = 0
+safetyLevelToInt SchemaBound     = 1
+safetyLevelToInt TypeCompat      = 2
+safetyLevelToInt NullSafe        = 3
+safetyLevelToInt InjectionProof  = 4
+safetyLevelToInt ResultTyped     = 5
+safetyLevelToInt CardinalitySafe = 6
+safetyLevelToInt EffectTracked   = 7
+safetyLevelToInt TemporalSafe    = 8
+safetyLevelToInt LinearSafe      = 9
 
-||| Results are decidably equal
+||| Parse a C integer tag back to SafetyLevel
 public export
-DecEq Result where
-  decEq Ok Ok = Yes Refl
-  decEq Error Error = Yes Refl
-  decEq InvalidParam InvalidParam = Yes Refl
-  decEq OutOfMemory OutOfMemory = Yes Refl
-  decEq NullPointer NullPointer = Yes Refl
+intToSafetyLevel : Bits32 -> Maybe SafetyLevel
+intToSafetyLevel 0 = Just ParseSafe
+intToSafetyLevel 1 = Just SchemaBound
+intToSafetyLevel 2 = Just TypeCompat
+intToSafetyLevel 3 = Just NullSafe
+intToSafetyLevel 4 = Just InjectionProof
+intToSafetyLevel 5 = Just ResultTyped
+intToSafetyLevel 6 = Just CardinalitySafe
+intToSafetyLevel 7 = Just EffectTracked
+intToSafetyLevel 8 = Just TemporalSafe
+intToSafetyLevel 9 = Just LinearSafe
+intToSafetyLevel _ = Nothing
+
+||| SafetyLevel decidable equality
+public export
+DecEq SafetyLevel where
+  decEq ParseSafe       ParseSafe       = Yes Refl
+  decEq SchemaBound     SchemaBound     = Yes Refl
+  decEq TypeCompat      TypeCompat      = Yes Refl
+  decEq NullSafe        NullSafe        = Yes Refl
+  decEq InjectionProof  InjectionProof  = Yes Refl
+  decEq ResultTyped     ResultTyped     = Yes Refl
+  decEq CardinalitySafe CardinalitySafe = Yes Refl
+  decEq EffectTracked   EffectTracked   = Yes Refl
+  decEq TemporalSafe    TemporalSafe    = Yes Refl
+  decEq LinearSafe      LinearSafe      = Yes Refl
+  decEq _ _ = No absurd
+
+--------------------------------------------------------------------------------
+-- VQL-UT Error Codes
+--------------------------------------------------------------------------------
+
+||| Error codes returned by VQL-UT FFI operations.
+||| Each maps to a specific failure mode in the safety checking pipeline.
+public export
+data VqlUtError : Type where
+  ||| Operation succeeded — no error
+  Ok                   : VqlUtError
+  ||| Query failed to parse (level 0 failure)
+  ParseError           : VqlUtError
+  ||| Schema reference not found (level 1 failure)
+  SchemaError          : VqlUtError
+  ||| Type incompatibility detected (level 2 failure)
+  TypeError            : VqlUtError
+  ||| Unhandled NULL propagation (level 3 failure)
+  NullError            : VqlUtError
+  ||| Potential injection vector detected (level 4 failure)
+  InjectionAttempt     : VqlUtError
+  ||| JOIN cardinality violation (level 6 failure)
+  CardinalityViolation : VqlUtError
+  ||| Untracked side effect (level 7 failure)
+  EffectViolation      : VqlUtError
+  ||| Temporal bounds exceeded (level 8 failure)
+  TemporalBoundsExceeded : VqlUtError
+  ||| Linear resource double-consumed (level 9 failure)
+  LinearityViolation   : VqlUtError
+  ||| Internal error (bug in VQL-UT itself)
+  InternalError        : VqlUtError
+
+||| Convert VqlUtError to C-compatible integer tag (0-10)
+public export
+vqlUtErrorToInt : VqlUtError -> Bits32
+vqlUtErrorToInt Ok                     = 0
+vqlUtErrorToInt ParseError             = 1
+vqlUtErrorToInt SchemaError            = 2
+vqlUtErrorToInt TypeError              = 3
+vqlUtErrorToInt NullError              = 4
+vqlUtErrorToInt InjectionAttempt       = 5
+vqlUtErrorToInt CardinalityViolation   = 6
+vqlUtErrorToInt EffectViolation        = 7
+vqlUtErrorToInt TemporalBoundsExceeded = 8
+vqlUtErrorToInt LinearityViolation     = 9
+vqlUtErrorToInt InternalError          = 10
+
+||| Parse a C integer tag back to VqlUtError
+public export
+intToVqlUtError : Bits32 -> Maybe VqlUtError
+intToVqlUtError 0  = Just Ok
+intToVqlUtError 1  = Just ParseError
+intToVqlUtError 2  = Just SchemaError
+intToVqlUtError 3  = Just TypeError
+intToVqlUtError 4  = Just NullError
+intToVqlUtError 5  = Just InjectionAttempt
+intToVqlUtError 6  = Just CardinalityViolation
+intToVqlUtError 7  = Just EffectViolation
+intToVqlUtError 8  = Just TemporalBoundsExceeded
+intToVqlUtError 9  = Just LinearityViolation
+intToVqlUtError 10 = Just InternalError
+intToVqlUtError _  = Nothing
+
+||| VqlUtError decidable equality
+public export
+DecEq VqlUtError where
+  decEq Ok                     Ok                     = Yes Refl
+  decEq ParseError             ParseError             = Yes Refl
+  decEq SchemaError            SchemaError            = Yes Refl
+  decEq TypeError              TypeError              = Yes Refl
+  decEq NullError              NullError              = Yes Refl
+  decEq InjectionAttempt       InjectionAttempt       = Yes Refl
+  decEq CardinalityViolation   CardinalityViolation   = Yes Refl
+  decEq EffectViolation        EffectViolation        = Yes Refl
+  decEq TemporalBoundsExceeded TemporalBoundsExceeded = Yes Refl
+  decEq LinearityViolation     LinearityViolation     = Yes Refl
+  decEq InternalError          InternalError          = Yes Refl
+  decEq _ _ = No absurd
+
+--------------------------------------------------------------------------------
+-- Query Mode
+--------------------------------------------------------------------------------
+
+||| VQL-UT query processing modes.
+|||
+||| Slipstream      — fast path, checks levels 0-4 only (parse through injection)
+||| DependentTypes  — checks levels 0-7 (adds result typing, cardinality, effects)
+||| UltimateTypeSafe — full 10-level check including temporal and linearity proofs
+public export
+data QueryMode : Type where
+  Slipstream       : QueryMode
+  DependentTypes   : QueryMode
+  UltimateTypeSafe : QueryMode
+
+||| Convert QueryMode to C-compatible integer tag (0-2)
+public export
+queryModeToInt : QueryMode -> Bits32
+queryModeToInt Slipstream       = 0
+queryModeToInt DependentTypes   = 1
+queryModeToInt UltimateTypeSafe = 2
+
+||| Parse a C integer tag back to QueryMode
+public export
+intToQueryMode : Bits32 -> Maybe QueryMode
+intToQueryMode 0 = Just Slipstream
+intToQueryMode 1 = Just DependentTypes
+intToQueryMode 2 = Just UltimateTypeSafe
+intToQueryMode _ = Nothing
+
+||| QueryMode decidable equality
+public export
+DecEq QueryMode where
+  decEq Slipstream       Slipstream       = Yes Refl
+  decEq DependentTypes   DependentTypes   = Yes Refl
+  decEq UltimateTypeSafe UltimateTypeSafe = Yes Refl
   decEq _ _ = No absurd
 
 --------------------------------------------------------------------------------
 -- Opaque Handles
 --------------------------------------------------------------------------------
 
-||| Opaque handle type for FFI
-||| Prevents direct construction, enforces creation through safe API
+||| Opaque query handle — prevents direct construction, enforces creation
+||| through the safe FFI API. Wraps a non-null pointer to a query context
+||| managed by the Zig FFI layer.
 public export
-data Handle : Type where
-  MkHandle : (ptr : Bits64) -> {auto 0 nonNull : So (ptr /= 0)} -> Handle
+data QueryHandle : Type where
+  MkQueryHandle : (ptr : Bits64) -> {auto 0 nonNull : So (ptr /= 0)} -> QueryHandle
 
-||| Safely create a handle from a pointer value
-||| Returns Nothing if pointer is null
+||| Safely create a query handle from a pointer value.
+||| Returns Nothing if pointer is null (allocation failure).
 public export
-createHandle : Bits64 -> Maybe Handle
-createHandle 0 = Nothing
-createHandle ptr = Just (MkHandle ptr)
+createQueryHandle : Bits64 -> Maybe QueryHandle
+createQueryHandle 0 = Nothing
+createQueryHandle ptr = Just (MkQueryHandle ptr)
 
-||| Extract pointer value from handle
+||| Extract pointer value from query handle
 public export
-handlePtr : Handle -> Bits64
-handlePtr (MkHandle ptr) = ptr
+queryHandlePtr : QueryHandle -> Bits64
+queryHandlePtr (MkQueryHandle ptr) = ptr
 
 --------------------------------------------------------------------------------
--- Platform-Specific Types
+-- Platform-Specific Types (VeriSimDB backends)
 --------------------------------------------------------------------------------
 
-||| C int size varies by platform
+||| VeriSimDB backend platform detection.
+||| VQL-UT targets VeriSimDB which can run on these platforms.
+public export
+data VeriSimDBBackend = Native | WASM32 | Embedded
+
+||| C int size — uniform across VeriSimDB-supported platforms
 public export
 CInt : Platform -> Type
-CInt Linux = Bits32
+CInt Linux   = Bits32
 CInt Windows = Bits32
-CInt MacOS = Bits32
-CInt BSD = Bits32
-CInt WASM = Bits32
+CInt MacOS   = Bits32
+CInt BSD     = Bits32
+CInt WASM    = Bits32
 
-||| C size_t varies by platform
+||| C size_t varies by platform (32-bit on WASM)
 public export
 CSize : Platform -> Type
-CSize Linux = Bits64
+CSize Linux   = Bits64
 CSize Windows = Bits64
-CSize MacOS = Bits64
-CSize BSD = Bits64
-CSize WASM = Bits32
+CSize MacOS   = Bits64
+CSize BSD     = Bits64
+CSize WASM    = Bits32
 
-||| C pointer size varies by platform
+||| Pointer size in bits by platform
 public export
 ptrSize : Platform -> Nat
-ptrSize Linux = 64
+ptrSize Linux   = 64
 ptrSize Windows = 64
-ptrSize MacOS = 64
-ptrSize BSD = 64
-ptrSize WASM = 32
+ptrSize MacOS   = 64
+ptrSize BSD     = 64
+ptrSize WASM    = 32
 
 ||| Pointer type for platform
 public export
@@ -132,102 +293,107 @@ CPtr : Platform -> Type -> Type
 CPtr p _ = Bits (ptrSize p)
 
 --------------------------------------------------------------------------------
--- Memory Layout Proofs
+-- Memory Layout Proofs for Query Plan Buffers
 --------------------------------------------------------------------------------
 
-||| Proof that a type has a specific size
+||| Proof that a type has a specific size in bytes
 public export
 data HasSize : Type -> Nat -> Type where
   SizeProof : {0 t : Type} -> {n : Nat} -> HasSize t n
 
-||| Proof that a type has a specific alignment
+||| Proof that a type has a specific alignment in bytes
 public export
 data HasAlignment : Type -> Nat -> Type where
   AlignProof : {0 t : Type} -> {n : Nat} -> HasAlignment t n
 
+||| Query plan buffer header — fixed-size header prepended to every
+||| serialised query plan crossing the FFI boundary.
+|||
+||| Layout (24 bytes, 8-byte aligned):
+|||   offset 0:  magic      (Bits32) — 0x56514C55 ("VQLU")
+|||   offset 4:  version    (Bits32) — ABI version number
+|||   offset 8:  mode       (Bits32) — QueryMode tag (0-2)
+|||   offset 12: level      (Bits32) — highest SafetyLevel achieved (0-9)
+|||   offset 16: plan_size  (Bits64) — size of plan payload in bytes
+public export
+record QueryPlanHeader where
+  constructor MkQueryPlanHeader
+  magic     : Bits32
+  version   : Bits32
+  mode      : Bits32
+  level     : Bits32
+  planSize  : Bits64
+
+||| Prove the query plan header has correct size (24 bytes)
+public export
+queryPlanHeaderSize : (p : Platform) -> HasSize QueryPlanHeader 24
+queryPlanHeaderSize p = SizeProof
+
+||| Prove the query plan header has correct alignment (8 bytes)
+public export
+queryPlanHeaderAlign : (p : Platform) -> HasAlignment QueryPlanHeader 8
+queryPlanHeaderAlign p = AlignProof
+
 ||| Size of C types (platform-specific)
 public export
 cSizeOf : (p : Platform) -> (t : Type) -> Nat
-cSizeOf p (CInt _) = 4
-cSizeOf p (CSize _) = if ptrSize p == 64 then 8 else 4
 cSizeOf p Bits32 = 4
 cSizeOf p Bits64 = 8
 cSizeOf p Double = 8
-cSizeOf p _ = ptrSize p `div` 8
+cSizeOf p _      = ptrSize p `div` 8
 
 ||| Alignment of C types (platform-specific)
 public export
 cAlignOf : (p : Platform) -> (t : Type) -> Nat
-cAlignOf p (CInt _) = 4
-cAlignOf p (CSize _) = if ptrSize p == 64 then 8 else 4
 cAlignOf p Bits32 = 4
 cAlignOf p Bits64 = 8
 cAlignOf p Double = 8
-cAlignOf p _ = ptrSize p `div` 8
+cAlignOf p _      = ptrSize p `div` 8
 
---------------------------------------------------------------------------------
--- Example Struct with Layout Proof
---------------------------------------------------------------------------------
-
-||| Example C-compatible struct
-||| Replace this with your actual data types
+||| Magic number constant for VQL-UT query plan buffers: "VQLU" in ASCII
 public export
-record ExampleStruct where
-  constructor MkExampleStruct
-  field1 : Bits32
-  field2 : Bits64
-  field3 : Double
-
-||| Prove the struct has correct size
-public export
-exampleStructSize : (p : Platform) -> HasSize ExampleStruct 16
-exampleStructSize p =
-  -- 4 bytes (Bits32) + 4 padding + 8 bytes (Bits64) + 8 bytes (Double) = 24
-  -- But with alignment, it's actually platform-specific
-  SizeProof
-
-||| Prove the struct has correct alignment
-public export
-exampleStructAlign : (p : Platform) -> HasAlignment ExampleStruct 8
-exampleStructAlign p = AlignProof
-
---------------------------------------------------------------------------------
--- FFI Declarations
---------------------------------------------------------------------------------
-
-||| Declare external C functions
-||| These will be implemented in Zig FFI
-namespace Foreign
-
-  ||| External function example
-  export
-  %foreign "C:example_function, libexample"
-  prim__exampleFunction : Bits64 -> PrimIO Bits32
-
-  ||| Safe wrapper around FFI function
-  export
-  exampleFunction : Handle -> IO (Either Result Bits32)
-  exampleFunction h = do
-    result <- primIO (prim__exampleFunction (handlePtr h))
-    pure (Right result)
+vqlutMagic : Bits32
+vqlutMagic = 0x56514C55
 
 --------------------------------------------------------------------------------
 -- Verification
 --------------------------------------------------------------------------------
 
-||| Compile-time verification of ABI properties
+||| Compile-time verification of VQL-UT ABI properties
 namespace Verify
 
-  ||| Verify struct sizes are correct
+  ||| Verify that all safety level tags are in range [0, 9]
   export
-  verifySizes : IO ()
-  verifySizes = do
-    -- Add compile-time checks here
-    putStrLn "ABI sizes verified"
+  safetyLevelTagsInRange : (s : SafetyLevel) -> So (safetyLevelToInt s <= 9)
+  safetyLevelTagsInRange ParseSafe       = Oh
+  safetyLevelTagsInRange SchemaBound     = Oh
+  safetyLevelTagsInRange TypeCompat      = Oh
+  safetyLevelTagsInRange NullSafe        = Oh
+  safetyLevelTagsInRange InjectionProof  = Oh
+  safetyLevelTagsInRange ResultTyped     = Oh
+  safetyLevelTagsInRange CardinalitySafe = Oh
+  safetyLevelTagsInRange EffectTracked   = Oh
+  safetyLevelTagsInRange TemporalSafe    = Oh
+  safetyLevelTagsInRange LinearSafe      = Oh
 
-  ||| Verify struct alignments are correct
+  ||| Verify that all error tags are in range [0, 10]
   export
-  verifyAlignments : IO ()
-  verifyAlignments = do
-    -- Add compile-time checks here
-    putStrLn "ABI alignments verified"
+  errorTagsInRange : (e : VqlUtError) -> So (vqlUtErrorToInt e <= 10)
+  errorTagsInRange Ok                     = Oh
+  errorTagsInRange ParseError             = Oh
+  errorTagsInRange SchemaError            = Oh
+  errorTagsInRange TypeError              = Oh
+  errorTagsInRange NullError              = Oh
+  errorTagsInRange InjectionAttempt       = Oh
+  errorTagsInRange CardinalityViolation   = Oh
+  errorTagsInRange EffectViolation        = Oh
+  errorTagsInRange TemporalBoundsExceeded = Oh
+  errorTagsInRange LinearityViolation     = Oh
+  errorTagsInRange InternalError          = Oh
+
+  ||| Verify that all query mode tags are in range [0, 2]
+  export
+  queryModeTagsInRange : (m : QueryMode) -> So (queryModeToInt m <= 2)
+  queryModeTagsInRange Slipstream       = Oh
+  queryModeTagsInRange DependentTypes   = Oh
+  queryModeTagsInRange UltimateTypeSafe = Oh

@@ -1,24 +1,285 @@
-= Quickstart
-:toc: preamble
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= VQL-UT Quickstart Guide
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+:date: 2026-03-16
+:toc: macro
+:toclevels: 2
+:icons: font
+:description: Getting started with VQL-UT — the verified query language with 10 safety levels
 
-Get up and running in 60 seconds.
+toc::[]
 
 == Prerequisites
 
-* Git 2.40+
-* just (command runner)
-* Your language toolchain (see Justfile for details)
+VQL-UT requires the following tools. All can be managed via
+https://asdf-vm.com[asdf]:
 
-== From Template (New Project)
+[cols="1,2,2"]
+|===
+|Tool |Minimum Version |Purpose
+
+|**Idris2**
+|0.8.0
+|Type kernel — type-checks safety proofs
+
+|**Zig**
+|0.15.2
+|FFI bridge — compiles C-ABI exports
+
+|**Deno**
+|2.x
+|ReScript parser build and JavaScript runtime
+
+|**asdf**
+|0.15+
+|Version manager for all of the above
+
+|**just**
+|1.x
+|Task runner (recipes in `justfile`)
+|===
+
+=== Installing Prerequisites with asdf
 
 [source,bash]
 ----
-git clone https://github.com/{{OWNER}}/rsr-template-repo my-project
-cd my-project
-rm -rf .git && git init -b main
-just init       # interactive placeholder replacement
+# Install asdf plugins (if not already present)
+asdf plugin add idris2
+asdf plugin add zig
+asdf plugin add deno
+
+# Install required versions
+asdf install idris2 0.8.0
+asdf install zig 0.15.2
+asdf install deno latest
+
+# Verify
+idris2 --version   # Idris 2, version 0.8.0
+zig version         # 0.15.2
+deno --version      # deno 2.x.x
 ----
 
-== Project Structure
+== Clone and Build
 
-See README.adoc in the root for the Dual-Track architecture summary.
+VQL-UT lives inside the `nextgen-databases` monorepo:
+
+[source,bash]
+----
+# Clone the monorepo (if you do not have it already)
+cd ~/Documents/hyperpolymath-repos
+git clone https://github.com/hyperpolymath/nextgen-databases.git
+
+# Navigate to VQL-UT
+cd nextgen-databases/vql-ut
+----
+
+=== Build Everything
+
+[source,bash]
+----
+# Type-check the Idris2 kernel (proves all 10 safety levels)
+just check
+
+# Build the Zig FFI bridge
+just build-zig
+
+# Build the ReScript parser
+just build-parser
+
+# Run all tests
+just test
+----
+
+=== Build Individually
+
+[source,bash]
+----
+# Idris2 type-check only (the most important step)
+idris2 --typecheck vql-ut.ipkg
+
+# Zig FFI tests only
+cd ffi/zig && zig build test
+
+# ReScript parser build only
+cd src/parser && deno task build
+
+# Banned pattern audit (should produce no output)
+just audit
+----
+
+== Run the Type Checker on an Example Query
+
+VQL-UT ships with example `.vqlut` files demonstrating each safety level.
+
+=== Example: A Fully Typed Query
+
+Create a file called `my-query.vqlut`:
+
+[source,vql]
+----
+-- A query that exercises 6 of the 10 safety levels
+SELECT GRAPH, DOCUMENT
+FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+WHERE FULLTEXT CONTAINS $searchTerm
+CONSUME AFTER 1 USE
+WITH SESSION ReadOnlyProtocol
+EFFECTS { Read, Cite }
+IN TRANSACTION Committed
+PROOF ATTACHED IntegrityTheorem
+USAGE LIMIT 100
+----
+
+=== Check It
+
+[source,bash]
+----
+just check-query my-query.vqlut
+----
+
+This runs the query through all 10 safety levels and reports the result.
+
+== Understand the Output
+
+A successful check produces output like this:
+
+[source]
+----
+VQL-UT Safety Report
+════════════════════
+
+Query:  my-query.vqlut
+Schema: v3 (2026-03-15)
+
+Safety Levels:
+  L1  Construction Safety     ✓ PASS   SafeQuery indexed by [searchTerm : String]
+  L2  Schema Pinning          ✓ PASS   SchemaQuery pinned to version 3
+  L3  Resource Linearity      ✓ PASS   LinConn 1 (single use, then close)
+  L4  Session Protocols       ✓ PASS   Session ReadOnlyProtocol
+  L5  Effect Tracking         ✓ PASS   Declared {Read, Cite} ⊇ Actual {Read, Cite}
+  L6  Scope Isolation         ✓ PASS   Box Committed (transaction scope)
+  L7  Information Flow        ✓ PASS   Labeled Public (no classification constraint)
+  L8  Quantitative Bounds     ✓ PASS   BoundedResource 100
+  L9  Proof Attachment        ✓ PASS   IntegrityTheorem discharged
+  L10 Cross-Cutting           ✓ PASS   All compositional invariants hold
+
+Result: 10/10 levels passed
+Certificate: sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c...
+----
+
+=== When a Level Fails
+
+If a safety level fails, the output includes a structured error:
+
+[source]
+----
+VQL-UT Safety Report
+════════════════════
+
+Query:  broken-query.vqlut
+
+Safety Levels:
+  L1  Construction Safety     ✓ PASS
+  L2  Schema Pinning          ✓ PASS
+  L3  Resource Linearity      ✓ PASS
+  L4  Session Protocols       ✓ PASS
+  L5  Effect Tracking         ✗ FAIL
+
+  Error at L5 (Effect Tracking):
+    Declared effects: { Read }
+    Actual effects:   { Read, Write }
+    Violation: Write effect used but not declared
+    Location: my-query.vqlut:3 (WHERE clause triggers write via side effect)
+    Fix: Add 'Write' to the EFFECTS clause, or remove the write operation
+
+  Levels L6–L10: SKIPPED (L5 failed)
+
+Result: 4/10 levels passed (blocked at L5)
+----
+
+=== Level Meanings at a Glance
+
+[cols="1,3"]
+|===
+|Level |What It Means When It Passes
+
+|L1
+|Your query cannot be an injection attack — it is structurally safe by construction.
+
+|L2
+|Your query matches the current database schema — no column/table mismatches.
+
+|L3
+|Your database connections will not leak and cannot be used after disposal.
+
+|L4
+|Your session follows the protocol — no querying after commit, no double-close.
+
+|L5
+|Your query only performs the effects it declares — no hidden writes or side effects.
+
+|L6
+|Data from one transaction cannot leak to another — scope boundaries are respected.
+
+|L7
+|Secret data cannot flow to public outputs — security classifications are enforced.
+
+|L8
+|Your query stays within its resource budget — no exceeding declared limits.
+
+|L9
+|Your query results carry verifiable proofs of the properties you claimed.
+
+|L10
+|All the above levels compose correctly with each other — no interaction bugs.
+|===
+
+== Next Steps
+
+=== Writing Your Own Queries
+
+1. Start with a basic VQL query (no extensions).
+2. Add one extension at a time and re-check after each addition.
+3. Use `just check-query --level 5 my-query.vqlut` to check only up to a
+   specific level.
+
+=== Extending the Type System
+
+To add a new safety level or modify an existing one:
+
+1. Read `docs/architecture/ARCHITECTURE.adoc` for the full pipeline description.
+2. Read `docs/architecture/DECISIONS.adoc` for the reasoning behind design choices.
+3. Look at an existing Idris2 module in `src/abi/` for the pattern.
+4. See `CONTRIBUTING.adoc` for code standards and the PR process.
+
+=== Exploring the Proofs
+
+The Idris2 modules in `src/abi/` are both *implementation* and *specification*.
+Every function is total (`%default total`), every proof is real (zero
+`believe_me`), and the type signatures are the specification.
+
+Start with:
+
+- `Core.idr` — Foundation types (modalities, hexad references)
+- `Linear.idr` — Simplest safety level (QTT linearity)
+- `Proofs.idr` — Cross-cutting invariants (see how levels compose)
+
+=== Running with PanLL
+
+If you have PanLL set up, the VQL-UT panels provide a visual interface:
+
+[source,bash]
+----
+# Register VQL-UT panels with PanLL
+just register-panels
+
+# Open the safety dashboard
+panll open vql-ut-safety-dashboard
+----
+
+The safety dashboard shows the 10 levels as a vertical pipeline with
+green/amber/red indicators based on the current query's check status.
+
+== Licence
+
+PMPL-1.0-or-later

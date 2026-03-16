@@ -1,0 +1,86 @@
+; SPDX-License-Identifier: PMPL-1.0-or-later
+; Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+;
+; clade.a2ml — PanLL clade definition for VQL-UT
+;
+; Declares VQL-UT's identity, capabilities, and relationships within the
+; PanLL panel ecosystem. Used by PanLL's autowiring system to resolve
+; dependencies and route data between panels.
+
+(clade
+  (id "vql-ut")
+  (version "0.1.0")
+  (kind "database-tooling")
+  (description
+    "Verified Query Language — Unified Types. A dependently-typed query
+     language compiler that produces machine-checkable proofs of query
+     safety through 10 formally verified levels. Instantiates TypeLL's
+     10-level type theory for VeriSimDB queries.")
+
+  (capabilities
+    (capability "TypeCheck"
+      (description "Type-check VQL-UT queries against all 10 safety levels")
+      (input "VQL-UT source text + schema version")
+      (output "Typed AST + safety level report"))
+    (capability "SafetyAnalysis"
+      (description "Analyse which safety levels a query passes or fails")
+      (input "Typed AST")
+      (output "Per-level pass/fail with structured error diagnostics"))
+    (capability "ProofGeneration"
+      (description "Generate machine-checkable proof certificates for safe queries")
+      (input "Typed AST that passes all requested levels")
+      (output "Proof certificate (JSON, independently verifiable)"))
+    (capability "QueryCompilation"
+      (description "Compile a type-checked query into an optimised execution plan")
+      (input "Typed AST + proof certificate")
+      (output "Native query plan for VeriSimDB dispatch"))
+    (capability "EffectTracking"
+      (description "Track and verify declared vs actual effects for L5 compliance")
+      (input "Query with EFFECTS clause")
+      (output "Subsumption proof or effect violation error"))
+    (capability "LiveFeedback"
+      (description "Real-time type-checking feedback for the PanLL query editor")
+      (input "Partial VQL-UT source text (keystroke-debounced)")
+      (output "Incremental type-check results with inline annotations")))
+
+  (consumed-by
+    (consumer "typell"
+      (relationship "validation-target")
+      (description "TypeLL uses VQL-UT as a concrete validation of its 10-level type theory"))
+    (consumer "verisimdb"
+      (relationship "query-provider")
+      (description "VeriSimDB receives compiled query plans and proof certificates from VQL-UT"))
+    (consumer "database-bridge"
+      (relationship "upstream-checker")
+      (description "The database bridge routes queries through VQL-UT for safety verification before dispatch")))
+
+  (dispatches-to
+    (target "typell"
+      (relationship "theory-provider")
+      (description "VQL-UT consults TypeLL for the formal semantics of each safety level"))
+    (target "echidna"
+      (relationship "quality-reporter")
+      (description "VQL-UT reports code quality metrics and safety level coverage to echidnabot")))
+
+  (panels
+    (panel "vql-ut-safety-dashboard"
+      (type "pipeline-status")
+      (description "10-level safety pipeline with green/amber/red indicators"))
+    (panel "vql-ut-query-editor"
+      (type "code-editor")
+      (description "VQL-UT editor with live type checking from TypeLL"))
+    (panel "vql-ut-proof-explorer"
+      (type "obligation-tracker")
+      (description "Proof obligation discharge status and certificate viewer"))
+    (panel "vql-ut-horror-stories"
+      (type "educational")
+      (description "Interactive examples of what each safety level prevents")))
+
+  (metadata
+    (licence "PMPL-1.0-or-later")
+    (author "Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>")
+    (repository "nextgen-databases/vql-ut")
+    (monorepo "nextgen-databases")
+    (predecessor "typeql-experimental")
+    (type-theory "TypeLL (10 levels)")
+    (target-engine "VeriSimDB")))

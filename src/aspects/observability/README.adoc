@@ -1,1 +1,7 @@
-= Observability Aspect
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= VQL-UT Observability Aspect
+
+Metrics and tracing hooks for the VQL-UT query pipeline: parse latency,
+safety level distribution histograms, pipeline stage transition counts,
+and error rate tracking per safety level.

@@ -1,0 +1,684 @@
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+= The 10 Levels of Type Safety -- Explained
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+:toc: preamble
+:icons: font
+:sectnums:
+
+This document is a detailed walkthrough of all 10 type safety levels in VQL-UT.
+Each level builds on the previous -- you cannot skip ahead. The foundations
+(levels 1-3) must be solid before the higher levels make sense.
+
+== How the Levels Stack
+
+Think of these levels like floors of a building. You cannot build the third
+floor without the second, and you cannot build the second without the first.
+
+----
+┌─────────────────────────────────────────────┐
+│  Level 10: Linearity Safety                 │  ← Research
+│  Level  9: Temporal Safety                  │  ← Research
+│  Level  8: Effect-Tracking Safety           │  ← Research
+│  Level  7: Cardinality Safety               │  ← Research
+├─────────────────────────────────────────────┤
+│  Level  6: Result-Type Safety               │  ← Established
+│  Level  5: Injection-Proof Safety           │  ← Established
+│  Level  4: Null Safety                      │  ← Established
+│  Level  3: Type-Compatible Operations       │  ← Established
+│  Level  2: Schema-Binding Safety            │  ← Established
+│  Level  1: Parse-Time Safety                │  ← Established
+├─────────────────────────────────────────────┤
+│  Level  0: No type safety (raw strings)     │  ← The danger zone
+└─────────────────────────────────────────────┘
+----
+
+**Levels 1-6** are well-established in the academic literature and implemented
+in various real-world systems (though rarely all six together).
+
+**Levels 7-10** are additional protections identified through our research.
+They address real failure modes that levels 1-6 leave uncovered. These levels
+use TypeQL-Experimental extension mechanisms.
+
+== The Progression at a Glance
+
+[cols="1,2,2,2"]
+|===
+| Level | What It Checks | When It Checks | What Happens Without It
+
+| 1 -- Parse
+| Is the query well-formed?
+| Parse time (before anything else)
+| Garbage reaches the database
+
+| 2 -- Schema
+| Do referenced tables and columns exist?
+| Compile time (against live schema)
+| Queries silently return nothing
+
+| 3 -- Type ops
+| Are operations applied to compatible types?
+| Compile time
+| Nonsense computations (date + colour)
+
+| 4 -- Null
+| Are nullable values handled explicitly?
+| Compile time
+| Silent blanks in results
+
+| 5 -- Injection
+| Is user input separated from query structure?
+| Compile time (by construction)
+| Attackers run arbitrary commands
+
+| 6 -- Result
+| Is the return type known?
+| Compile time
+| Runtime crashes on unexpected data shapes
+
+| 7 -- Cardinality
+| How many results will the query return?
+| Compile time
+| Code assumes one row, gets zero or thousands
+
+| 8 -- Effects
+| Does this query read, write, or modify structure?
+| Compile time
+| Read-only functions accidentally delete data
+
+| 9 -- Temporal
+| Is the data fresh enough for the intended use?
+| Compile time (bounds in types)
+| Stale data treated as current
+
+| 10 -- Linearity
+| Are resources used exactly once?
+| Compile time (via QTT)
+| Connection leaks, use-after-close
+|===
+
+== Level 1: Parse-Time Safety
+
+=== What It Checks
+
+The query conforms to VQL-UT grammar. Keywords are spelt correctly. Brackets
+are balanced. The query is a valid sentence in the VQL-UT language.
+
+=== When It Checks
+
+At **parse time** -- the very first stage of processing, before the query is
+even understood semantically.
+
+=== How VQL-UT Implements It
+
+The VQL-UT parser is written in ReScript (extending VeriSimDB's VQL parser)
+and produces a typed abstract syntax tree (AST). If the input does not match
+the grammar, parsing fails immediately with a clear error message.
+
+----
+Input:  "SELCT users WHERE id = 1"
+         ^^^^^
+Parser: Error at position 0: Unknown keyword "SELCT". Did you mean "SELECT"?
+
+Input:  "FETCH users WHERE id = 1"
+Parser: OK → AST { kind: Fetch, target: "users", filter: Eq("id", 1) }
+----
+
+=== What You Lose Without It
+
+The query reaches the database as a raw string. The database must guess what
+you meant. Different databases handle this differently -- some crash, some
+silently ignore the error, some execute a partial query.
+
+---
+
+== Level 2: Schema-Binding Safety
+
+=== What It Checks
+
+Every table name, column name, modality reference, and relationship mentioned
+in the query actually exists in the database schema. Types are resolved to
+their concrete definitions.
+
+=== When It Checks
+
+At **compile time**, by comparing the parsed AST against the live database
+schema (or a cached schema snapshot).
+
+=== How VQL-UT Implements It
+
+The schema binder is written in Idris2. The database schema is represented as
+a dependent type, meaning the type itself encodes what tables and columns exist:
+
+----
+Schema "mydb" has:
+  Table "users" with columns:
+    id    : UserId (unique, non-null)
+    name  : Text (non-null)
+    email : Text (nullable)
+    age   : Int (nullable)
+
+Query: FETCH users.emial WHERE users.id = ?id
+                  ^^^^^
+Schema Binder: Error: "emial" is not a column in "users".
+               Available columns: id, name, email, age.
+               Did you mean "email"?
+----
+
+=== What You Lose Without It
+
+Queries reference columns that do not exist and return empty results _without
+any error_. This is one of the most common sources of silent bugs in production
+systems.
+
+---
+
+== Level 3: Type-Compatible Operations
+
+=== What It Checks
+
+Every operation (comparison, arithmetic, aggregation, sorting) is applied to
+values of compatible types. You cannot add a number to a text string, compare
+a date to a boolean, or take the average of a set of names.
+
+=== When It Checks
+
+At **compile time**, during type-checking of the bound AST.
+
+=== How VQL-UT Implements It
+
+The type checker (Idris2) verifies that operators receive arguments of the
+correct types:
+
+----
+Query: FETCH users WHERE users.name > 42
+Type Checker: Error: operator (>) expects compatible types,
+              but got Text > Int. Cannot compare Text with Int.
+
+Query: FETCH users WHERE users.age > 42
+Type Checker: OK. Int > Int is valid.
+----
+
+Type compatibility rules are defined in the Idris2 core with proofs of
+correctness. The type checker is _total_ -- it always terminates and always
+gives a definitive answer (accept or reject).
+
+=== What You Lose Without It
+
+The database silently coerces types. `"42" > 7` might be `true` (string
+comparison) or `true` (numeric comparison) depending on the database. Or it
+might throw a runtime error. Or it might return nonsense. The behaviour is
+_undefined_.
+
+---
+
+== Level 4: Null Safety
+
+=== What It Checks
+
+Every value that might be absent (`null`) is tracked in the type system. If a
+column is nullable, its type is `Nullable<T>` rather than just `T`. Operations
+on nullable values must explicitly handle the `null` case.
+
+=== When It Checks
+
+At **compile time**. The null-tracking is integrated into the type system and
+propagated through joins, subqueries, and projections.
+
+=== How VQL-UT Implements It
+
+----
+Schema: users.email is Nullable<Text>
+
+Query: FETCH UPPER(users.email) FROM users
+Type Checker: Error: UPPER expects Text, but users.email is Nullable<Text>.
+              Use COALESCE(users.email, "unknown") to provide a default,
+              or add WHERE users.email IS NOT NULL to narrow the type.
+
+Query: FETCH UPPER(COALESCE(users.email, "N/A")) FROM users
+Type Checker: OK. COALESCE returns Text (non-null guaranteed).
+----
+
+Null tracking propagates through joins:
+
+----
+LEFT JOIN orders ON users.id = orders.user_id
+-- After this join, ALL columns from "orders" become Nullable,
+-- because the LEFT JOIN may produce rows where orders is absent.
+----
+
+=== What You Lose Without It
+
+`null` propagates silently through computations. `null + 1` is `null`.
+`null > 0` is `null`. `null = null` is _not true_ in SQL (it is `null`).
+This leads to bizarre results that are technically correct by SQL semantics
+but violate every reasonable expectation.
+
+---
+
+== Level 5: Injection-Proof Safety
+
+=== What It Checks
+
+User input is a fundamentally different type from query structure. They _cannot_
+be combined. This is not sanitisation or escaping -- it is a structural
+impossibility enforced by the type system.
+
+=== When It Checks
+
+At **compile time**, by construction. The parser produces a typed AST where
+parameters are typed slots, not string holes. There is no string concatenation
+path that could produce a query.
+
+=== How VQL-UT Implements It
+
+----
+-- VQL-UT query with typed parameter
+FETCH users WHERE users.id = ?id
+
+-- ?id has type Param<UserId>. It is not a string.
+-- The only way to fill ?id is to provide a UserId value.
+-- You cannot put VQL commands inside a UserId value because
+-- UserId is not a string -- it is an opaque type.
+
+-- There is no function that converts String -> Query.
+-- The only way to create a Query is through the parser,
+-- which validates grammar (level 1) and schema (level 2).
+----
+
+=== What You Lose Without It
+
+Injection attacks. The #1 web application security risk for over a decade.
+
+---
+
+== Level 6: Result-Type Safety
+
+=== What It Checks
+
+The exact type of the query result is known at compile time. The caller knows
+precisely what fields will be returned, what their types are, and how they are
+structured.
+
+=== When It Checks
+
+At **compile time**. The type checker infers the result type from the query
+and makes it available to the calling code.
+
+=== How VQL-UT Implements It
+
+----
+Query: FETCH users.name, users.age WHERE users.active = true
+
+Result Type (inferred at compile time):
+  List<{ name : Text, age : Nullable<Int> }>
+
+-- The caller receives a List of records.
+-- Each record has a "name" field (Text, never null)
+-- and an "age" field (Nullable<Int>, might be absent).
+-- Accessing .nama would be a compile error (no such field).
+----
+
+=== What You Lose Without It
+
+Query results come back as untyped blobs. You parse them at runtime. You cast
+them manually. You discover type mismatches when the application crashes, not
+when the code is compiled.
+
+---
+
+== Level 7: Cardinality Safety
+
+=== What It Checks
+
+The number of results a query returns is part of the return type:
+
+- `ExactlyOne<T>` -- guaranteed to return exactly one result
+- `AtMostOne<T>` -- returns zero or one result
+- `NonEmpty<T>` -- returns at least one result
+- `List<T>` -- returns zero or more results
+
+=== When It Checks
+
+At **compile time**, using schema constraints (unique keys, NOT NULL) and query
+structure (LIMIT, DISTINCT, aggregation).
+
+=== How VQL-UT Implements It
+
+This level uses the **TypeQL-Experimental** extension mechanisms:
+
+[cols="1,2"]
+|===
+| VQL-UT Syntax | Meaning
+
+| `FETCH UNIQUE ...`
+| Returns `ExactlyOne<T>` -- compile error if uniqueness cannot be proved
+
+| `FETCH OPTIONAL ...`
+| Returns `AtMostOne<T>` -- caller must handle the empty case
+
+| `FETCH ...`
+| Returns `List<T>` -- zero or more results
+|===
+
+----
+-- Schema: users.id has UNIQUE constraint
+
+FETCH UNIQUE users WHERE users.id = ?id
+-- Return type: ExactlyOne<User>
+-- The compiler proves this from the UNIQUE constraint on users.id.
+
+FETCH OPTIONAL users WHERE users.email = ?email
+-- Return type: AtMostOne<User>
+-- Email is not unique, so we might get zero results.
+-- The caller MUST pattern-match on Some/None.
+----
+
+=== TypeQL-Experimental Encoding
+
+Cardinality is encoded in Idris2 using dependent types:
+
+----
+data Cardinality = ExactlyOne | AtMostOne | NonEmpty | Many
+
+Query : (card : Cardinality) -> Schema -> Type -> Type
+----
+
+=== What You Lose Without It
+
+Code assumes a query returns one row and crashes when it returns zero. Or code
+processes only the first of many results, silently ignoring the rest.
+
+---
+
+== Level 8: Effect-Tracking Safety
+
+=== What It Checks
+
+Every query is classified by its effects:
+
+- **Read** -- retrieves data without modification
+- **Write** -- inserts, updates, or deletes data
+- **DDL** -- modifies schema structure (create table, alter column)
+
+A function that only has `Read` permission _cannot_ perform writes. This is
+enforced at compile time, not by convention.
+
+=== When It Checks
+
+At **compile time**, using an effect system encoded in Idris2.
+
+=== How VQL-UT Implements It
+
+This level uses the **effect system** extension from TypeQL-Experimental:
+
+[cols="1,2"]
+|===
+| VQL-UT Syntax | Effect
+
+| `EFFECTS { Read }`
+| Read-only. Cannot modify data.
+
+| `EFFECTS { Read, Write }`
+| Can read and write data.
+
+| `EFFECTS { Read, Write, DDL }`
+| Can read, write, and modify schema.
+|===
+
+----
+FETCH users.name EFFECTS { Read }
+-- OK: FETCH is a read operation.
+
+REMOVE users WHERE users.expired = true EFFECTS { Read }
+-- Compile error: REMOVE requires Write effect, but only Read is permitted.
+
+REMOVE users WHERE users.expired = true EFFECTS { Read, Write }
+-- OK: Write effect is available.
+----
+
+=== TypeQL-Experimental Encoding
+
+Effects are tracked using an effect set with subsumption proofs in Idris2:
+
+----
+data Effect = Read | Write | DDL
+
+-- A query's effect is a set of Effect values.
+-- Subsumption: {Read} is a subset of {Read, Write}.
+-- A Read-only context can call Read queries but not Write queries.
+----
+
+=== What You Lose Without It
+
+A "reporting" function accidentally executes a DELETE. A monitoring dashboard
+triggers a write. An analytics query modifies production data.
+
+---
+
+== Level 9: Temporal Safety
+
+=== What It Checks
+
+Queries that involve time carry their temporal bounds in the type system.
+The compiler ensures:
+
+- Historical queries actually get historical data
+- Freshness guarantees are met (data is not staler than claimed)
+- Bi-temporal queries correctly distinguish between "when it happened" (valid
+  time) and "when we recorded it" (transaction time)
+
+=== When It Checks
+
+At **compile time**, using temporal type annotations.
+
+=== How VQL-UT Implements It
+
+This level uses the **modal type** and **session type** extensions from
+TypeQL-Experimental:
+
+[cols="1,2"]
+|===
+| VQL-UT Syntax | Temporal Guarantee
+
+| `AS OF <timestamp>`
+| Point-in-time query -- data as it was at that moment
+
+| `AS OF NOW - <duration>`
+| Freshness bound -- data no older than the specified duration
+
+| `BETWEEN <t1> AND <t2>`
+| Range query -- all versions within the time window
+
+| `IN TRANSACTION`
+| Snapshot isolation -- consistent view within a transaction
+|===
+
+----
+FETCH stocks.price
+  WHERE stocks.ticker = "FTSE100"
+  AS OF NOW - 5 SECONDS
+-- Return type: Temporal<Price, Freshness<5s>>
+-- If the most recent data is older than 5 seconds, the query fails
+-- rather than returning stale data.
+
+FETCH orders.status
+  WHERE orders.id = ?id
+  BETWEEN "2026-01-01" AND "2026-01-31"
+-- Return type: List<Temporal<OrderStatus, Range<2026-01-01, 2026-01-31>>>
+-- Every result carries a timestamp within the specified range.
+----
+
+=== TypeQL-Experimental Encoding
+
+Temporal safety uses box types indexed by world/scope:
+
+----
+-- Modal type: data tagged with its temporal context
+data Temporal : Type -> TemporalBound -> Type where
+  MkTemporal : (value : a) -> (bound : TemporalBound) -> Temporal a bound
+----
+
+=== What You Lose Without It
+
+Code treats yesterday's cached data as if it were live. Financial decisions
+are made on stale price data. Medical records show a patient's old medication
+list instead of the current one.
+
+---
+
+== Level 10: Linearity Safety
+
+=== What It Checks
+
+Resources that must be used exactly once -- database connections, transaction
+handles, cursor positions -- are tracked by the type system. You cannot:
+
+- **Forget** to close a connection (it would be unused -- the compiler rejects it)
+- **Use** a connection after closing it (it has been consumed -- the compiler
+  rejects it)
+- **Share** a transaction handle between two threads (it is linear -- only one
+  owner at a time)
+
+=== When It Checks
+
+At **compile time**, using Quantitative Type Theory (QTT) -- the same
+theoretical foundation that powers Idris2's resource tracking.
+
+=== How VQL-UT Implements It
+
+This level uses the **linear type** and **QTT** extensions from
+TypeQL-Experimental:
+
+[cols="1,2"]
+|===
+| VQL-UT Syntax | Linearity Guarantee
+
+| `CONSUME AFTER N USE`
+| Resource is consumed after N uses
+
+| `USAGE LIMIT n`
+| Bounded resource tracking
+
+| `WITH SESSION protocol`
+| Session types enforce a communication protocol
+|===
+
+----
+OPEN CONNECTION conn
+  FETCH users USING conn
+  FETCH orders USING conn
+CLOSE conn
+-- conn is linear (quantity 1 in QTT terms).
+-- After CLOSE, conn does not exist. Using it is a compile error.
+
+BEGIN TRANSACTION txn CONSUME AFTER 1 USE
+  UPDATE accounts SET balance = balance - 100 USING txn
+COMMIT txn
+-- txn is consumed by COMMIT.
+-- It cannot be used again. It cannot be forgotten (unused linear resource).
+----
+
+=== TypeQL-Experimental Encoding
+
+Linearity is encoded using Idris2's native QTT support:
+
+----
+-- Connection with quantity 1 (must be used exactly once)
+open : (1 _ : IO ()) -> IO Connection
+close : (1 _ : Connection) -> IO ()
+
+-- The "1" before the underscore means: this argument must be used
+-- exactly once. If you forget to close, the compiler rejects your code.
+-- If you close twice, the compiler rejects your code.
+----
+
+=== Session Types for Protocol Safety
+
+Session types enforce a communication protocol between client and database:
+
+----
+data SessionState = Ready | InTransaction | Closed
+
+-- You can only BEGIN from Ready state
+begin : Session Ready -> Session InTransaction
+
+-- You can only COMMIT or ROLLBACK from InTransaction state
+commit   : Session InTransaction -> Session Ready
+rollback : Session InTransaction -> Session Ready
+
+-- You can only CLOSE from Ready state
+close : Session Ready -> Session Closed
+
+-- Attempting to COMMIT when not in a transaction is a type error.
+-- Attempting to query after CLOSE is a type error.
+----
+
+=== What You Lose Without It
+
+Connection leaks exhaust the connection pool. Use-after-close corrupts data.
+Double-commits create duplicate transactions. Forgotten rollbacks leave locks
+held indefinitely.
+
+== How TypeLL Provides the Foundation
+
+All 10 levels are defined in **TypeLL**, the core type theory. VQL-UT
+_inherits_ these levels rather than inventing them. This means:
+
+----
+TypeLL (core type theory)
+   │
+   │  Defines: 10 levels of type safety as formal constructs
+   │
+   ├──→ PanLL (panel framework)
+   │       Uses levels 1-10 for UI component safety
+   │
+   └──→ VQL-UT (database queries)
+           Uses levels 1-10 for query safety
+----
+
+The same mathematical proofs that ensure a PanLL UI panel cannot render invalid
+state also ensure a VQL-UT query cannot execute an invalid operation. The
+theory is shared; only the application domain differs.
+
+== Summary: What Each Level Prevents
+
+[cols="1,3"]
+|===
+| Level | Category of Bug Eliminated
+
+| 1 -- Parse
+| Malformed queries, syntax errors reaching the database
+
+| 2 -- Schema
+| References to non-existent tables, columns, or relationships
+
+| 3 -- Type ops
+| Nonsense operations (adding a name to a date)
+
+| 4 -- Null
+| Null pointer exceptions, silent blanks in results
+
+| 5 -- Injection
+| SQL/VQL injection attacks -- the #1 web security risk
+
+| 6 -- Result
+| Runtime type mismatches when processing query results
+
+| 7 -- Cardinality
+| Wrong assumptions about how many results a query returns
+
+| 8 -- Effects
+| Accidental data modification by read-only code
+
+| 9 -- Temporal
+| Stale data treated as current, mixed time contexts
+
+| 10 -- Linearity
+| Connection leaks, use-after-close, double-commit
+|===
+
+Together, these 10 levels cover the vast majority of database-related bugs
+that have caused real-world catastrophes. The goal of VQL-UT is to eliminate
+all of them at compile time, with zero runtime overhead.

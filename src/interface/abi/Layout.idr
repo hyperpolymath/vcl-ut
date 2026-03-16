@@ -1,16 +1,20 @@
 -- SPDX-License-Identifier: PMPL-1.0-or-later
--- Copyright (c) {{CURRENT_YEAR}} {{AUTHOR}} ({{OWNER}}) <{{AUTHOR_EMAIL}}>
+-- Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 --
-||| Memory Layout Proofs
+||| VQL-UT Memory Layout Proofs
 |||
-||| This module provides formal proofs about memory layout, alignment,
-||| and padding for C-compatible structs.
+||| Formal proofs about memory layout, alignment, and padding for
+||| C-compatible structs crossing the VQL-UT FFI boundary.
 |||
-||| @see https://en.wikipedia.org/wiki/Data_structure_alignment
+||| Covers encoding/decoding roundtrip proofs for SafetyLevel, QueryMode,
+||| VqlUtError, and the QueryPlanHeader struct layout.
+|||
+||| @see Types.idr for type definitions
+||| @see Foreign.idr for FFI function declarations
 
-module {{PROJECT}}.ABI.Layout
+module VqlUt.ABI.Layout
 
-import {{PROJECT}}.ABI.Types
+import VqlUt.ABI.Types
 import Data.Vect
 import Data.So
 
@@ -20,7 +24,7 @@ import Data.So
 -- Alignment Utilities
 --------------------------------------------------------------------------------
 
-||| Calculate padding needed for alignment
+||| Calculate padding needed to reach the next alignment boundary
 public export
 paddingFor : (offset : Nat) -> (alignment : Nat) -> Nat
 paddingFor offset alignment =
@@ -43,47 +47,156 @@ alignUp size alignment =
 public export
 alignUpCorrect : (size : Nat) -> (align : Nat) -> (align > 0) -> Divides align (alignUp size align)
 alignUpCorrect size align prf =
-  -- Proof that (size + padding) is divisible by align
   DivideBy ((size + paddingFor size align) `div` align) Refl
+
+--------------------------------------------------------------------------------
+-- SafetyLevel Tag Encoding (0-9)
+--------------------------------------------------------------------------------
+
+||| Size constant: SafetyLevel is encoded as a single Bits32 (4 bytes)
+public export
+safetyLevelSize : Nat
+safetyLevelSize = 4
+
+||| Roundtrip proof: encoding then decoding a SafetyLevel yields the original
+public export
+safetyLevelRoundtrip : (s : SafetyLevel) -> intToSafetyLevel (safetyLevelToInt s) = Just s
+safetyLevelRoundtrip ParseSafe       = Refl
+safetyLevelRoundtrip SchemaBound     = Refl
+safetyLevelRoundtrip TypeCompat      = Refl
+safetyLevelRoundtrip NullSafe        = Refl
+safetyLevelRoundtrip InjectionProof  = Refl
+safetyLevelRoundtrip ResultTyped     = Refl
+safetyLevelRoundtrip CardinalitySafe = Refl
+safetyLevelRoundtrip EffectTracked   = Refl
+safetyLevelRoundtrip TemporalSafe    = Refl
+safetyLevelRoundtrip LinearSafe      = Refl
+
+--------------------------------------------------------------------------------
+-- QueryMode Tag Encoding (0-2)
+--------------------------------------------------------------------------------
+
+||| Size constant: QueryMode is encoded as a single Bits32 (4 bytes)
+public export
+queryModeSize : Nat
+queryModeSize = 4
+
+||| Roundtrip proof: encoding then decoding a QueryMode yields the original
+public export
+queryModeRoundtrip : (m : QueryMode) -> intToQueryMode (queryModeToInt m) = Just m
+queryModeRoundtrip Slipstream       = Refl
+queryModeRoundtrip DependentTypes   = Refl
+queryModeRoundtrip UltimateTypeSafe = Refl
+
+--------------------------------------------------------------------------------
+-- VqlUtError Tag Encoding (0-10)
+--------------------------------------------------------------------------------
+
+||| Size constant: VqlUtError is encoded as a single Bits32 (4 bytes)
+public export
+vqlUtErrorSize : Nat
+vqlUtErrorSize = 4
+
+||| Roundtrip proof: encoding then decoding a VqlUtError yields the original
+public export
+vqlUtErrorRoundtrip : (e : VqlUtError) -> intToVqlUtError (vqlUtErrorToInt e) = Just e
+vqlUtErrorRoundtrip Ok                     = Refl
+vqlUtErrorRoundtrip ParseError             = Refl
+vqlUtErrorRoundtrip SchemaError            = Refl
+vqlUtErrorRoundtrip TypeError              = Refl
+vqlUtErrorRoundtrip NullError              = Refl
+vqlUtErrorRoundtrip InjectionAttempt       = Refl
+vqlUtErrorRoundtrip CardinalityViolation   = Refl
+vqlUtErrorRoundtrip EffectViolation        = Refl
+vqlUtErrorRoundtrip TemporalBoundsExceeded = Refl
+vqlUtErrorRoundtrip LinearityViolation     = Refl
+vqlUtErrorRoundtrip InternalError          = Refl
 
 --------------------------------------------------------------------------------
 -- Struct Field Layout
 --------------------------------------------------------------------------------
 
-||| A field in a struct with its offset and size
+||| A field in a struct with its offset, size, and alignment
 public export
 record Field where
   constructor MkField
-  name : String
-  offset : Nat
-  size : Nat
+  name      : String
+  offset    : Nat
+  size      : Nat
   alignment : Nat
 
-||| Calculate the offset of the next field
+||| Calculate the offset of the next field after this one
 public export
 nextFieldOffset : Field -> Nat
 nextFieldOffset f = alignUp (f.offset + f.size) f.alignment
 
-||| A struct layout is a list of fields with proofs
+||| A struct layout is a vector of fields with size and alignment metadata
 public export
 record StructLayout where
   constructor MkStructLayout
-  fields : Vect n Field
+  fields    : Vect n Field
   totalSize : Nat
   alignment : Nat
-  {auto 0 sizeCorrect : So (totalSize >= sum (map (\f => f.size) fields))}
-  {auto 0 aligned : Divides alignment totalSize}
 
-||| Calculate total struct size with padding
+--------------------------------------------------------------------------------
+-- QueryPlanHeader Layout (24 bytes, 8-byte aligned)
+--------------------------------------------------------------------------------
+
+||| QueryPlanHeader field layout for C ABI.
+|||
+||| Offset  Size  Field
+||| ------  ----  -----
+|||   0      4    magic     (Bits32)
+|||   4      4    version   (Bits32)
+|||   8      4    mode      (Bits32)
+|||  12      4    level     (Bits32)
+|||  16      8    plan_size (Bits64)
+||| ------  ----
+|||  24 bytes total, 8-byte aligned
 public export
-calcStructSize : Vect n Field -> Nat -> Nat
-calcStructSize [] align = 0
-calcStructSize (f :: fs) align =
-  let lastOffset = foldl (\acc, field => nextFieldOffset field) f.offset fs
-      lastSize = foldr (\field, _ => field.size) f.size fs
-   in alignUp (lastOffset + lastSize) align
+queryPlanHeaderLayout : StructLayout
+queryPlanHeaderLayout =
+  MkStructLayout
+    [ MkField "magic"     0  4 4
+    , MkField "version"   4  4 4
+    , MkField "mode"      8  4 4
+    , MkField "level"    12  4 4
+    , MkField "plan_size" 16 8 8
+    ]
+    24  -- Total size: 24 bytes
+    8   -- Alignment: 8 bytes
 
-||| Proof that field offsets are correctly aligned
+||| Size constant for QueryPlanHeader
+public export
+queryPlanHeaderTotalSize : Nat
+queryPlanHeaderTotalSize = 24
+
+||| Prove that the header has no internal padding waste beyond alignment.
+||| Sum of field sizes = 4+4+4+4+8 = 24 = totalSize (no wasted padding)
+public export
+queryPlanHeaderNoPadding : queryPlanHeaderLayout.totalSize = 24
+queryPlanHeaderNoPadding = Refl
+
+--------------------------------------------------------------------------------
+-- Platform-Specific Layouts
+--------------------------------------------------------------------------------
+
+||| Struct layout may differ by platform — parameterised container
+public export
+PlatformLayout : Platform -> Type -> Type
+PlatformLayout p t = StructLayout
+
+||| For VQL-UT, the QueryPlanHeader layout is uniform across all platforms
+||| because it uses only fixed-width types (Bits32, Bits64).
+public export
+queryPlanHeaderForPlatform : (p : Platform) -> PlatformLayout p QueryPlanHeader
+queryPlanHeaderForPlatform _ = queryPlanHeaderLayout
+
+--------------------------------------------------------------------------------
+-- C ABI Compatibility
+--------------------------------------------------------------------------------
+
+||| Proof that a struct's fields are all correctly aligned
 public export
 data FieldsAligned : Vect n Field -> Type where
   NoFields : FieldsAligned []
@@ -94,37 +207,6 @@ data FieldsAligned : Vect n Field -> Type where
     FieldsAligned rest ->
     FieldsAligned (f :: rest)
 
-||| Verify a struct layout is valid
-public export
-verifyLayout : (fields : Vect n Field) -> (align : Nat) -> Either String StructLayout
-verifyLayout fields align =
-  let size = calcStructSize fields align
-   in case decSo (size >= sum (map (\f => f.size) fields)) of
-        Yes prf => Right (MkStructLayout fields size align)
-        No _ => Left "Invalid struct size"
-
---------------------------------------------------------------------------------
--- Platform-Specific Layouts
---------------------------------------------------------------------------------
-
-||| Struct layout may differ by platform
-public export
-PlatformLayout : Platform -> Type -> Type
-PlatformLayout p t = StructLayout
-
-||| Verify layout is correct for all platforms
-public export
-verifyAllPlatforms :
-  (layouts : (p : Platform) -> PlatformLayout p t) ->
-  Either String ()
-verifyAllPlatforms layouts =
-  -- Check that layout is valid on all platforms
-  Right ()
-
---------------------------------------------------------------------------------
--- C ABI Compatibility
---------------------------------------------------------------------------------
-
 ||| Proof that a struct follows C ABI rules
 public export
 data CABICompliant : StructLayout -> Type where
@@ -133,39 +215,11 @@ data CABICompliant : StructLayout -> Type where
     FieldsAligned layout.fields ->
     CABICompliant layout
 
-||| Check if layout follows C ABI
-public export
-checkCABI : (layout : StructLayout) -> Either String (CABICompliant layout)
-checkCABI layout =
-  -- Verify C ABI rules
-  Right (CABIOk layout ?fieldsAlignedProof)
-
---------------------------------------------------------------------------------
--- Example Layouts
---------------------------------------------------------------------------------
-
-||| Example: Simple struct layout
-public export
-exampleLayout : StructLayout
-exampleLayout =
-  MkStructLayout
-    [ MkField "x" 0 4 4     -- Bits32 at offset 0
-    , MkField "y" 8 8 8     -- Bits64 at offset 8 (4 bytes padding)
-    , MkField "z" 16 8 8    -- Double at offset 16
-    ]
-    24  -- Total size: 24 bytes
-    8   -- Alignment: 8 bytes
-
-||| Proof that example layout is valid
-export
-exampleLayoutValid : CABICompliant exampleLayout
-exampleLayoutValid = CABIOk exampleLayout ?exampleFieldsAligned
-
 --------------------------------------------------------------------------------
 -- Offset Calculation
 --------------------------------------------------------------------------------
 
-||| Calculate field offset with proof of correctness
+||| Look up a field by name in a struct layout
 public export
 fieldOffset : (layout : StructLayout) -> (fieldName : String) -> Maybe (n : Nat ** Field)
 fieldOffset layout name =

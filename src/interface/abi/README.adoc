@@ -1,1 +1,11 @@
-= abi Logic
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= VQL-UT ABI Definitions (Idris2)
+
+Formal ABI definitions for VQL-UT, written in Idris2 with dependent type proofs.
+
+== Files
+
+`Types.idr`:: Core types: SafetyLevel (10 levels), VqlUtError (11 codes), QueryMode (3 modes), QueryHandle, QueryPlanHeader, and platform detection.
+`Layout.idr`:: C-ABI memory layout proofs, alignment utilities, field offset calculations, and roundtrip proofs for all tag encodings.
+`Foreign.idr`:: FFI function declarations for the query pipeline: parse, bind_schema, check_types, check_effects, compile, get_safety_level, and destroy.

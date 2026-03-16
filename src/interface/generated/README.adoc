@@ -1,1 +1,7 @@
-= generated Logic
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= VQL-UT Generated Headers
+
+Auto-generated C headers bridging the Idris2 ABI definitions and the Zig FFI
+implementation. These headers are consumed by any C/C++ code that links against
+libvqlut.

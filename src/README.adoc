@@ -1,1 +1,14 @@
-= src Pillar
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= VQL-UT Source Root
+
+This directory contains the VQL-UT (VQL Ultimate Type-Safety) source tree.
+VQL-UT is a 10-level progressive query safety checker for VeriSimDB backends.
+
+== Subdirectories
+
+`interface/`:: ABI definitions (Idris2), FFI implementation (Zig), and generated C headers.
+`aspects/`:: Cross-cutting concerns: integrity, observability, and security aspects.
+`contracts/`:: Interface contracts and protocol definitions for VQL-UT consumers.
+`definitions/`:: Core type definitions and domain vocabulary shared across all modules.
+`errors/`:: Structured error types for all 10 safety levels plus internal errors.

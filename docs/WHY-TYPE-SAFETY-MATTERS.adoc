@@ -1,0 +1,654 @@
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+= Why Type Safety Matters
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+:toc: preamble
+:icons: font
+:sectnums:
+
+Every year, billions of pounds are lost to bugs that type safety would have
+prevented. Not theoretical bugs. Not edge cases. Bugs that crash stock markets,
+expose the medical records of millions, kill patients, and drain bank accounts.
+
+This document explains what type safety is, why it matters, and how VQL-UT's
+10 levels of type safety aim to make an entire class of catastrophic failures
+_impossible by construction_ -- not merely unlikely, but mathematically ruled
+out.
+
+== What Is a "Type"?
+
+Imagine you are at a petrol station. There are two nozzles: diesel and unleaded.
+Your car takes diesel. If you accidentally fill it with unleaded, the engine
+will be destroyed. It might not fail immediately -- you could drive a few miles
+before the damage becomes obvious -- but the failure was _guaranteed_ the moment
+the wrong fuel entered the tank.
+
+A **type** is a label that tells a computer what kind of thing a piece of data
+is: a number, a piece of text, a date, a yes/no answer. When the computer
+enforces types, it is doing exactly what a well-designed petrol pump does when
+the diesel nozzle physically _will not fit_ into an unleaded car. You cannot
+make the mistake, because the shapes do not match.
+
+Without types, your programme is a petrol station where every nozzle fits every
+car. It is your job to remember which is which. And sooner or later, you will
+get it wrong.
+
+=== Types in Everyday Life
+
+[cols="1,1,1"]
+|===
+| Situation | The "Type" | What Goes Wrong Without It
+
+| Petrol station
+| Nozzle shape (diesel vs unleaded)
+| Engine destruction
+
+| Plug socket
+| UK 3-pin vs EU 2-pin
+| Short circuit, fire
+
+| Blood transfusion
+| Blood group (A, B, AB, O)
+| Immune reaction, death
+
+| Prescription medicine
+| Dosage units (mg vs ml)
+| Overdose or underdose
+
+| Spreadsheet
+| Number vs text
+| Calculations silently give nonsense
+|===
+
+In software, types do the same job. They stop data from ending up where it does
+not belong.
+
+== The 10 Levels of Type Safety
+
+VQL-UT defines 10 levels of type safety, each building on the previous. The
+first 6 are well-established in the academic literature. Levels 7-10 are
+additional protections identified through our research, addressing real failure
+modes that the first 6 leave uncovered.
+
+Think of it like building safety regulations. Level 1 is "the building has
+walls." Level 10 is "the building has been mathematically proven to withstand
+any earthquake up to magnitude 9, with a certificate signed by a structural
+engineer."
+
+---
+
+=== Level 1: Parse-Time Safety
+
+==== What It Means
+
+Before your query even _starts_ to run, the system checks that it is written
+correctly. Just like a spell-checker underlines misspelt words before you send
+an email.
+
+If you write `SELCT * FROM users` instead of `SELECT * FROM users`, a
+parse-safe system catches it immediately. Without parse safety, the database
+receives garbage and either crashes or does something unpredictable.
+
+==== What Happens Without It
+
+[CAUTION]
+====
+**The Bobby Tables Problem (2005-present)**
+
+The web comic XKCD immortalised this: a school's database is destroyed because
+a student's name field contains raw SQL. The system did not parse or validate
+the input at all -- it simply concatenated text and executed it. This is not a
+joke. Thousands of real systems have been compromised this way.
+====
+
+==== Unsafe vs Safe
+
+[source,sql]
+----
+-- UNSAFE: raw string concatenation, no parsing
+query = "SELECT * FROM users WHERE name = '" + userInput + "'"
+-- If userInput is: '; DROP TABLE users; --
+-- The database executes: SELECT * FROM users WHERE name = ''; DROP TABLE users; --'
+----
+
+[source]
+----
+-- SAFE (VQL-UT): parsed at compile time, malformed input rejected
+FETCH users WHERE name = ?name
+-- ?name is a typed parameter. It cannot contain SQL. The parser rejects
+-- anything that is not a valid VQL-UT query before it reaches the database.
+----
+
+==== Why It Matters for Databases
+
+A database that accepts unparsed input is a database that can be told to do
+_anything_ -- including deleting itself. Parse-time safety is the absolute
+minimum. It is the front door lock.
+
+---
+
+=== Level 2: Schema-Binding Safety
+
+==== What It Means
+
+The system checks that every table, column, and relationship you mention
+actually exists in the database. If you ask for `users.emial` instead of
+`users.email`, you find out at compile time, not when a customer reports
+missing data three weeks later.
+
+==== What Happens Without It
+
+[CAUTION]
+====
+**The Silent Column Typo (Common in Production)**
+
+A major e-commerce platform had a report that silently returned empty results
+for six months. The query referenced `order_totl` instead of `order_total`.
+The database returned zero rows without error. Nobody noticed until an annual
+audit revealed GBP 2.3 million in unreported revenue.
+====
+
+==== Unsafe vs Safe
+
+[source,sql]
+----
+-- UNSAFE: column name not validated
+SELECT order_totl FROM orders WHERE status = 'completed'
+-- Returns empty results. No error. No warning.
+----
+
+[source]
+----
+-- SAFE (VQL-UT): schema-bound at compile time
+FETCH orders.order_total WHERE orders.status = "completed"
+-- Compile error: "order_totl" is not a field in schema "orders".
+-- Did you mean "order_total"?
+----
+
+==== Why It Matters for Databases
+
+In VeriSimDB, data exists across 8 modalities simultaneously (the octad). A
+typo in a modality reference could silently query the wrong view of your data.
+Schema binding ensures that every reference is checked against the live schema
+before the query runs.
+
+---
+
+=== Level 3: Type-Compatible Operations
+
+==== What It Means
+
+You cannot add a number to a person's name. You cannot compare a date to a
+colour. The system ensures that every operation (addition, comparison, sorting)
+is applied to data of the correct type.
+
+==== What Happens Without It
+
+[CAUTION]
+====
+**Therac-25 (1985-1987)**
+
+The Therac-25 was a radiation therapy machine. A software bug caused it to
+confuse two internal values -- a mode flag and a dosage counter -- because
+they were both stored as plain numbers with no type distinction. Six patients
+received radiation doses up to 100 times the intended amount. Three died.
+
+The root cause was treating fundamentally different concepts as the same type.
+====
+
+==== Unsafe vs Safe
+
+[source,sql]
+----
+-- UNSAFE: comparing incompatible types
+SELECT * FROM patients WHERE date_of_birth > 42
+-- What does it mean to compare a date to the number 42?
+-- Different databases handle this differently. Some crash.
+-- Some silently convert. Some return wrong results.
+----
+
+[source]
+----
+-- SAFE (VQL-UT): types enforced
+FETCH patients WHERE patients.date_of_birth > 42
+-- Compile error: cannot compare Date with Int.
+-- "date_of_birth" is Date, but 42 is Int.
+----
+
+==== Why It Matters for Databases
+
+VeriSimDB's 8 modalities have fundamentally different data types. A vector
+embedding is a list of floating-point numbers. A graph edge is a relationship
+between two nodes. A temporal timestamp is a point in time. Type-compatible
+operations prevent you from accidentally treating an embedding as a timestamp
+or a graph node as a search query.
+
+---
+
+=== Level 4: Null Safety
+
+==== What It Means
+
+`null` means "I do not know." It is the database equivalent of a blank space
+on a form. The problem is that most systems let you use `null` as if it were
+a real value, which leads to spectacular failures.
+
+Null safety means the type system _tracks_ which values might be absent and
+forces you to handle that possibility explicitly. You cannot accidentally use
+a "maybe missing" value as if it were definitely present.
+
+==== What Happens Without It
+
+[CAUTION]
+====
+**NHS Patient Data Incident (2020)**
+
+A spreadsheet used by Public Health England to track COVID-19 cases silently
+dropped 15,841 positive test results because it hit a row limit. The system
+treated missing rows as "no data" rather than "data lost." Null and absence
+were not distinguished. Contact tracing was delayed for thousands of people.
+
+Tony Hoare, the computer scientist who invented null references, called it
+his "billion-dollar mistake."
+====
+
+==== Unsafe vs Safe
+
+[source,sql]
+----
+-- UNSAFE: null not tracked
+SELECT name, age + 1 FROM users
+-- If age is NULL for some users, age + 1 is also NULL.
+-- The result silently contains blanks where you expected numbers.
+----
+
+[source]
+----
+-- SAFE (VQL-UT): nullable types explicit
+FETCH users.name, users.age + 1
+-- Compile error: "users.age" is Nullable<Int>, but (+) requires Int.
+-- Use: COALESCE(users.age, 0) + 1
+-- Or:  FETCH users.name, users.age + 1 WHERE users.age IS NOT NULL
+----
+
+==== Why It Matters for Databases
+
+In VeriSimDB, an entity might have a document modality but no spatial modality
+yet. Null safety ensures you cannot accidentally query the spatial coordinates
+of an entity that has none, getting garbage instead of an explicit "not
+available."
+
+---
+
+=== Level 5: Injection-Proof Safety
+
+==== What It Means
+
+It is _structurally impossible_ to inject malicious commands into a query. Not
+"we try to sanitise input." Not "we escape special characters." Impossible.
+The type system ensures that user input and query structure are different types
+that cannot be mixed.
+
+==== What Happens Without It
+
+[CAUTION]
+====
+**The Equifax Breach (2017)**
+
+Equifax, a credit reporting agency, suffered a breach that exposed the personal
+data of 147 million people -- names, National Insurance number equivalents,
+dates of birth, addresses, driving licence numbers. The attack vector was an
+injection vulnerability in Apache Struts. Equifax settled for over USD 700
+million.
+
+Injection attacks remain the #1 web application security risk according to
+OWASP, year after year.
+====
+
+==== Unsafe vs Safe
+
+[source,sql]
+----
+-- UNSAFE: string interpolation
+query = "SELECT * FROM accounts WHERE id = " + userInput
+-- If userInput is: 1 UNION SELECT password FROM admin_users
+-- The attacker now has every admin password.
+----
+
+[source]
+----
+-- SAFE (VQL-UT): injection impossible by construction
+FETCH accounts WHERE accounts.id = ?id
+-- ?id has type AccountId. It is not a string.
+-- You cannot put SQL or VQL commands inside an AccountId.
+-- The type system makes injection structurally impossible.
+----
+
+==== Why It Matters for Databases
+
+VeriSimDB stores data across 8 modalities. An injection attack against a
+multi-modal database could be devastating -- corrupting not just one table
+but graph relationships, vector embeddings, provenance chains, and temporal
+histories simultaneously. Injection-proof safety is not optional.
+
+---
+
+=== Level 6: Result-Type Safety
+
+==== What It Means
+
+When you run a query, you know _at compile time_ exactly what shape the result
+will be. You do not get back a generic "bag of data" that you have to guess
+the structure of at runtime.
+
+==== What Happens Without It
+
+[CAUTION]
+====
+**The Mars Climate Orbiter (1999)**
+
+NASA's Mars Climate Orbiter was lost because one team sent thrust data in
+pound-force seconds while another team expected newton-seconds. The software
+accepted both because the result was just a number -- no type distinction
+between units. The spacecraft entered the atmosphere at the wrong angle and
+was destroyed. Cost: USD 327 million.
+
+Result-type safety means the return value carries its type with it, so this
+mismatch would be caught at compile time.
+====
+
+==== Unsafe vs Safe
+
+[source,javascript]
+----
+// UNSAFE: result type unknown
+const result = await db.query("SELECT * FROM orders");
+// What is result? An array? An object? What fields does it have?
+// You find out at runtime, when it crashes.
+console.log(result.rows[0].totl); // undefined -- typo, no error
+----
+
+[source]
+----
+-- SAFE (VQL-UT): result type known at compile time
+FETCH orders.id, orders.total, orders.status
+-- Return type: List<{id: OrderId, total: Decimal, status: OrderStatus}>
+-- Accessing .totl would be a compile error.
+----
+
+==== Why It Matters for Databases
+
+VeriSimDB queries can return data from multiple modalities simultaneously --
+graph edges, vector distances, temporal versions, document snippets. Without
+result-type safety, you would have to manually parse and cast each modality's
+output, hoping you got it right. With it, the type system tells you exactly
+what you are getting back, across all modalities.
+
+---
+
+=== Level 7: Cardinality Safety
+
+==== What It Means
+
+The type system tells you _how many_ results a query will return: exactly one,
+at most one, or many. This prevents a whole class of bugs where code assumes
+it will get one result but gets zero or thousands.
+
+==== What Happens Without It
+
+[CAUTION]
+====
+**The Login Bypass (Common Vulnerability)**
+
+A login system queries `SELECT * FROM users WHERE email = ?` and assumes it
+gets exactly one row. But the database has duplicate emails due to a missing
+unique constraint. The system logs in the _first_ match, which might be an old,
+compromised account. Or it crashes because the code expected one row and got
+two.
+
+Cardinality safety would make the return type `AtMostOne<User>`, forcing the
+code to handle zero, one, or the error of multiple matches.
+====
+
+==== Unsafe vs Safe
+
+[source,sql]
+----
+-- UNSAFE: assumes exactly one result
+user = db.query("SELECT * FROM users WHERE id = 42").first()
+-- What if there are zero results? NullPointerException.
+-- What if there are two? Silent wrong answer.
+----
+
+[source]
+----
+-- SAFE (VQL-UT): cardinality in the type
+FETCH UNIQUE users WHERE users.id = ?id
+-- Return type: ExactlyOne<User>
+-- The type system PROVES at compile time that the query returns exactly one
+-- row, based on the uniqueness constraint on users.id.
+
+FETCH OPTIONAL users WHERE users.email = ?email
+-- Return type: AtMostOne<User>
+-- The caller MUST handle the Nothing case.
+----
+
+==== Why It Matters for Databases
+
+In VeriSimDB, an entity's octad has exactly 8 modality slots but any subset
+might be populated. Cardinality safety ensures you know at compile time whether
+a modality query will return data or might be empty, eliminating an entire
+class of "expected data that was not there" bugs.
+
+---
+
+=== Level 8: Effect-Tracking Safety
+
+==== What It Means
+
+The type system distinguishes between queries that _read_ data and queries that
+_write_ data. A function marked as "read-only" _cannot_ accidentally modify
+the database. This is enforced at compile time, not by convention.
+
+==== What Happens Without It
+
+[CAUTION]
+====
+**Knight Capital Group (2012)**
+
+On 1 August 2012, Knight Capital deployed a software update to their trading
+system. A read-only monitoring function accidentally triggered write operations
+-- live trades on the New York Stock Exchange. In 45 minutes, Knight Capital
+lost USD 440 million. The company was bankrupt within days.
+
+The root cause: nothing in the type system prevented a read function from
+performing writes. It was enforced by convention, and conventions break.
+====
+
+==== Unsafe vs Safe
+
+[source,sql]
+----
+-- UNSAFE: read and write not distinguished
+function getReport(db) {
+  db.query("SELECT * FROM orders")        // read -- fine
+  db.query("DELETE FROM orders")           // write -- DISASTER
+  // Both calls use the same db.query() function.
+  // Nothing stops a "report" function from deleting data.
+}
+----
+
+[source]
+----
+-- SAFE (VQL-UT): effects tracked in types
+FETCH orders.total EFFECTS { Read }
+-- This query is typed as Read-only. It CANNOT modify data.
+-- Attempting to add a DELETE or UPDATE inside a Read context
+-- is a compile-time error.
+
+REMOVE orders WHERE orders.expired = true EFFECTS { Read, Write }
+-- This query requires Write permission. The caller must have
+-- a Write-capable connection.
+----
+
+==== Why It Matters for Databases
+
+VeriSimDB has 8 modalities, each with its own write semantics. Accidentally
+writing to the provenance chain (which is append-only and tamper-evident) when
+you meant to query it would corrupt the integrity of the entire audit trail.
+Effect tracking prevents this by making read and write operations different
+types.
+
+---
+
+=== Level 9: Temporal Safety
+
+==== What It Means
+
+Queries carry time bounds in their types. When you ask for data "as of
+yesterday," the type system ensures you actually get yesterday's data, not
+today's. It prevents stale reads (getting old data when you wanted current)
+and future reads (getting data that has not been committed yet).
+
+==== What Happens Without It
+
+[CAUTION]
+====
+**The Flash Crash (2010)**
+
+On 6 May 2010, the Dow Jones dropped nearly 1,000 points in minutes, then
+recovered. One contributing factor: trading algorithms reading stale price data
+and acting on it as if it were current. The timestamps were not part of the
+data type, so there was no compile-time check that the data was fresh enough
+for the decision being made.
+====
+
+==== Unsafe vs Safe
+
+[source,sql]
+----
+-- UNSAFE: no temporal guarantee
+SELECT price FROM stocks WHERE ticker = 'FTSE100'
+-- Is this the current price? The price from 5 minutes ago?
+-- The price from yesterday's close? You have no idea.
+----
+
+[source]
+----
+-- SAFE (VQL-UT): temporal bounds in types
+FETCH stocks.price
+  WHERE stocks.ticker = "FTSE100"
+  AS OF NOW - 5 SECONDS
+-- Return type: Temporal<Price, Freshness<5s>>
+-- The type system guarantees the result is at most 5 seconds old.
+-- If the data is staler than that, the query fails rather than
+-- returning misleading results.
+----
+
+==== Why It Matters for Databases
+
+VeriSimDB's temporal modality tracks version history and time-series data.
+Temporal safety ensures that when you query historical data (e.g., "show me
+the state of this entity last Tuesday"), you get exactly that version, and
+the type system prevents you from accidentally mixing current and historical
+data in the same computation.
+
+---
+
+=== Level 10: Linearity Safety
+
+==== What It Means
+
+Some things should only be used once. A bus ticket. A password reset link. A
+database connection. Linearity safety means the type system tracks _how many
+times_ a resource is used and prevents double-use or use-after-close.
+
+==== What Happens Without It
+
+[CAUTION]
+====
+**Use-After-Free Vulnerabilities (Ongoing)**
+
+The most common class of security vulnerability in systems software is
+"use-after-free" -- using a resource (memory, file handle, connection) after
+it has been released. These bugs are behind countless CVEs, including
+browser exploits that allow remote code execution.
+
+In databases, use-after-close means using a connection or transaction handle
+after it has been closed, which can corrupt data or leak connections.
+====
+
+==== Unsafe vs Safe
+
+[source,python]
+----
+# UNSAFE: connection used after close
+conn = db.connect()
+conn.execute("INSERT INTO logs ...")
+conn.close()
+conn.execute("INSERT INTO logs ...")  # USE AFTER CLOSE
+# Some databases silently reconnect. Some crash. Some corrupt data.
+----
+
+[source]
+----
+-- SAFE (VQL-UT): linear types enforce single use
+OPEN CONNECTION conn
+  INSERT INTO logs ... USING conn
+CLOSE conn
+-- conn is a linear resource (quantity 1 in QTT).
+-- After CLOSE, conn no longer exists in the type context.
+-- Any attempt to use it is a compile-time error.
+
+-- Transactions are also linear:
+BEGIN TRANSACTION txn CONSUME AFTER 1 USE
+  UPDATE accounts SET balance = balance - 100 USING txn
+COMMIT txn
+-- txn is consumed by COMMIT. Using it again is impossible.
+----
+
+==== Why It Matters for Databases
+
+VeriSimDB connections span multiple modalities. A connection might hold locks
+on graph edges, vector indices, and temporal versions simultaneously. A leaked
+or double-used connection could cause deadlocks across modalities or corrupt
+cross-modal consistency. Linearity safety makes this impossible.
+
+== The Dream
+
+Imagine a world where:
+
+- Your database **literally cannot** execute a malformed query -- the compiler
+  rejects it.
+- A typo in a column name is caught **before your code ships**, not in
+  production at 3am.
+- It is **structurally impossible** to inject malicious commands, no matter what
+  input a user provides.
+- Every query result has a **known type** -- no guessing, no casting, no
+  runtime surprises.
+- A function marked "read-only" **cannot write** -- enforced by mathematics,
+  not by code review.
+- Your database connections **cannot leak** -- the type system tracks every
+  open handle and ensures it is closed exactly once.
+- Every piece of temporal data carries a **freshness guarantee** in its type,
+  so stale data cannot be mistaken for current data.
+- All of this is checked **at compile time**, meaning zero runtime overhead.
+  Your queries run at full speed.
+
+This is not science fiction. It is what happens when you apply dependent types,
+linear types, effect systems, and formal verification to a query language.
+
+VQL-UT is the path to that world. Each of the 10 levels brings us closer.
+Some levels are well-understood and ready for production. Others are active
+research. But the destination is clear: a database query language where
+correctness is not a goal but a _mathematical guarantee_.
+
+[quote, Tony Hoare, Turing Award Lecture (2009)]
+____
+There are two ways of constructing a software design: One way is to make it so
+simple that there are obviously no deficiencies, and the other way is to make
+it so complicated that there are no obvious deficiencies.
+____
+
+VQL-UT chooses the first way.

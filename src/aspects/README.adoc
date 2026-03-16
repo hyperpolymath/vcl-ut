@@ -1,1 +1,9 @@
-= Aspects Pillar
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= VQL-UT Aspects
+
+Cross-cutting concerns for VQL-UT, organised by domain.
+
+`integrity/`:: Data integrity checks — ensures query plans are well-formed and safety level proofs are consistent.
+`observability/`:: Metrics and tracing for the query pipeline (parse times, safety level distribution, error rates).
+`security/`:: Injection detection, schema access control, and audit logging for safety level checks.

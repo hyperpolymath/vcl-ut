@@ -1,182 +1,170 @@
-// {{PROJECT}} Integration Tests
+// VQL-UT Integration Tests
 // SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 //
 // These tests verify that the Zig FFI correctly implements the Idris2 ABI
+// contract defined in Foreign.idr. They exercise the full query pipeline
+// through external function calls.
 
 const std = @import("std");
 const testing = std.testing;
 
-// Import FFI functions
-extern fn {{project}}_init() ?*opaque {};
-extern fn {{project}}_free(?*opaque {}) void;
-extern fn {{project}}_process(?*opaque {}, u32) c_int;
-extern fn {{project}}_get_string(?*opaque {}) ?[*:0]const u8;
-extern fn {{project}}_free_string(?[*:0]const u8) void;
-extern fn {{project}}_last_error() ?[*:0]const u8;
-extern fn {{project}}_version() [*:0]const u8;
-extern fn {{project}}_is_initialized(?*opaque {}) u32;
+// Import the FFI module directly for integration testing
+const ffi = @import("../src/main.zig");
 
 //==============================================================================
-// Lifecycle Tests
+// ABI Version Tests
 //==============================================================================
 
-test "create and destroy handle" {
-    const handle = {{project}}_init() orelse return error.InitFailed;
-    defer {{project}}_free(handle);
-
-    try testing.expect(handle != null);
-}
-
-test "handle is initialized" {
-    const handle = {{project}}_init() orelse return error.InitFailed;
-    defer {{project}}_free(handle);
-
-    const initialized = {{project}}_is_initialized(handle);
-    try testing.expectEqual(@as(u32, 1), initialized);
-}
-
-test "null handle is not initialized" {
-    const initialized = {{project}}_is_initialized(null);
-    try testing.expectEqual(@as(u32, 0), initialized);
+test "abi version returns valid semantic version" {
+    const ver = ffi.vqlut_abi_version();
+    const major = ver >> 16;
+    const minor = (ver >> 8) & 0xFF;
+    // Major version 0 for pre-release
+    try testing.expectEqual(@as(u32, 0), major);
+    // Minor version should be at least 1
+    try testing.expect(minor >= 1);
 }
 
 //==============================================================================
-// Operation Tests
+// Pipeline Lifecycle Tests
 //==============================================================================
 
-test "process with valid handle" {
-    const handle = {{project}}_init() orelse return error.InitFailed;
-    defer {{project}}_free(handle);
-
-    const result = {{project}}_process(handle, 42);
-    try testing.expectEqual(@as(c_int, 0), result); // 0 = ok
+test "parse creates handle and destroy frees it" {
+    const result = ffi.vqlut_parse(0, 0, 0);
+    try testing.expectEqual(@as(u32, 0), result);
+    ffi.vqlut_destroy(1);
 }
 
-test "process with null handle returns error" {
-    const result = {{project}}_process(null, 42);
-    try testing.expectEqual(@as(c_int, 4), result); // 4 = null_pointer
-}
+test "multiple concurrent handles are independent" {
+    // Allocate two contexts
+    const r1 = ffi.vqlut_parse(0, @intFromEnum(ffi.QueryMode.slipstream), 0);
+    try testing.expectEqual(@as(u32, 0), r1);
 
-//==============================================================================
-// String Tests
-//==============================================================================
+    const r2 = ffi.vqlut_parse(0, @intFromEnum(ffi.QueryMode.ultimate_type_safe), 0);
+    try testing.expectEqual(@as(u32, 0), r2);
 
-test "get string result" {
-    const handle = {{project}}_init() orelse return error.InitFailed;
-    defer {{project}}_free(handle);
+    // Handle 1 and handle 2 should have different safety levels after pipeline
+    const handle1: u64 = 1;
+    const handle2: u64 = 2;
 
-    const str = {{project}}_get_string(handle);
-    defer if (str) |s| {{project}}_free_string(s);
+    // Run handle1 through full pipeline
+    _ = ffi.vqlut_bind_schema(handle1, 0, 0);
+    _ = ffi.vqlut_check_types(handle1, 0);
+    _ = ffi.vqlut_check_effects(handle1, 0);
+    _ = ffi.vqlut_compile(handle1, 0, 0);
 
-    try testing.expect(str != null);
-}
+    // Run handle2 through full pipeline
+    _ = ffi.vqlut_bind_schema(handle2, 0, 0);
+    _ = ffi.vqlut_check_types(handle2, 0);
+    _ = ffi.vqlut_check_effects(handle2, 0);
+    _ = ffi.vqlut_compile(handle2, 0, 0);
 
-test "get string with null handle" {
-    const str = {{project}}_get_string(null);
-    try testing.expect(str == null);
+    // Slipstream tops out at injection_proof (4)
+    const level1 = ffi.vqlut_get_safety_level(handle1);
+    try testing.expectEqual(@as(u32, 4), level1);
+
+    // UltimateTypeSafe reaches linear_safe (9)
+    const level2 = ffi.vqlut_get_safety_level(handle2);
+    try testing.expectEqual(@as(u32, 9), level2);
+
+    ffi.vqlut_destroy(handle1);
+    ffi.vqlut_destroy(handle2);
 }
 
 //==============================================================================
 // Error Handling Tests
 //==============================================================================
 
-test "last error after null handle operation" {
-    _ = {{project}}_process(null, 0);
+test "null handle returns error on all pipeline stages" {
+    const bind_result = ffi.vqlut_bind_schema(0, 0, 0);
+    try testing.expectEqual(@intFromEnum(ffi.VqlUtError.internal_error), bind_result);
 
-    const err = {{project}}_last_error();
-    try testing.expect(err != null);
+    const type_result = ffi.vqlut_check_types(0, 0);
+    try testing.expectEqual(@intFromEnum(ffi.VqlUtError.internal_error), type_result);
 
-    if (err) |e| {
-        const err_str = std.mem.span(e);
-        try testing.expect(err_str.len > 0);
-    }
+    const effect_result = ffi.vqlut_check_effects(0, 0);
+    try testing.expectEqual(@intFromEnum(ffi.VqlUtError.internal_error), effect_result);
+
+    const compile_result = ffi.vqlut_compile(0, 0, 0);
+    try testing.expectEqual(@intFromEnum(ffi.VqlUtError.internal_error), compile_result);
 }
 
-test "no error after successful operation" {
-    const handle = {{project}}_init() orelse return error.InitFailed;
-    defer {{project}}_free(handle);
+test "out-of-order pipeline stages return error" {
+    // Parse first
+    _ = ffi.vqlut_parse(0, 0, 0);
+    const handle: u64 = 1;
 
-    _ = {{project}}_process(handle, 0);
+    // Try to compile without binding schema — should fail
+    const result = ffi.vqlut_compile(handle, 0, 0);
+    try testing.expectEqual(@intFromEnum(ffi.VqlUtError.internal_error), result);
 
-    // Error should be cleared after successful operation
-    // (This depends on implementation)
+    ffi.vqlut_destroy(handle);
+}
+
+test "last error is set after failure" {
+    // Use an invalid handle
+    _ = ffi.vqlut_get_safety_level(0);
+
+    const err = ffi.vqlut_last_error();
+    try testing.expect(err != 0);
 }
 
 //==============================================================================
-// Version Tests
+// Safety Level Tests
 //==============================================================================
 
-test "version string is not empty" {
-    const ver = {{project}}_version();
-    const ver_str = std.mem.span(ver);
+test "dependent types mode reaches effect_tracked level" {
+    _ = ffi.vqlut_parse(0, @intFromEnum(ffi.QueryMode.dependent_types), 0);
+    const handle: u64 = 1;
 
-    try testing.expect(ver_str.len > 0);
-}
+    _ = ffi.vqlut_bind_schema(handle, 0, 0);
+    _ = ffi.vqlut_check_types(handle, 0);
+    _ = ffi.vqlut_check_effects(handle, 0);
+    _ = ffi.vqlut_compile(handle, 0, 0);
 
-test "version string is semantic version format" {
-    const ver = {{project}}_version();
-    const ver_str = std.mem.span(ver);
+    // DependentTypes mode tops out at effect_tracked (7)
+    const level = ffi.vqlut_get_safety_level(handle);
+    try testing.expectEqual(@as(u32, 7), level);
 
-    // Should be in format X.Y.Z
-    try testing.expect(std.mem.count(u8, ver_str, ".") >= 1);
+    ffi.vqlut_destroy(handle);
 }
 
 //==============================================================================
 // Memory Safety Tests
 //==============================================================================
 
-test "multiple handles are independent" {
-    const h1 = {{project}}_init() orelse return error.InitFailed;
-    defer {{project}}_free(h1);
+test "double destroy is safe" {
+    _ = ffi.vqlut_parse(0, 0, 0);
+    const handle: u64 = 1;
 
-    const h2 = {{project}}_init() orelse return error.InitFailed;
-    defer {{project}}_free(h2);
-
-    try testing.expect(h1 != h2);
-
-    // Operations on h1 should not affect h2
-    _ = {{project}}_process(h1, 1);
-    _ = {{project}}_process(h2, 2);
+    ffi.vqlut_destroy(handle);
+    ffi.vqlut_destroy(handle); // second destroy should be no-op
 }
 
-test "double free is safe" {
-    const handle = {{project}}_init() orelse return error.InitFailed;
+test "destroy then use returns error" {
+    _ = ffi.vqlut_parse(0, 0, 0);
+    const handle: u64 = 1;
 
-    {{project}}_free(handle);
-    {{project}}_free(handle); // Should not crash
-}
+    ffi.vqlut_destroy(handle);
 
-test "free null is safe" {
-    {{project}}_free(null); // Should not crash
+    // After destroy, the handle is invalid
+    const level = ffi.vqlut_get_safety_level(handle);
+    try testing.expectEqual(@as(u32, 0xFFFFFFFF), level);
 }
 
 //==============================================================================
-// Thread Safety Tests (if applicable)
+// Struct Layout Tests
 //==============================================================================
 
-test "concurrent operations" {
-    const handle = {{project}}_init() orelse return error.InitFailed;
-    defer {{project}}_free(handle);
+test "QueryPlanHeader has correct C-ABI layout" {
+    try testing.expectEqual(@as(usize, 24), @sizeOf(ffi.QueryPlanHeader));
+    try testing.expectEqual(@as(usize, 8), @alignOf(ffi.QueryPlanHeader));
 
-    const ThreadContext = struct {
-        h: *opaque {},
-        id: u32,
-    };
-
-    const thread_fn = struct {
-        fn run(ctx: ThreadContext) void {
-            _ = {{project}}_process(ctx.h, ctx.id);
-        }
-    }.run;
-
-    var threads: [4]std.Thread = undefined;
-    for (&threads, 0..) |*thread, i| {
-        thread.* = try std.Thread.spawn(.{}, thread_fn, .{
-            ThreadContext{ .h = handle, .id = @intCast(i) },
-        });
-    }
-
-    for (threads) |thread| {
-        thread.join();
-    }
+    // Verify field offsets match Layout.idr
+    try testing.expectEqual(@as(usize, 0), @offsetOf(ffi.QueryPlanHeader, "magic"));
+    try testing.expectEqual(@as(usize, 4), @offsetOf(ffi.QueryPlanHeader, "version"));
+    try testing.expectEqual(@as(usize, 8), @offsetOf(ffi.QueryPlanHeader, "mode"));
+    try testing.expectEqual(@as(usize, 12), @offsetOf(ffi.QueryPlanHeader, "level"));
+    try testing.expectEqual(@as(usize, 16), @offsetOf(ffi.QueryPlanHeader, "plan_size"));
 }

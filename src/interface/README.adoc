@@ -1,1 +1,13 @@
-= interface Unit
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= VQL-UT Interface Layer
+
+The interface layer defines the ABI (Application Binary Interface) and FFI
+(Foreign Function Interface) for VQL-UT, following the hyperpolymath
+Idris2-ABI / Zig-FFI standard.
+
+== Subdirectories
+
+`abi/`:: Idris2 ABI definitions with formal proofs of correctness (Types, Layout, Foreign).
+`ffi/`:: Zig implementation of the C-compatible FFI matching the Idris2 ABI contract.
+`generated/`:: Auto-generated C headers bridging the ABI and FFI layers.

@@ -1,1 +1,7 @@
-= Definitions Unit
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= VQL-UT Definitions
+
+Core type definitions and domain vocabulary shared across all VQL-UT modules.
+Includes the canonical names for the 10 safety levels, error code taxonomy,
+and query mode semantics.

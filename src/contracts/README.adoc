@@ -1,1 +1,7 @@
-= Contracts Unit
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= VQL-UT Contracts
+
+Interface contracts and protocol definitions for VQL-UT consumers. Specifies
+the expected calling conventions for the query pipeline, handle ownership rules,
+and safety level guarantees that callers can rely upon.

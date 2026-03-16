@@ -1,26 +1,433 @@
-= Contributing to {project-name}
-:toc: preamble
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= Contributing to VQL-UT
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+:date: 2026-03-16
+:toc: macro
+:toclevels: 3
 :icons: font
+:description: How to contribute to VQL-UT — the verified query language with 10 safety levels
 
-This document explains how to contribute to the project. We follow a "Dual-Track" architecture where human-readable documentation lives in the root and machine-readable policies live in `.machine_readable/`.
+toc::[]
 
-== How to Contribute
+== Welcome
 
-We welcome contributions in many forms:
-* **Code:** Improving the core verified stack or extensions.
-* **Documentation:** Enhancing AsciiDoc manuals or AI manifests.
-* **Testing:** Adding property-based tests or formal proofs.
+VQL-UT is a dependently-typed query language compiler that produces
+machine-checkable proofs of query safety. Contributions are welcome across all
+layers: the Idris2 type kernel, the Zig FFI bridge, the ReScript parser, and
+the documentation.
 
-== Getting Started
+This guide covers the development setup, code standards, testing requirements,
+and the process for submitting changes.
 
-1. **Read the AI Manifest:** Start with `0-AI-MANIFEST.a2ml` to understand the repository structure.
-2. **Environment:** Use `nix develop` or `direnv allow` to set up your tools (Idris2, Zig, Rust).
-3. **Task Runner:** Use `just` to see available commands (`just --list`).
+== Development Setup
 
-== Contribution Policies
+=== Required Tools
 
-For detailed rules on branch naming, commit messages, and the PR process, please refer to the machine-readable manual at link:.github/CONTRIBUTING.md[CONTRIBUTING.adoc].
+[cols="1,1,2"]
+|===
+|Tool |Version |Install
 
-== Code of Conduct
+|Idris2
+|>= 0.8.0
+|`asdf install idris2 0.8.0`
 
-All contributors are expected to adhere to our ethical standards. See link:.github/CODE_OF_CONDUCT.md[CODE_OF_CONDUCT.adoc] for details.
+|Zig
+|>= 0.15.2
+|`asdf install zig 0.15.2`
+
+|Deno
+|>= 2.x
+|`asdf install deno latest`
+
+|just
+|>= 1.x
+|`cargo install just` or via system package manager
+
+|panic-attack
+|latest
+|Pre-commit security scanner (hyperpolymath tool)
+|===
+
+=== First-Time Setup
+
+[source,bash]
+----
+# Clone the monorepo
+cd ~/Documents/hyperpolymath-repos
+git clone https://github.com/hyperpolymath/nextgen-databases.git
+cd nextgen-databases/vql-ut
+
+# Verify all tools are available
+just doctor
+
+# Type-check the Idris2 kernel
+just check
+
+# Run Zig FFI tests
+just test-zig
+
+# Run the full test suite
+just test
+----
+
+=== Editor Setup
+
+For Idris2 development, install the Idris2 LSP:
+
+[source,bash]
+----
+# The LSP provides type-on-hover, go-to-definition, and hole-driven development
+idris2 --install-contrib
+----
+
+For ReScript, use the ReScript VSCode extension or Vim plugin with the
+`rescript.json` configuration in the repo root.
+
+== Code Standards
+
+=== Idris2 (`src/abi/`)
+
+Every Idris2 module in VQL-UT follows these invariants:
+
+==== Totality
+
+[source,idris]
+----
+%default total
+----
+
+All functions must be total. Partial functions are rejected. This is
+non-negotiable — totality is what makes our proofs meaningful.
+
+==== No Escape Hatches
+
+The following patterns are **banned** in all Idris2 code:
+
+[cols="1,3"]
+|===
+|Banned Pattern |Why
+
+|`believe_me`
+|Asserts any type equality without proof. Renders the type system unsound.
+
+|`assert_total`
+|Claims totality without proof. Hides potential non-termination.
+
+|`assert_smaller`
+|Claims a value is structurally smaller without proof. Hides recursion bugs.
+
+|`unsafePerformIO`
+|Breaks referential transparency. Effects must be tracked via L5.
+
+|`Obj.magic` (if any FFI)
+|Unsafe cast. Type-level evidence must be provided instead.
+|===
+
+The `just audit` recipe checks for these patterns and will fail the build if
+any are found.
+
+==== Documentation
+
+Every public function and data type must have:
+
+1. A `|||` doc comment explaining its purpose.
+2. Inline comments for non-obvious implementation choices.
+3. An explanation of which safety level it belongs to.
+
+Example:
+
+[source,idris]
+----
+||| Execute a safe query with bound parameters. The type system guarantees:
+||| 1. The query structure is a valid AST (not a string).
+||| 2. Every parameter slot is filled with a value of the correct type.
+||| 3. No user-supplied data can appear in structural positions.
+|||
+||| Safety level: L1 (Construction Safety)
+public export
+executeSafe : SafeQuery schema -> BoundParams schema -> Core.QueryResult
+----
+
+==== Module Structure
+
+Each safety level module follows this pattern:
+
+[source,idris]
+----
+-- SPDX-License-Identifier: PMPL-1.0-or-later
+-- Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+--
+-- ModuleName.idr — One-line description
+--
+-- Multi-line explanation of what this module does, what safety level
+-- it implements, and what class of bugs it prevents.
+
+module ModuleName
+
+import Core
+
+%default total
+
+-- ============================================================================
+-- Section: Core Types
+-- ============================================================================
+
+-- ... type definitions ...
+
+-- ============================================================================
+-- Section: Operations
+-- ============================================================================
+
+-- ... functions ...
+
+-- ============================================================================
+-- Section: Safety Proofs
+-- ============================================================================
+
+-- ... proofs ...
+
+-- ============================================================================
+-- Section: Examples
+-- ============================================================================
+
+-- ... example usage ...
+----
+
+=== Zig (`ffi/zig/`)
+
+==== C-ABI Exports
+
+All Zig functions that cross the FFI boundary must:
+
+1. Be declared `export` with C calling convention.
+2. Use only C-compatible types (no Zig slices, optionals, or error unions in
+   the signature).
+3. Have a corresponding declaration in the generated C header (`generated/abi/*.h`).
+4. Include error codes rather than Zig error unions.
+
+Example:
+
+[source,zig]
+----
+/// Check a VQL-UT query against all 10 safety levels.
+///
+/// Returns 0 on success, or a negative error code:
+///   -1: parse error
+///   -2: schema mismatch
+///   -3: type error at level N (check `out_failed_level`)
+export fn vqlut_check(
+    query_ptr: [*]const u8,
+    query_len: usize,
+    schema_version: u32,
+    out_failed_level: *i32,
+) callconv(.c) i32 {
+    // ...
+}
+----
+
+==== Build Configuration
+
+Zig 0.15.2 removed `addStaticLibrary`. Use `addModule` + `addTest(.root_module)`
+instead. See `ffi/zig/build.zig` for the current pattern.
+
+=== ReScript (`src/parser/`)
+
+==== Extending the VQL Grammar
+
+VQL-UT extends VQL v3.0 with optional clauses appended after the standard
+query. When adding new syntax:
+
+1. Add tokens to the lexer in `TQLParser.res`.
+2. Add AST nodes to `TQLAst.res`.
+3. Ensure no keyword conflicts with VQL's 60+ reserved keywords.
+4. Update `docs/vql-dtpp-grammar.ebnf` with the delta grammar.
+5. Add example `.vqlut` files demonstrating the new syntax.
+
+==== No TypeScript
+
+VQL-UT uses ReScript exclusively. TypeScript is banned per hyperpolymath policy.
+If you need JavaScript interop, use ReScript's `@module` bindings.
+
+== How to Add a New Safety Level Check
+
+Adding a new safety level (e.g., L11) requires changes across the full stack:
+
+=== Step 1: Define the Idris2 Module
+
+Create `src/abi/NewLevel.idr`:
+
+[source,idris]
+----
+-- SPDX-License-Identifier: PMPL-1.0-or-later
+-- Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+--
+-- NewLevel.idr — Description of what this level prevents
+
+module NewLevel
+
+import Core
+
+%default total
+
+-- Define the core types that enforce the property
+-- Define operations that use/consume/produce these types
+-- Prove that the property holds (soundness)
+-- Provide examples
+----
+
+=== Step 2: Integrate with the Checker
+
+Update `src/abi/Checker.idr` to include the new level in the
+`ExtensionAnnotations` record and the `validate` function.
+
+=== Step 3: Extend the Grammar (if needed)
+
+If the new level requires new VQL-UT syntax:
+
+1. Update `docs/vql-dtpp-grammar.ebnf`.
+2. Add AST nodes to `src/parser/TQLAst.res`.
+3. Add parsing logic to `src/parser/TQLParser.res`.
+
+=== Step 4: Add Zig FFI Exports
+
+Expose the new level's validation function via the Zig FFI bridge.
+
+=== Step 5: Add Tests
+
+- Idris2: add a test module in `test/` that exercises the new level.
+- Zig: add integration tests in `ffi/zig/test/`.
+- Examples: add `.vqlut` files demonstrating the new level.
+
+=== Step 6: Update Documentation
+
+- Update `docs/architecture/ARCHITECTURE.adoc` (add the level to the table).
+- Update `docs/architecture/TOPOLOGY.adoc` (if the level affects topology).
+- Add an ADR to `docs/architecture/DECISIONS.adoc` explaining why the level
+  exists.
+- Update `docs/QUICKSTART.adoc` with new output format.
+
+== Testing Requirements
+
+=== What Must Pass Before a PR
+
+[cols="1,3"]
+|===
+|Check |Command
+
+|Idris2 type-check
+|`just check` — all modules compile with `%default total`
+
+|Zig FFI tests
+|`just test-zig` — all FFI tests pass
+
+|Banned pattern scan
+|`just audit` — zero `believe_me`, `assert_total`, `assert_smaller`
+
+|Pre-commit security scan
+|`panic-attack assail` — no secrets, no banned patterns
+
+|ReScript build (if parser changed)
+|`just build-parser` — parser compiles without errors
+|===
+
+=== Writing Tests
+
+==== Idris2 Tests
+
+Idris2 tests are additional modules that import the module under test and
+construct values that exercise the type-level properties:
+
+[source,idris]
+----
+-- If this module type-checks, the test passes.
+-- The type checker IS the test runner.
+
+module TestLinear
+
+import Linear
+import Core
+
+%default total
+
+-- This compiles: using a connection exactly once
+testSingleUse : LinConn 1 -> (QueryResult, LinConn 0)
+testSingleUse conn = useConn conn
+
+-- This would NOT compile (uncommenting would be a type error):
+-- testDoubleUse : LinConn 1 -> ((QueryResult, QueryResult), LinConn 0)
+-- testDoubleUse conn = let (r1, conn') = useConn conn
+--                          (r2, conn'') = useConn conn'  -- ERROR: LinConn 0 has no useConn
+--                      in ((r1, r2), conn'')
+----
+
+==== Zig Tests
+
+Zig tests use the built-in test framework:
+
+[source,zig]
+----
+test "check returns pass for valid query" {
+    var failed_level: i32 = 0;
+    const result = vqlut_check(query.ptr, query.len, 3, &failed_level);
+    try std.testing.expectEqual(@as(i32, 0), result);
+}
+----
+
+== Pull Request Process
+
+=== Branch Naming
+
+[source]
+----
+feat/l11-new-safety-level      — New safety level
+fix/l5-subsumption-direction   — Bug fix in a specific level
+docs/architecture-update       — Documentation only
+refactor/checker-simplify      — Internal refactoring
+----
+
+=== PR Checklist
+
+Before submitting:
+
+- [ ] `just check` passes (Idris2 type-check)
+- [ ] `just test-zig` passes (Zig FFI tests)
+- [ ] `just audit` passes (no banned patterns)
+- [ ] `panic-attack assail` passes (pre-commit scan)
+- [ ] New Idris2 modules have `%default total`
+- [ ] New public functions have `|||` doc comments
+- [ ] SPDX header present on all new files
+- [ ] Architecture docs updated (if applicable)
+- [ ] Examples added (if new syntax)
+
+=== Review Process
+
+1. All PRs require at least one review.
+2. PRs that modify Idris2 proofs require review by someone familiar with
+   dependent types.
+3. PRs that modify the grammar require corresponding parser updates.
+4. PRs that add new safety levels require an ADR in `docs/architecture/DECISIONS.adoc`.
+
+== Licence
+
+All contributions to VQL-UT are licensed under **PMPL-1.0-or-later** (Palimpsest
+Licence). By submitting a pull request, you agree that your contribution is
+licensed under the same terms.
+
+Third-party code retains its original licence. Do not relicense dependencies.
+
+Every file must have the SPDX header:
+
+[source]
+----
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+----
+
+For Idris2 files, use `--` comment style:
+
+[source]
+----
+-- SPDX-License-Identifier: PMPL-1.0-or-later
+-- Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+----

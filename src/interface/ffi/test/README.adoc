@@ -1,1 +1,8 @@
-= Test Logic
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= VQL-UT FFI Integration Tests
+
+`integration_test.zig` exercises the full query pipeline through the exported C
+functions, verifying ABI version, lifecycle, error handling, safety level
+progression across all three query modes, memory safety (double-free, use-after-free),
+and QueryPlanHeader struct layout against the Idris2 Layout.idr definitions.

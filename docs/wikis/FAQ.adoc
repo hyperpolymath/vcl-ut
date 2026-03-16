@@ -1,0 +1,318 @@
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+= Frequently Asked Questions
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+:toc: preamble
+:icons: font
+
+Honest answers to the questions people actually ask about VQL-UT.
+
+== "Is this just academic wankery?"
+
+No. The bugs that type safety prevents are not theoretical. They are the bugs
+behind real disasters:
+
+[cols="1,1,1"]
+|===
+| Incident | Cost | What Type Safety Would Have Prevented
+
+| Equifax breach (2017)
+| USD 700 million + 147 million people exposed
+| Injection-proof safety (level 5)
+
+| Knight Capital (2012)
+| USD 440 million in 45 minutes
+| Effect-tracking safety (level 8)
+
+| Therac-25 (1985-87)
+| 3 deaths, 3 severe injuries
+| Type-compatible operations (level 3)
+
+| Mars Climate Orbiter (1999)
+| USD 327 million
+| Result-type safety (level 6)
+
+| NHS COVID data loss (2020)
+| 15,841 cases unreported
+| Null safety (level 4)
+|===
+
+Every one of these incidents would have been caught at compile time by the
+relevant type safety level. These are not edge cases. They are the _common_
+failure modes of software that lacks type safety.
+
+The academic research exists to solve real problems. VQL-UT applies it to
+databases, where the stakes are highest.
+
+== "Why not just use SQL?"
+
+You can. VQL-UT is not a replacement for SQL in general. It is a query language
+for VeriSimDB specifically, designed for situations where correctness matters
+more than familiarity.
+
+That said, SQL has well-known problems:
+
+- **No compile-time checking.** SQL queries are strings. Typos, missing columns,
+  and type mismatches are discovered at runtime.
+- **Null is everywhere.** SQL's null semantics are notoriously confusing.
+  `NULL = NULL` is not `TRUE`. `NULL + 1` is `NULL`. `WHERE x NOT IN (1, NULL)`
+  returns zero rows regardless of the data.
+- **Injection is the default.** String concatenation is the path of least
+  resistance in most SQL client libraries. Parameterised queries exist but are
+  opt-in, not enforced.
+- **No effect tracking.** Nothing in SQL distinguishes a SELECT from a DELETE
+  at the type level. Both are just strings.
+
+VQL-UT addresses all of these. But if you are happy with SQL and your
+application does not need formal guarantees, SQL is fine.
+
+== "Do I need to understand all 10 levels to use VQL?"
+
+No. VQL-UT is designed around **progressive disclosure**:
+
+- **Levels 1-3** are invisible. The parser, schema binder, and type checker run
+  automatically. You just write queries and get error messages if something is
+  wrong. No special syntax needed.
+
+- **Levels 4-6** add annotations when you want them. You can opt into explicit
+  null handling, typed parameters, and result-type declarations. But the
+  defaults are safe -- the system infers what it can.
+
+- **Levels 7-10** use explicit syntax (`FETCH UNIQUE`, `EFFECTS { Read }`,
+  `AS OF`, `CONSUME AFTER`). You only use these when you need their guarantees.
+  Most everyday queries do not.
+
+Think of it like a car. Everyone uses the engine (levels 1-3). Most people use
+the seatbelt (levels 4-6). Rally drivers use the roll cage (levels 7-10). The
+roll cage does not make the car harder to drive for everyone else.
+
+== "How does this compare to TypeScript for SQL?"
+
+TypeScript-based SQL tools (Prisma, Drizzle, Kysely) provide some of levels
+1-6. They check query syntax, validate schema references, and infer result
+types. This is valuable and much better than raw strings.
+
+But they stop there. VQL-UT goes further in three ways:
+
+[cols="1,1,1"]
+|===
+| Feature | TypeScript SQL Tools | VQL-UT
+
+| Parse safety (L1)
+| Yes
+| Yes
+
+| Schema binding (L2)
+| Yes (via codegen)
+| Yes (via dependent types)
+
+| Type-compatible ops (L3)
+| Partial
+| Yes (with proofs)
+
+| Null safety (L4)
+| Partial (TypeScript has `strictNullChecks`)
+| Full (tracked through joins, subqueries)
+
+| Injection proof (L5)
+| Mostly (parameterised by default)
+| By construction (impossible, not just default)
+
+| Result types (L6)
+| Yes (via codegen)
+| Yes (via dependent types)
+
+| Cardinality (L7)
+| No
+| Yes
+
+| Effect tracking (L8)
+| No
+| Yes
+
+| Temporal safety (L9)
+| No
+| Yes
+
+| Linearity (L10)
+| No
+| Yes
+
+| Formal proofs
+| No
+| Yes (Idris2, all functions total)
+
+| Multi-modal (octad)
+| No (single database)
+| Yes (8 modalities)
+|===
+
+TypeScript SQL tools are a good step forward. VQL-UT is the destination.
+
+== "Can I use VQL-UT today?"
+
+Not yet. VQL-UT is in **pre-alpha**. The ABI/FFI skeleton exists, the 10 levels
+are documented, and the architecture is designed, but the compiler has not been
+built yet.
+
+Here is the roadmap:
+
+[cols="1,2,1"]
+|===
+| Milestone | What Ships | Status
+
+| v0.1.0
+| Levels 1-3 (parser, schema binder, type checker)
+| Not started
+
+| v0.2.0
+| Levels 4-6 (null safety, injection proof, result types)
+| Not started
+
+| v0.3.0
+| Levels 7-10 (cardinality, effects, temporal, linearity)
+| Not started
+
+| v0.4.0
+| VQL-DT supersession (all VQL-DT features expressible in VQL-UT)
+| Not started
+
+| v1.0.0
+| Production release (benchmarks, client SDKs, documentation)
+| Not started
+|===
+
+=== Dependencies
+
+VQL-UT depends on:
+
+- **TypeLL** stabilising for levels 7-10 (the core type theory)
+- **VeriSimDB** supporting VQL-UT as a third query path alongside Slipstream
+  and VQL-DT
+- **ReScript evangeliser** proving the type-safety concept in the ReScript
+  community first
+
+If you want to follow progress, watch the repository. If you want to
+contribute, see CONTRIBUTING.adoc.
+
+== "Why Idris2 and not Haskell/Lean/Coq?"
+
+This is a fair question. All four are serious languages for formal reasoning.
+Here is why Idris2 wins for VQL-UT's specific needs:
+
+[cols="1,1,1,1,1"]
+|===
+| Feature | Idris2 | Haskell | Lean 4 | Coq
+
+| Dependent types
+| Native
+| Partial (via extensions)
+| Native
+| Native
+
+| QTT (resource tracking)
+| Native
+| No
+| No
+| No
+
+| Erasure (zero runtime cost)
+| Excellent
+| Good
+| Good
+| N/A (proof assistant)
+
+| Totality checking
+| Built-in (`%default total`)
+| Partial
+| Built-in
+| Built-in
+
+| General-purpose language
+| Yes
+| Yes
+| Yes
+| No (proof assistant)
+
+| FFI to C/Zig
+| Yes
+| Yes
+| Yes (via C)
+| No
+|===
+
+The decisive factor is **QTT** (Quantitative Type Theory). QTT lets Idris2
+track _how many times_ a value is used -- zero, one, or unlimited. This is
+exactly what level 10 (linearity safety) needs: database connections that must
+be used exactly once, transaction handles that are consumed by commit.
+
+Haskell can approximate linear types (via the `Linear Haskell` extension), but
+it is an afterthought, not the core design. Lean 4 has no native linearity.
+Coq is a proof assistant, not a programming language -- it cannot compile to
+native code.
+
+Idris2 gives us dependent types, QTT, erasure, totality, and FFI in one
+coherent package. No other language does.
+
+== "What is the performance overhead?"
+
+**At runtime: zero.** All 10 levels of type checking happen at **compile time**.
+By the time a query reaches VeriSimDB's execution engine, it has already been
+verified. The compiled query plan is identical to what an unverified query
+would produce.
+
+The overhead exists at **compile time**: the Idris2 type checker must verify
+proofs, check effects, track linearity, and validate temporal bounds. For
+complex queries with many proof obligations, this could take seconds rather
+than milliseconds.
+
+But compile time is developer time, not user time. Your users never pay the
+cost. They get the same speed as unverified VQL (Slipstream), with
+mathematically proven correctness guarantees.
+
+This is the power of **erasure**: Idris2 is specifically designed to erase
+type-level information that has no runtime relevance. Proofs, linearity
+annotations, effect labels, and cardinality constraints all vanish in the
+compiled output. They exist only to convince the compiler that your query is
+correct.
+
+== "Is VQL-UT only for VeriSimDB?"
+
+Yes. VQL-UT is specifically designed for VeriSimDB's multi-modal octad
+architecture. The 8 modalities, drift detection, and cross-modal consistency
+are all reflected in VQL-UT's type system.
+
+However, the **10 levels of type safety** are universal. They originate in
+TypeLL (the core type theory) and apply to any domain. VQL-UT applies them to
+database queries. PanLL applies them to UI panels. AffineScript applies them to
+general-purpose programming. The levels are the same; the application differs.
+
+If you wanted to build a type-safe query language for a different database, you
+could use the same 10 levels as a design guide, adapting the specifics (octad
+modalities, drift semantics) to your database's architecture.
+
+== "What does 'formally verified' actually mean?"
+
+It means **proven correct by mathematics, not just tested**.
+
+Testing checks that your code works for the specific inputs you thought to
+test. If you test 1,000 cases and they all pass, you know it works for those
+1,000 cases. You know nothing about case 1,001.
+
+Formal verification proves that your code works for _every possible input_. It
+is a mathematical proof, checked by a computer, that the code does what it
+claims to do. Not "probably correct." Not "correct in all the cases we tried."
+Correct. Full stop.
+
+In VQL-UT, formal verification means:
+
+- The parser is **proven to accept all valid queries and reject all invalid
+  ones** (level 1)
+- The type checker is **proven to terminate** on every input (totality)
+- The injection-proof guarantee is **proven impossible to circumvent** (level 5)
+- The effect system is **proven sound** -- if a function is marked Read-only,
+  there is a mathematical proof that it cannot write (level 8)
+
+This is not testing with extra steps. It is a fundamentally different approach
+to correctness.

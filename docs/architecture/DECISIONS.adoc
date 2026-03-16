@@ -1,0 +1,485 @@
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= VQL-UT Architecture Decision Records
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+:date: 2026-03-16
+:toc: macro
+:toclevels: 3
+:icons: font
+:description: Architecture Decision Records for VQL-UT design choices
+
+toc::[]
+
+== ADR Index
+
+[cols="1,3,1,1"]
+|===
+|ADR |Title |Status |Date
+
+|ADR-0001
+|Use AsciiDoc for all documentation
+|Accepted
+|2026-03-01
+
+|ADR-0002
+|Use Idris2 over Lean for the type kernel
+|Accepted
+|2026-03-01
+
+|ADR-0003
+|10 safety levels, not fewer
+|Accepted
+|2026-03-16
+
+|ADR-0004
+|VQL-UT supersedes VQL-DT
+|Accepted
+|2026-03-16
+
+|ADR-0005
+|ReScript for the parser
+|Accepted
+|2026-03-01
+|===
+
+---
+
+== ADR-0002: Use Idris2 over Lean for the Type Kernel
+
+=== Status
+
+Accepted (2026-03-01)
+
+=== Context
+
+VQL-UT requires a dependently-typed language for its type kernel — the
+component that formally specifies and checks the 10 safety levels. The two
+serious candidates were **Idris2** and **Lean 4**.
+
+Both are mature dependently-typed languages with:
+
+- Full dependent types (Pi, Sigma, indexed families)
+- Totality checking
+- Compiled backends (not just interpreted)
+- Active development and community
+
+The choice affects every safety level module and the project's long-term
+maintainability.
+
+=== Decision
+
+Use **Idris2** for the type kernel.
+
+=== Rationale
+
+==== 1. Quantitative Type Theory (QTT) is Native
+
+Idris2 is built on QTT. Every variable binding carries a quantity:
+
+- `0` — erased at compile time (type-level only)
+- `1` — used exactly once (linear)
+- `omega` — used any number of times (unrestricted)
+
+This means VQL-UT's L3 (Resource Linearity) and L8 (Quantitative Bounds) are
+*first-class features of the language*, not encodings. A linear connection is
+simply:
+
+[source,idris]
+----
+useConn : (1 conn : Connection) -> IO Result
+----
+
+The Idris2 compiler enforces linearity. No custom checker needed.
+
+In Lean 4, linearity must be encoded manually — typically via monadic wrappers
+or custom elaboration. This encoding is heavier, more fragile, and harder to
+audit.
+
+==== 2. Erasure Annotations
+
+Idris2's quantity `0` means "erased at runtime". This is critical for VQL-UT's
+proof certificates: the proofs exist at the type level but are erased from the
+compiled output. The compiled query plan carries no proof overhead.
+
+Lean 4 has `@[reducible]` and `noncomputable`, but the erasure story is less
+precise and less integrated with the type system.
+
+==== 3. Totality Checking Built In
+
+Idris2's `%default total` directive makes totality the default, with explicit
+opt-out via `%default covering` or `partial`. This matches VQL-UT's invariant
+that all functions must be total.
+
+Lean 4 also has totality checking, but it is less strict by default and requires
+more manual annotation.
+
+==== 4. Hyperpolymath Ecosystem Alignment
+
+Idris2 is the standard formal verification language across the hyperpolymath
+ecosystem (proven-servers, TypeLL, ABI definitions). Using Lean would introduce
+a second formal language, complicating tooling, CI, and developer onboarding.
+
+==== 5. Practical Concern: Build Speed
+
+Idris2 compiles faster than Lean 4 for the size of modules in VQL-UT (typically
+100–300 lines). The type-check-edit cycle is noticeably faster.
+
+=== Alternatives Considered
+
+[cols="1,3"]
+|===
+|Alternative |Why Rejected
+
+|**Lean 4**
+|No native QTT. Linearity requires encoding. Different ecosystem from
+hyperpolymath. Heavier toolchain.
+
+|**Agda**
+|Excellent type theory but no practical compilation backend. Research tool,
+not production tool.
+
+|**Coq/Rocq**
+|Tactics-based proof style is powerful but harder to read. Extraction to
+OCaml adds a translation layer. Licence (LGPL) less compatible.
+
+|**F***
+|Strong on effects but less expressive dependent types. Tied to the .NET
+ecosystem.
+
+|**ATS2**
+|Rejected per hyperpolymath policy. Idris2 is the designated formal
+verification language.
+|===
+
+=== Consequences
+
+- All 10 safety levels are implemented as Idris2 modules.
+- L3 and L8 use native QTT quantities, making them simpler and more trustworthy
+  than they would be in any other language.
+- Developers contributing to the type kernel must learn Idris2.
+- Proofs are erased from compiled output, so runtime performance is unaffected.
+
+---
+
+== ADR-0003: 10 Safety Levels, Not Fewer
+
+=== Status
+
+Accepted (2026-03-16)
+
+=== Context
+
+The original VQL-dt system had 6 PROOF types. During the design of VQL-UT, the
+question arose: why not consolidate into fewer, broader levels? Fewer levels
+would be simpler to explain and implement.
+
+=== Decision
+
+VQL-UT has exactly **10 safety levels**, each targeting a distinct class of bug.
+
+=== Rationale
+
+==== Each Level Catches a Distinct Class of Bug
+
+The 10 levels are not arbitrary subdivisions — each one prevents a specific,
+well-documented category of failure:
+
+[cols="1,2,3"]
+|===
+|Level |Class of Bug |Real-World Example
+
+|L1
+|Injection attacks
+|SQL injection via string concatenation (OWASP Top 10 #1)
+
+|L2
+|Schema drift
+|Query references column dropped in migration (silent runtime failure)
+
+|L3
+|Resource leaks
+|Database connection not closed (pool exhaustion, OOM)
+
+|L4
+|Protocol violations
+|Query executed after transaction committed (stale data)
+
+|L5
+|Undeclared effects
+|Read-only API endpoint that silently writes to the database
+
+|L6
+|Scope escapes
+|Data from rolled-back transaction used in committed context
+
+|L7
+|Classification leaks
+|Confidential data appearing in public API response
+
+|L8
+|Resource overuse
+|API key used beyond its rate limit (account suspension)
+
+|L9
+|Unverified claims
+|"Data is fresh" claim without a freshness proof
+
+|L10
+|Composition bugs
+|Two safety levels interact to create a loophole
+|===
+
+Merging any two of these would lose the ability to independently control and
+report on each class. For example, merging L3 (linearity) and L8 (quantitative)
+would conflate "exactly once" with "at most N" — these are related but
+distinct properties.
+
+==== Graduated Adoption
+
+10 levels enable graduated adoption. A team can start at L1 (injection safety)
+and progressively enable higher levels as confidence grows. With fewer levels,
+the jumps would be larger and harder to adopt incrementally.
+
+==== 1:1 Mapping to TypeLL
+
+TypeLL defines exactly 10 type theory levels. The 1:1 mapping between TypeLL
+and VQL-UT means VQL-UT serves as both a useful tool and a concrete validation
+of TypeLL's design. Changing the number of levels would break this alignment.
+
+==== Independent Modules
+
+Each level is implemented as an independent Idris2 module. This means:
+
+- Levels can be developed, tested, and reviewed independently.
+- A bug in one level's implementation does not affect other levels.
+- New levels can be added without modifying existing modules.
+
+=== Alternatives Considered
+
+[cols="1,3"]
+|===
+|Alternative |Why Rejected
+
+|**6 levels** (matching VQL-dt's 6 PROOF types)
+|Misses injection safety (L1), schema pinning (L2), information flow (L7),
+and quantitative bounds (L8). These are critical for production safety.
+
+|**3 levels** (parse safety, type safety, proof safety)
+|Too coarse. "Type safety" would be a grab-bag of linearity, effects, sessions,
+modality, and information flow. Loses granular control and reporting.
+
+|**Unlimited levels** (extensible without bound)
+|The 10-level structure provides a clear mental model. Extensibility is
+supported (new levels can be added), but the core 10 are fixed.
+|===
+
+=== Consequences
+
+- VQL-UT always reports 10 levels in its safety dashboard and proof certificates.
+- Each level has its own error type, Idris2 module, and documentation section.
+- TypeLL and VQL-UT remain in 1:1 correspondence.
+- The `safety_level` API parameter accepts values 1–10 for graduated checking.
+
+---
+
+== ADR-0004: VQL-UT Supersedes VQL-DT
+
+=== Status
+
+Accepted (2026-03-16)
+
+=== Context
+
+VeriSimDB currently has two query type systems:
+
+- **VQL-DT** (Dependently Typed): covers 6 PROOF types (Pi, Sigma, dependent
+  pattern matching, basic type checking, universe polymorphism, implicit
+  arguments). ~35% wired into VeriSimDB.
+
+- **VQL-UT** (Unified Types): covers 10 safety levels with full formal
+  verification. Successor to VQL-dt++ (typeql-experimental).
+
+The question: should VQL-UT replace VQL-DT, or coexist alongside it?
+
+=== Decision
+
+VQL-UT **supersedes** VQL-DT. VQL-DT remains available as a legacy path but
+receives no further development.
+
+=== Rationale
+
+==== VQL-UT is a Strict Superset
+
+Every safety property that VQL-DT checks is also checked by VQL-UT:
+
+[cols="2,1,1"]
+|===
+|VQL-DT Feature |VQL-UT Coverage |Level
+
+|Pi types (function types)
+|Covered
+|L1 (Construction Safety — typed parameter schemas)
+
+|Sigma types (dependent pairs)
+|Covered
+|L9 (Proof Attachment — ProvedResult is a sigma pair)
+
+|Dependent pattern matching
+|Covered
+|All levels (native Idris2 feature)
+
+|Basic type checking
+|Covered
+|L1–L2 (construction + schema)
+
+|Universe polymorphism
+|Covered
+|Core.idr foundation types
+
+|Implicit arguments
+|Covered
+|All levels (native Idris2 feature)
+|===
+
+VQL-UT additionally covers linearity (L3), sessions (L4), effects (L5),
+modality (L6), information flow (L7), quantitative bounds (L8), and
+compositional invariants (L10) — none of which VQL-DT addresses.
+
+==== Single Codebase Reduces Maintenance
+
+Maintaining two type systems creates confusion about which one to use,
+duplicates testing effort, and risks divergent semantics. A single type system
+(VQL-UT) with configurable safety levels (`--level 1` through `--level 10`)
+provides the same flexibility without duplication.
+
+==== Graduated Migration Path
+
+VQL-DT's existing ~35% wiring in VeriSimDB is not wasted. VQL-UT's L1 and L2
+levels approximately correspond to VQL-DT's type checking. Teams currently
+using VQL-DT can migrate to VQL-UT at level 2 with minimal disruption, then
+increase levels over time.
+
+=== Alternatives Considered
+
+[cols="1,3"]
+|===
+|Alternative |Why Rejected
+
+|**Keep both active**
+|Doubles maintenance, creates confusion about which to use, risks semantic
+divergence.
+
+|**Merge VQL-DT into VQL-UT**
+|VQL-DT's implementation is too different (no Idris2, no formal proofs). A
+clean reimplementation in VQL-UT's framework is more reliable than a merge.
+
+|**Deprecate without replacement**
+|Removes safety guarantees. Unacceptable.
+|===
+
+=== Consequences
+
+- VQL-DT enters maintenance mode (security fixes only, no new features).
+- The Slipstream (untyped) and VQL-UT paths are the two active query paths.
+- VeriSimDB documentation points to VQL-UT for all new safety-critical work.
+- The `typeql-experimental` directory in `nextgen-databases` is the historical
+  prototype; `vql-ut` is the production successor.
+
+---
+
+== ADR-0005: ReScript for the Parser
+
+=== Status
+
+Accepted (2026-03-01)
+
+=== Context
+
+VQL-UT needs a parser for its surface syntax. The parser must:
+
+1. Extend the existing VQL v3.0 grammar with 6 new optional clauses.
+2. Run both server-side (API gateway) and client-side (PanLL query editor panel).
+3. Be maintainable by the existing team.
+4. Produce an AST that can be consumed by the Idris2 type kernel.
+
+=== Decision
+
+Use **ReScript** for the VQL-UT parser.
+
+=== Rationale
+
+==== 1. Extends Existing VQL Parser
+
+VeriSimDB's existing VQL parser is written in ReScript. VQL-UT's parser extends
+this parser with new clauses rather than reimplementing from scratch. This
+ensures consistency between VQL and VQL-UT surface syntax and reduces the
+risk of subtle parsing differences.
+
+==== 2. Runs Everywhere
+
+ReScript compiles to JavaScript, which runs:
+
+- Server-side via Deno (API gateway and build tooling)
+- Client-side in the browser (PanLL query editor panel)
+- In Elixir via embedded V8 (for hot-path parsing in the orchestration layer)
+
+This universality means one parser implementation serves all deployment targets.
+
+==== 3. Team Expertise
+
+The hyperpolymath team has deep ReScript expertise (the maintainer is on the
+ReScript core team). This reduces ramp-up time and ensures idiomatic code.
+
+==== 4. Type-Safe Without TypeScript
+
+ReScript provides OCaml-grade type safety (algebraic data types, exhaustive
+pattern matching, type inference) without TypeScript's unsoundness. This is
+critical for a parser that must correctly represent VQL-UT's rich syntax.
+
+==== 5. No Keyword Conflicts
+
+VQL-UT's 6 new clause keywords (`CONSUME`, `SESSION`, `EFFECTS`, `TRANSACTION`,
+`ATTACHED`, `USAGE`) were chosen to be disjoint from VQL's 60+ reserved
+keywords. The ReScript parser handles these as simple token extensions with no
+ambiguity.
+
+=== Alternatives Considered
+
+[cols="1,3"]
+|===
+|Alternative |Why Rejected
+
+|**Idris2 parser**
+|Idris2's parsing libraries are immature. Running an Idris2 parser in the
+browser would require compilation to JavaScript, which is not well supported.
+
+|**Zig parser**
+|Cannot run in the browser without WASM compilation. Does not extend the
+existing VQL parser.
+
+|**Rust parser (nom/pest)**
+|Cannot run in the browser without WASM. Does not extend the existing VQL
+parser. Would require maintaining two parser codebases (Rust for VQL-UT,
+ReScript for VQL).
+
+|**Tree-sitter grammar**
+|Good for syntax highlighting but not for producing typed ASTs. Would still
+need a separate semantic parser.
+
+|**TypeScript**
+|Banned per hyperpolymath policy. ReScript is the designated replacement.
+|===
+
+=== Consequences
+
+- The VQL-UT parser lives in `src/parser/` and is written entirely in ReScript.
+- The parser produces `TQLAst.res` nodes that are serialised to JSON for
+  consumption by the Idris2 type kernel.
+- The parser runs in Deno (server), the browser (PanLL panels), and embedded
+  V8 (Elixir NIFs).
+- Parser changes require corresponding grammar updates in
+  `docs/vql-dtpp-grammar.ebnf`.
+
+== Licence
+
+PMPL-1.0-or-later

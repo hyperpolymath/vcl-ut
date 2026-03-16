@@ -6,21 +6,21 @@
 uuid = "a5ea1382-a34c-5334-8a46-a2ebe904c810"
 primary-forge = "github"
 primary-owner = "hyperpolymath"
-canonical-name = "rsr-template-repo"
-prefixed-name = "rm-rsr-template-repo"
+canonical-name = "vql-ut"
+prefixed-name = "rm-vql-ut"
 
 [clade]
 primary = "rm"
 secondary = ["gv"]
 assigned = "2026-03-16"
-rationale = ""
+rationale = "VQL Ultimate Type-Safety — 10-level query safety checker for VeriSimDB"
 
 [forges]
-github = "hyperpolymath/rsr-template-repo"
-gitlab = "hyperpolymath/rsr-template-repo"
-bitbucket = "hyperpolymath/rsr-template-repo"
+github = "hyperpolymath/vql-ut"
+gitlab = "hyperpolymath/vql-ut"
+bitbucket = "hyperpolymath/vql-ut"
 
 [lineage]
-type = "standalone"
-parent = "RSR template — scaffold for new repos"
+type = "component"
+parent = "nextgen-databases"
 born = "2026-03-16"

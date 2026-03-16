@@ -1,0 +1,334 @@
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+= What Is VeriSimDB?
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+:toc: preamble
+:icons: font
+:sectnums:
+
+VQL-UT is a query language for VeriSimDB. Before you can understand VQL-UT,
+you need to understand VeriSimDB. This document explains what VeriSimDB is,
+what makes it different, and how VQL-UT fits into the picture.
+
+== What Is a Database? (30 Seconds)
+
+A database is an organised collection of data that a computer can search, read,
+and update. When you log into a website, a database checks your password. When
+you search for a product on Amazon, a database finds it. When your bank shows
+your balance, a database retrieved it.
+
+Think of a database as a very fast, very reliable filing cabinet that can hold
+billions of documents and find any one of them in milliseconds.
+
+== The Problem: Too Many Filing Cabinets
+
+In the real world, different kinds of data suit different kinds of filing
+cabinets. There are at least six common styles:
+
+[cols="1,2,2"]
+|===
+| Style | What It Is Good At | Real Example
+
+| **Document store**
+| Storing and searching text, JSON, complex nested records
+| MongoDB -- used by eBay, Forbes, Adobe
+
+| **Graph database**
+| Relationships between things (who knows whom, what links to what)
+| Neo4j -- used by NASA, Airbus, the Panama Papers investigation
+
+| **Key-value store**
+| Extremely fast lookups by a single key (like a dictionary)
+| Redis -- used by Twitter, GitHub, Stack Overflow
+
+| **Search engine**
+| Full-text search with ranking and relevance
+| Elasticsearch -- used by Wikipedia, Netflix, the Guardian
+
+| **Embedding/vector store**
+| Similarity search ("find things like this one")
+| Used by every AI chatbot for retrieving relevant context
+
+| **Time-series database**
+| Data that changes over time (sensor readings, stock prices, logs)
+| InfluxDB -- used by Tesla, IBM, Siemens
+|===
+
+Most organisations end up running three, four, or even all six of these. The
+same data gets copied into each one, in different formats. When one copy
+changes, the others become stale. This is called **data drift**, and it is
+the source of countless bugs, inconsistencies, and expensive outages.
+
+== What Makes VeriSimDB Different?
+
+VeriSimDB is a **multi-modal consistency engine**. Instead of running six
+separate databases and hoping they stay in sync, VeriSimDB gives you all of
+them in one system, with _automatic consistency guarantees_.
+
+=== The Octad: One Entity, Eight Views
+
+Every piece of data in VeriSimDB is stored as an **octad** -- a single entity
+with up to eight simultaneous representations:
+
+----
+┌─────────────────────────────────────────────────────────────┐
+│                    ONE ENTITY, EIGHT VIEWS                  │
+│                         (the Octad)                         │
+│                                                             │
+│   1. Graph ──── 2. Vector ──── 3. Tensor ──── 4. Semantic  │
+│      │                                            │         │
+│   5. Document ─ 6. Temporal ─ 7. Provenance ─ 8. Spatial   │
+│                                                             │
+│            ↕ Continuous drift detection ↕                   │
+│            ↕ Automatic self-normalisation ↕                 │
+└─────────────────────────────────────────────────────────────┘
+----
+
+[cols="1,3"]
+|===
+| Modality | What It Stores
+
+| **Graph**
+| Relationships: who connects to what, parent-child, dependencies
+
+| **Vector**
+| Numerical embedding for AI similarity search
+
+| **Tensor**
+| Multi-dimensional numerical representation for advanced computation
+
+| **Semantic**
+| Type annotations and proof blobs -- what this entity _means_
+
+| **Document**
+| Full-text searchable content (the human-readable version)
+
+| **Temporal**
+| Version history -- every past state, with timestamps
+
+| **Provenance**
+| Origin tracking -- where this data came from, who changed it, why
+
+| **Spatial**
+| Geospatial coordinates and geometries -- where this entity is in the world
+|===
+
+=== Why This Matters
+
+Suppose you have a customer record. In a traditional setup:
+
+- MongoDB stores the customer's profile as a JSON document
+- Neo4j stores the customer's relationships (friends, purchases, preferences)
+- Redis caches the customer's session for fast login
+- Elasticsearch indexes the customer's name and address for search
+- A vector store holds an embedding for "customers like this one"
+- InfluxDB tracks the customer's activity over time
+
+That is six copies of the same customer, in six different systems, with six
+different update mechanisms. When the customer changes their address, you have
+to update _all six_ -- and if any update fails or is delayed, your data drifts.
+
+In VeriSimDB, there is one octad for that customer. All eight views are
+maintained automatically. When the document modality updates, VeriSimDB detects
+that the vector embedding, graph relationships, and search index may have
+drifted, and triggers automatic re-normalisation.
+
+**You do not have to choose between MongoDB and Neo4j and Redis. You get all
+of them, and they stay in sync.**
+
+=== Drift Detection
+
+VeriSimDB continuously monitors for drift between modalities:
+
+- Has the vector embedding diverged from the document content?
+- Does the graph structure still match the document?
+- Is the provenance chain's hash integrity intact?
+- Do the spatial coordinates match the address in the text?
+
+When drift exceeds a configurable threshold, VeriSimDB:
+
+1. Identifies the most authoritative modality
+2. Regenerates the drifted modalities from it
+3. Validates consistency across all eight views
+4. Updates everything atomically (all at once, or not at all)
+
+== The Three Query Paths
+
+VeriSimDB offers three ways to query data, depending on how much safety you
+need:
+
+[cols="1,2,2,1"]
+|===
+| Path | What It Does | Type Safety | Speed
+
+| **VQL** (Slipstream)
+| Standard queries for everyday use. Fast and simple. No formal proofs.
+| None (runtime checks only)
+| Fastest
+
+| **VQL-DT** (Dependent Types)
+| Queries with PROOF clauses. The database proves properties of your results.
+| Dependent types (6 proof types)
+| Medium
+
+| **VQL-UT** (Ultimate Type-Safe)
+| All 10 levels of type safety. The query is mathematically verified _before_
+  execution.
+| Full formal verification
+| Fastest at runtime (checking is compile-time)
+|===
+
+=== VQL (Slipstream) -- The Fast Path
+
+VQL is VeriSimDB's native query language. It is designed for routine operations
+where speed matters and you trust the query:
+
+[source]
+----
+FETCH users
+  WHERE users.name CONTAINS "Smith"
+  VIA document, graph
+----
+
+This queries the document and graph modalities for users matching "Smith". It
+runs immediately with no compile-time checks beyond basic syntax validation.
+
+=== VQL-DT (Dependent Types) -- The Proof Path
+
+VQL-DT adds PROOF clauses that ask the database to prove properties of the
+result:
+
+[source]
+----
+FETCH accounts.balance
+  WHERE accounts.id = ?id
+  PROOF EXISTENCE(accounts.id = ?id)
+  PROOF INTEGRITY(accounts.balance >= 0)
+----
+
+There are 6 proof types:
+
+[cols="1,3"]
+|===
+| Proof Type | What It Proves
+
+| **Existence** | The queried entity actually exists
+| **Integrity** | Data satisfies invariants (e.g., balance >= 0)
+| **Consistency** | Cross-modal views agree
+| **Provenance** | Data origin is verified
+| **Freshness** | Data is not stale beyond a threshold
+| **Authorisation** | The caller has permission
+|===
+
+VQL-DT is powerful, but it only covers dependent types -- one dimension of
+type safety.
+
+=== VQL-UT (Ultimate Type-Safe) -- The Full Path
+
+VQL-UT is where this project lives. It extends VQL with _all 10 levels_ of
+type safety:
+
+[source]
+----
+FETCH UNIQUE accounts.balance
+  WHERE accounts.id = ?id
+  EFFECTS { Read }
+  AS OF NOW - 10 SECONDS
+  PROOF ATTACHED balance_non_negative
+----
+
+This single query:
+
+- **Level 1**: Is parsed and validated at compile time
+- **Level 2**: `accounts.id` and `accounts.balance` are checked against the live schema
+- **Level 3**: The comparison `=` between `accounts.id` and `?id` is type-checked
+- **Level 4**: Null safety ensures `balance` is non-nullable (or explicitly handled)
+- **Level 5**: `?id` is a typed parameter -- injection is structurally impossible
+- **Level 6**: The return type `Decimal` is known at compile time
+- **Level 7**: `UNIQUE` means the return type is `ExactlyOne<Decimal>`, not `List<Decimal>`
+- **Level 8**: `EFFECTS { Read }` ensures this query cannot modify data
+- **Level 9**: `AS OF NOW - 10 SECONDS` provides a freshness guarantee in the type
+- **Level 10**: The connection used to execute this is a linear resource -- tracked, not leaked
+
+All of this checking happens at **compile time**. By the time the query reaches
+VeriSimDB's execution engine, it is _proven correct_. There is no runtime
+overhead for the safety -- you get the speed of VQL with the guarantees of
+formal verification.
+
+== How VQL-UT Fits In
+
+VQL-UT is not a separate database. It is a query language layer that sits on
+top of VeriSimDB:
+
+----
+                        +---------------+
+                        |  Your Query   |
+                        |  (.vqlut)     |
+                        +-------+-------+
+                                |
+                    +-----------v-----------+
+                    |  VQL-UT Compiler      |
+                    |  (10-level checker)   |
+                    +-----------+-----------+
+                                |
+                    +-----------v-----------+
+                    |  VeriSimDB Engine     |
+                    |  (8-modal octad)      |
+                    +-----------------------+
+----
+
+You write queries in VQL-UT. The compiler checks them against all 10 levels.
+If they pass, they are compiled into an optimised query plan that VeriSimDB
+executes at full speed.
+
+If VQL-UT succeeds as a project, it will **replace VQL-DT entirely**, becoming
+THE type-safe query path for VeriSimDB. VQL (Slipstream) will remain as the
+fast, unverified path for trusted internal queries.
+
+== The Type Theory Foundation
+
+VQL-UT does not invent its own type theory. It inherits from **TypeLL**, a core
+type theory that defines the 10 safety levels. TypeLL also feeds into **PanLL**
+(a panel framework for user interfaces). The same mathematical foundation
+powers both database queries and UI safety:
+
+----
+TypeLL (core type theory -- defines the 10 levels)
+   │
+   ├──→ PanLL (panel framework type safety)
+   │
+   └──→ VQL-UT (database query language type safety)
+             │
+             └──→ VeriSimDB (8-modal execution engine)
+----
+
+This means advances in the type theory benefit both projects simultaneously.
+A proof technique discovered for VQL-UT can be applied to PanLL, and vice versa.
+
+== Summary
+
+[cols="1,3"]
+|===
+| Concept | One-Sentence Summary
+
+| **VeriSimDB**
+| A database where every entity exists in 8 views simultaneously, with automatic
+  drift detection and repair.
+
+| **Octad**
+| The 8 simultaneous representations of a single entity (graph, vector, tensor,
+  semantic, document, temporal, provenance, spatial).
+
+| **VQL**
+| The fast, unverified query language for VeriSimDB.
+
+| **VQL-DT**
+| VQL with dependent-type PROOF clauses (6 proof types).
+
+| **VQL-UT**
+| VQL with all 10 levels of type safety -- the goal of this project.
+
+| **TypeLL**
+| The core type theory that defines the 10 levels.
+|===

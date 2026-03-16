@@ -1,1 +1,7 @@
-= Integrity Aspect
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= VQL-UT Integrity Aspect
+
+Integrity checks verifying that query plan buffers are well-formed, safety level
+proofs are internally consistent, and the QueryPlanHeader magic/version fields
+match expected values.

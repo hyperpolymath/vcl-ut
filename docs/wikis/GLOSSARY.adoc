@@ -1,0 +1,221 @@
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+= Glossary
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+:icons: font
+
+A plain-English glossary of terms used throughout the VQL-UT project. Aimed at
+someone with no prior exposure to type theory, formal verification, or database
+internals.
+
+== A
+
+ABI (Application Binary Interface)::
+The low-level contract that defines how compiled code calls functions across
+language boundaries -- what size integers are, how memory is laid out, how
+arguments are passed. Think of it as the wiring diagram between Idris2 and Zig.
+
+AST (Abstract Syntax Tree)::
+The structured representation of a query after parsing. Instead of a raw string
+like `FETCH users WHERE id = 1`, the AST is a tree: a FETCH node with a "users"
+target child and a filter child containing an equality check.
+
+== B
+
+Bi-temporal::
+A way of tracking two different timelines: _when something actually happened_
+(valid time) and _when the database recorded it_ (transaction time). Useful for
+auditing: "the patient's address changed on 1 March, but we only recorded the
+change on 5 March."
+
+== C
+
+Cardinality::
+How many results a query returns. "Exactly one," "at most one," "at least one,"
+or "any number." Level 7 puts this information into the type system so the
+compiler can check your assumptions.
+
+Compile time::
+The moment when your code is translated from human-readable text into something
+the computer can execute. Checks at compile time happen _before_ your programme
+runs, so bugs are caught before they reach users.
+
+== D
+
+Dependent type::
+A type that depends on a _value_. Ordinary types say "this is a list."
+Dependent types say "this is a list of exactly 5 elements." This lets the
+compiler prove much stronger properties about your code.
+
+Drift (data drift)::
+When two copies of the same data silently diverge. For example, a customer's
+address is updated in the document store but not in the search index.
+VeriSimDB detects and repairs drift automatically.
+
+== E
+
+Effect system::
+A way of tracking _what a function does_ (reads data, writes data, modifies
+schema) in the type system. A function marked as "read-only" is _proven_ to
+be unable to write, not just promised.
+
+Erasure::
+Removing type information at compile time so it has no runtime cost. Idris2
+is particularly good at this -- complex proofs exist at compile time but
+vanish completely in the compiled output, adding zero overhead.
+
+== F
+
+FFI (Foreign Function Interface)::
+The mechanism for calling functions written in one language from another
+language. VQL-UT uses a Zig FFI to bridge between the Idris2 type system and
+VeriSimDB's runtime.
+
+Formal verification::
+Using mathematical proofs (not just testing) to guarantee that code is correct.
+Testing shows the absence of bugs in the cases you tested. Formal verification
+proves the absence of bugs in _all possible cases_.
+
+Freshness::
+How recently a piece of data was updated. A freshness guarantee of "5 seconds"
+means the data is at most 5 seconds old. Level 9 puts freshness into the type
+system.
+
+== I
+
+Idris2::
+A programming language with dependent types and Quantitative Type Theory (QTT).
+VQL-UT uses Idris2 for its type-checking core because Idris2 can express and
+prove all 10 safety levels.
+
+Injection (SQL/VQL injection)::
+An attack where malicious commands are smuggled into a query through user input.
+If a login form's username field contains `'; DROP TABLE users; --`, and the
+system builds queries by string concatenation, the attacker can delete the
+entire users table.
+
+== L
+
+Linear type::
+A type that must be used _exactly once_. Like a single-use train ticket: you
+must use it (you cannot throw it away), and once used, it is gone (you cannot
+use it again). Level 10 uses linear types for database connections and
+transaction handles.
+
+== M
+
+Modality (VeriSimDB)::
+One of the 8 views of an entity in VeriSimDB's octad: graph, vector, tensor,
+semantic, document, temporal, provenance, spatial. Each modality stores a
+different representation of the same data.
+
+Modal type::
+A type that carries information about its context -- for example, whether data
+is inside a transaction, or from a specific point in time. Used in levels 9 and
+10.
+
+== N
+
+Null::
+A special value meaning "no data" or "unknown." The source of Tony Hoare's
+famous "billion-dollar mistake." Level 4 tracks nullability in the type system
+to prevent silent failures.
+
+== O
+
+Octad::
+The core data structure in VeriSimDB: a single entity with up to 8 simultaneous
+representations (the 8 modalities). Every entity exists across all populated
+modalities, and VeriSimDB keeps them in sync.
+
+== P
+
+PROOF clause::
+A VQL-DT feature where the database proves properties of a query result.
+For example, `PROOF EXISTENCE(users.id = 42)` proves that the queried entity
+exists before returning it.
+
+Proof-carrying code::
+Code that comes bundled with a mathematical proof of its correctness. In
+VQL-UT, queries can carry proofs (e.g., that a balance is non-negative) that
+VeriSimDB can verify before execution.
+
+== Q
+
+QTT (Quantitative Type Theory)::
+A type theory that tracks _how many times_ a value is used: zero times (erased
+at runtime), once (linear), or unlimited. Idris2 implements QTT natively. VQL-UT
+uses it for level 10 (linearity safety).
+
+== R
+
+Roundtrip proof::
+A proof that data survives a round trip (encode then decode, or write then
+read) without corruption. For example, proving that serialising a query plan
+to bytes and deserialising it back produces the identical plan.
+
+Runtime::
+The moment when your programme is actually executing. Checks at runtime happen
+_while users are using the system_, which means bugs manifest as crashes or
+wrong results in production.
+
+== S
+
+Schema::
+The structure of a database: what tables exist, what columns each table has,
+what types those columns are, and what constraints apply (unique, non-null,
+foreign keys).
+
+Session type::
+A type that describes a _protocol_ -- a sequence of allowed operations. For
+example: "first connect, then begin a transaction, then execute queries, then
+commit or rollback, then disconnect." Used in level 10 to ensure correct
+connection lifecycle.
+
+Slipstream (VQL Slipstream)::
+The fast, unverified query path in VeriSimDB. Standard VQL queries with runtime
+checks only, no compile-time type safety. Used for trusted internal queries
+where speed is the priority.
+
+Subsumption::
+The rule that a smaller set of effects is compatible with a larger one. A
+function that only needs `Read` can be called in a context that allows
+`Read + Write`, because Read is a subset of Read + Write.
+
+== T
+
+Totality::
+The guarantee that a function always terminates and handles every possible
+input. VQL-UT's Idris2 core uses `%default total`, meaning all functions must
+be proven total. No infinite loops. No unhandled cases.
+
+TypeLL::
+The core type theory that defines the 10 levels of type safety. VQL-UT
+inherits from TypeLL rather than inventing its own theory.
+
+== V
+
+VQL (VeriSim Query Language)::
+The native query language for VeriSimDB. Exists in three variants: VQL
+(slipstream), VQL-DT (dependent types), and VQL-UT (ultimate type-safe).
+
+VQL-DT::
+VQL with dependent-type PROOF clauses. Supports 6 proof types: Existence,
+Integrity, Consistency, Provenance, Freshness, and Authorisation. VQL-UT aims
+to supersede VQL-DT.
+
+VQL-UT::
+VQL with all 10 levels of type safety. The subject of this project. If
+successful, it replaces VQL-DT as THE type-safe query path for VeriSimDB.
+
+VeriSimDB::
+A multi-modal database engine where every entity exists across up to 8
+simultaneous representations (the octad), with automatic drift detection and
+self-normalisation.
+
+== Z
+
+Zig::
+A systems programming language used for VQL-UT's FFI layer. Chosen for native
+C ABI compatibility, cross-compilation support, and zero runtime dependencies.

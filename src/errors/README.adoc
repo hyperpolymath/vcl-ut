@@ -1,1 +1,7 @@
-= Errors Unit
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= VQL-UT Errors
+
+Structured error types for all 10 safety levels plus the InternalError sentinel.
+Each error carries context about which pipeline stage failed and what evidence
+triggered the failure, enabling precise diagnostic reporting.

@@ -1,0 +1,364 @@
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= VQL-UT System Topology
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+:date: 2026-03-16
+:toc: macro
+:toclevels: 3
+:icons: font
+:description: System topology showing how VQL-UT fits in the broader hyperpolymath ecosystem
+
+toc::[]
+
+== Position in the Hyperpolymath Ecosystem
+
+VQL-UT sits at the intersection of three major subsystems: the type theory
+stack (TypeLL), the database stack (VeriSimDB), and the orchestration layer
+(BoJ server / PanLL). It is the component that makes database queries
+*provably safe* by applying TypeLL's 10-level type system to VeriSimDB's
+query language.
+
+[source]
+----
+                    HYPERPOLYMATH ECOSYSTEM — VQL-UT POSITION
+                    ═══════════════════════════════════════════
+
+  ┌─────────────────────────────────────────────────────────────────┐
+  │                        USER / ANALYST                           │
+  │              (Browser, CLI, PanLL Dashboard)                    │
+  └─────────────────────────────┬───────────────────────────────────┘
+                                │
+                                ▼
+  ┌─────────────────────────────────────────────────────────────────┐
+  │                     BoJ SERVER (Cartridge Hub)                  │
+  │                                                                 │
+  │  Orchestrates MCP cartridges. Routes queries to the             │
+  │  appropriate query path. Manages cartridge lifecycle.           │
+  │                                                                 │
+  │  Relevant cartridges:                                           │
+  │    • vql-ut-cartridge     — VQL-UT type checking via MCP        │
+  │    • verisimdb-cartridge  — Direct VeriSimDB operations         │
+  │    • proven-servers-cart  — Verified network primitives          │
+  └──────────┬──────────────────────┬───────────────────────────────┘
+             │                      │
+             ▼                      ▼
+  ┌────────────────────┐  ┌─────────────────────────────────────────┐
+  │      PanLL         │  │            QUERY LAYER                  │
+  │  (Panel System)    │  │                                         │
+  │                    │  │  Three paths to VeriSimDB:               │
+  │  vql-ut-safety-    │  │                                         │
+  │    dashboard       │  │  ┌───────────┐ ┌──────┐ ┌───────────┐  │
+  │  vql-ut-query-     │  │  │Slipstream │ │VQL-DT│ │  VQL-UT   │  │
+  │    editor          │  │  │           │ │      │ │           │  │
+  │  vql-ut-proof-     │  │  │ Fast,     │ │ 6    │ │ 10 safety │  │
+  │    explorer        │  │  │ untyped,  │ │PROOF │ │ levels,   │  │
+  │  vql-ut-horror-    │  │  │ direct    │ │types │ │ full      │  │
+  │    stories         │  │  │ dispatch  │ │only  │ │ proofs    │  │
+  │                    │  │  └─────┬─────┘ └──┬───┘ └─────┬─────┘  │
+  └────────────────────┘  │        │          │           │         │
+                          │        ▼          ▼           ▼         │
+                          │  ┌─────────────────────────────────┐    │
+                          │  │         VeriSimDB ENGINE         │    │
+                          │  │                                  │    │
+                          │  │  8 modalities (Graph, Vector,    │    │
+                          │  │  Tensor, Semantic, Document,     │    │
+                          │  │  Temporal, Provenance, Spatial)  │    │
+                          │  │                                  │    │
+                          │  │  HEXAD addressing                │    │
+                          │  └──────────────────────────────────┘    │
+                          └─────────────────────────────────────────┘
+----
+
+== The Three Query Paths
+
+VeriSimDB supports three query paths, each offering a different trade-off
+between safety guarantees and performance:
+
+[cols="1,2,2,2"]
+|===
+|Path |Safety |Performance |Use Case
+
+|**Slipstream**
+|None — raw query dispatch
+|Fastest (no type checking overhead)
+|Trusted internal services, batch ingestion, migration scripts
+
+|**VQL-DT**
+|6 PROOF types (Pi, Sigma, dependent pattern matching, basic type checking, universe polymorphism, implicit arguments)
+|Moderate (basic type checking)
+|Production queries with standard safety (current VeriSimDB default)
+
+|**VQL-UT**
+|10 safety levels (construction, schema, linearity, session, effects, modal, information flow, quantitative, proof-carrying, metatheory)
+|Slower (full proof generation), but cached certificates amortise cost
+|Safety-critical queries, audit-grade operations, compliance workloads
+|===
+
+=== Path Selection
+
+The query path is selected at the API level:
+
+[source]
+----
+  POST /api/v1/query
+  ─────────────────
+  {
+    "path": "slipstream" | "vql-dt" | "vql-ut",
+    "query": "SELECT GRAPH FROM HEXAD ...",
+    "safety_level": 10          // VQL-UT only: 1-10
+  }
+----
+
+For VQL-UT, the `safety_level` parameter controls how many levels are checked.
+A query requesting level 5 will pass through L1–L5 only, skipping L6–L10.
+This enables graduated adoption: start at L1 and increase as confidence grows.
+
+== TypeLL → PanLL → VQL-UT → VeriSimDB
+
+The dependency chain from theory to execution:
+
+[source]
+----
+  ┌──────────────────────────────────────────────────────────────┐
+  │                        TypeLL                                 │
+  │                                                               │
+  │  The general-purpose 10-level type theory.                    │
+  │  Defines: construction types, indexed types, linear types,    │
+  │  session types, effect types, modal types, information flow   │
+  │  types, quantitative types, proof-relevant types,             │
+  │  metatheoretic types.                                         │
+  │                                                               │
+  │  Provides: formal semantics, soundness proofs, level          │
+  │  composition rules.                                           │
+  └──────────────────────────┬───────────────────────────────────┘
+                             │ Specialises
+                             ▼
+  ┌──────────────────────────────────────────────────────────────┐
+  │                        VQL-UT                                 │
+  │                                                               │
+  │  TypeLL instantiated for VeriSimDB queries.                   │
+  │  Maps each TypeLL level to a concrete Idris2 module.          │
+  │  Produces proof certificates for query safety.                │
+  │                                                               │
+  │  Technology: Idris2 (kernel), Zig (FFI), ReScript (parser)    │
+  └──────────────────────────┬───────────────────────────────────┘
+                             │ Dispatches to
+                             ▼
+  ┌──────────────────────────────────────────────────────────────┐
+  │                       VeriSimDB                               │
+  │                                                               │
+  │  The database engine. 8 modalities, HEXAD addressing,         │
+  │  Rust core, Elixir orchestration.                             │
+  │                                                               │
+  │  Receives: compiled query plans with proof certificates.      │
+  │  Returns: results tagged with safety attestations.            │
+  └──────────────────────────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │                        PanLL                                  │
+  │                                                               │
+  │  The panel system. Provides real-time UI for VQL-UT.          │
+  │                                                               │
+  │  Panels:                                                      │
+  │    • Safety dashboard (10-level pipeline visualisation)        │
+  │    • Query editor (live type checking feedback)                │
+  │    • Proof explorer (obligation discharge status)              │
+  │    • Horror stories (what each level prevents)                 │
+  │                                                               │
+  │  Connects to VQL-UT via BoJ cartridge + PanLL manifest.       │
+  └──────────────────────────────────────────────────────────────┘
+----
+
+== BoJ Server Integration
+
+VQL-UT is exposed as a BoJ cartridge, following the standard cartridge
+protocol:
+
+[source]
+----
+  BoJ Server
+  ──────────
+       │
+       ├── vql-ut-cartridge
+       │   ├── tools:
+       │   │   ├── vqlut_check     — Type-check a query (returns safety levels)
+       │   │   ├── vqlut_compile   — Compile a checked query to a plan
+       │   │   ├── vqlut_certify   — Generate proof certificate
+       │   │   └── vqlut_levels    — List safety levels and their status
+       │   │
+       │   ├── resources:
+       │   │   ├── vqlut://schema/current    — Current schema definition
+       │   │   ├── vqlut://levels/{1..10}    — Individual level documentation
+       │   │   └── vqlut://certificate/{id}  — Retrieve a proof certificate
+       │   │
+       │   └── prompts:
+       │       ├── check_query    — "Check this query for safety"
+       │       └── explain_error  — "Explain this type error"
+       │
+       └── verisimdb-cartridge
+           └── (existing VeriSimDB MCP cartridge)
+----
+
+== proven-servers Integration
+
+VQL-UT depends on proven-servers for verified network primitives when queries
+span distributed VeriSimDB instances:
+
+[source]
+----
+  VQL-UT Query Plan
+  ─────────────────
+       │
+       │ Distributed query (spans multiple VeriSimDB nodes)
+       ▼
+  ┌──────────────────────────────────────┐
+  │          proven-servers               │
+  │                                       │
+  │  Provides:                            │
+  │    • proven-tls    — Verified TLS     │
+  │    • proven-dns    — Verified DNS     │
+  │    • proven-http   — Verified HTTP    │
+  │    • proven-fsm    — State machines   │
+  │    • proven-queueconn — Message queue │
+  │                                       │
+  │  VQL-UT uses:                         │
+  │    proven-tls for inter-node queries  │
+  │    proven-fsm for session protocols   │
+  │    proven-queueconn for async results │
+  └──────────────────────────────────────┘
+----
+
+The Idris2 proofs in proven-servers compose with VQL-UT's L4 (session
+protocols) and L7 (information flow) levels. A distributed query's safety
+certificate includes attestations from both VQL-UT and proven-servers.
+
+== Deployment Topology
+
+=== What Runs Where
+
+[cols="2,2,3"]
+|===
+|Component |Runtime |Deployment
+
+|**Idris2 Type Kernel** (`src/abi/`)
+|Idris2 compiler (compile-time only)
+|Build server / CI. The type kernel runs at compile time — it does not ship
+as a runtime binary. Its outputs are proof certificates and typed ASTs.
+
+|**Zig FFI Bridge** (`ffi/zig/`)
+|Native binary (compiled from Zig)
+|Co-located with the query gateway. Exposes `vqlut_parse`, `vqlut_check`,
+`vqlut_compile` as C-ABI functions. Linked into the V-lang API and Elixir
+NIFs.
+
+|**ReScript Parser** (`src/parser/`)
+|JavaScript (via Deno or browser)
+|Client-side (browser) for the PanLL query editor panel, or server-side
+(Deno) for the API gateway. The parser is lightweight enough for both.
+
+|**V-lang API Gateway** (`v-api/`)
+|Native binary (compiled from V)
+|Edge / API tier. Handles HTTP routing, authentication, rate limiting.
+Calls the Zig FFI for actual type checking.
+
+|**Elixir Orchestration** (`elixir/`)
+|BEAM VM
+|Application tier. Manages query lifecycle, distributes to VeriSimDB nodes,
+handles async results via GenServer supervision trees. Zig NIFs for
+performance-critical type checking in the hot path.
+|===
+
+=== Deployment Diagram
+
+[source]
+----
+  ┌─────────────────────────────────────────────────────────┐
+  │                    BUILD TIER                            │
+  │                                                         │
+  │  ┌─────────────┐  ┌────────────┐  ┌────────────────┐   │
+  │  │ Idris2      │  │ Zig        │  │ ReScript       │   │
+  │  │ Compiler    │  │ Compiler   │  │ Compiler       │   │
+  │  │             │  │            │  │                │   │
+  │  │ Proof certs │  │ FFI .so    │  │ Parser .js     │   │
+  │  └──────┬──────┘  └─────┬──────┘  └───────┬────────┘   │
+  │         │               │                 │            │
+  └─────────│───────────────│─────────────────│────────────┘
+            │               │                 │
+            ▼               ▼                 ▼
+  ┌─────────────────────────────────────────────────────────┐
+  │                    EDGE TIER                             │
+  │                                                         │
+  │  ┌──────────────────────────────────────────────────┐   │
+  │  │ V-lang API Gateway                               │   │
+  │  │   ↳ links Zig FFI (.so)                          │   │
+  │  │   ↳ serves ReScript parser (.js) for browsers    │   │
+  │  └──────────────────────┬───────────────────────────┘   │
+  └─────────────────────────│───────────────────────────────┘
+                            │
+                            ▼
+  ┌─────────────────────────────────────────────────────────┐
+  │                  APPLICATION TIER                        │
+  │                                                         │
+  │  ┌──────────────────────────────────────────────────┐   │
+  │  │ Elixir / Phoenix                                 │   │
+  │  │   ↳ Zig NIFs for type checking hot path          │   │
+  │  │   ↳ GenServer supervision for query lifecycle     │   │
+  │  │   ↳ Phoenix Channels for real-time feedback       │   │
+  │  └──────────────────────┬───────────────────────────┘   │
+  └─────────────────────────│───────────────────────────────┘
+                            │
+                            ▼
+  ┌─────────────────────────────────────────────────────────┐
+  │                   DATA TIER                              │
+  │                                                         │
+  │  ┌──────────────────────────────────────────────────┐   │
+  │  │ VeriSimDB Cluster                                │   │
+  │  │   ↳ Rust core engine                             │   │
+  │  │   ↳ 8-modality HEXAD storage                     │   │
+  │  │   ↳ Receives compiled query plans + certificates  │   │
+  │  └──────────────────────────────────────────────────┘   │
+  └─────────────────────────────────────────────────────────┘
+----
+
+== Related Repositories
+
+[cols="2,2,3"]
+|===
+|Repository |Relationship |Notes
+
+|`nextgen-databases/verisimdb`
+|Target engine
+|VQL-UT compiles queries for this engine
+
+|`nextgen-databases/typeql-experimental`
+|Predecessor
+|VQL-dt++ experimental space; VQL-UT is the productionised successor
+
+|`nextgen-languages/typell`
+|Theory provider
+|10-level type theory that VQL-UT instantiates
+
+|`proven-servers`
+|Network primitives
+|Verified TLS, DNS, HTTP for distributed queries
+
+|`boj-server`
+|Cartridge host
+|Exposes VQL-UT as an MCP cartridge
+
+|`panll`
+|UI framework
+|Renders VQL-UT panels (safety dashboard, query editor, etc.)
+
+|`developer-ecosystem/rescript-ecosystem`
+|Parser toolchain
+|ReScript compiler and VQL parser patterns
+
+|`developer-ecosystem/idris2-ecosystem`
+|Type kernel toolchain
+|Idris2 compiler and dependent type patterns
+|===
+
+== Licence
+
+PMPL-1.0-or-later
