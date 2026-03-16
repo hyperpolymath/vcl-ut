@@ -1,121 +1,142 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
 # ⚠️ STOP - CRITICAL READING REQUIRED
 
 **THIS FILE MUST BE READ FIRST BY ALL AI AGENTS**
 
 ## WHAT IS THIS?
 
-This is the AI manifest for **[YOUR-REPO-NAME]**. It declares:
-- Canonical file locations (where things MUST be, and nowhere else)
-- Critical invariants (rules that must NEVER be violated)
-- Repository structure and organization
+This is the AI manifest for **vql-ut** (VQL Ultimate Type-Safe) — the 10-level
+type-safe query language for VeriSimDB. It supersedes VQL-DT (dependent types
+only) as THE formally verified query path.
+
+## NAMING
+
+- ALWAYS: "VQL-UT", "vql-ut"
+- NEVER: "vql++", "vqlpp", "VQL Plus Plus" (old names, killed 2026-03-16)
+- File extension: `.vqlut` (NOT `.vqlpp`)
+
+## LINEAGE (CRITICAL CONTEXT)
+
+```
+TypeLL (type theory core)
+   │
+   ├──→ PanLL (panel framework type safety)
+   │
+   └──→ VQL-UT (database query language type safety)
+             │
+             └──→ VeriSimDB (6-modal execution engine)
+```
+
+- **TypeLL** defines the 10 type safety levels as core type theory
+- **PanLL** integrates TypeLL's type safety via TypeLL-PanLL assimilation
+- **VQL-UT** applies those same 10 levels to VeriSimDB's query language
+- The 6 TypeQL-Experimental extensions (linear, session, effect, modal,
+  proof-carrying, QTT) map to VQL-UT levels 7-10
+
+### The 3 Query Paths in VeriSimDB
+
+| Path | Purpose | Type Safety |
+|------|---------|-------------|
+| VQL (Slipstream) | Standard routine queries, fast | None (runtime only) |
+| VQL-DT | PROOF clauses (6 proof types) | Dependent types via Lean |
+| VQL-UT | All 10 levels, research → production | Full formal verification via Idris2 |
+
+If VQL-UT succeeds, it replaces VQL-DT entirely.
+
+### Adoption Path
+
+1. **ReScript evangeliser** proves the type-safety concept first (in ReScript)
+2. Once proven, **VQL-UT** and **AffineScript** are the two showcase languages
+   for teaching people the 10 levels of type safety
+3. VQL-UT for database queries, AffineScript for general programming
 
 ## CANONICAL LOCATIONS (UNIVERSAL RULE)
 
 ### Machine-Readable Metadata: `.machine_readable/` ONLY
 
-These 6 a2ml files MUST exist in `.machine_readable/` directory ONLY:
+These a2ml files MUST exist in `.machine_readable/` directory ONLY:
 1. **STATE.a2ml** - Project state, progress, blockers
 2. **META.a2ml** - Architecture decisions, governance
 3. **ECOSYSTEM.a2ml** - Position in ecosystem, relationships
-4. **AGENTIC.a2ml** - AI agent interaction patterns
-5. **NEUROSYM.a2ml** - Neurosymbolic integration config
-6. **PLAYBOOK.a2ml** - Operational runbook
 
 **CRITICAL:** If ANY of these files exist in the root directory, this is an ERROR.
 
-### Anchor File: `.machine_readable/anchors/ANCHOR.a2ml` ONLY
+### Source Code
 
-Canonical authority and semantic-boundary declaration MUST exist at:
+- `src/interface/abi/` — Idris2 ABI (type kernel, formal proofs)
+- `src/interface/ffi/` — Zig FFI (C-ABI query plan compilation)
+- `src/contracts/` — VQL proof contracts
+- `src/parser/` — ReScript parser (surface syntax)
+- `adapter/` — V-lang API layer
 
-` .machine_readable/anchors/ANCHOR.a2ml `
+### Build Artefacts
 
-Do not place `ANCHOR.a2ml` at repository root.
-
-### Maintenance Policies: `.machine_readable/policies/` ONLY
-
-Canonical maintenance/governance files MUST exist under:
-
-` .machine_readable/policies/ `
-
-Minimum required files:
-- `MAINTENANCE-AXES.a2ml`
-- `MAINTENANCE-CHECKLIST.a2ml`
-- `SOFTWARE-DEVELOPMENT-APPROACH.a2ml`
-
-Do not place maintenance policy files in repository root.
-
-### Bot Directives: `.machine_readable/bot_directives/` ONLY
-
-Bot-specific instructions for your automated agents.
-
-### Contractiles: `.machine_readable/contractiles/` ONLY
-
-Policy enforcement contracts (k9, dust, lust, must, trust).
-
-### AI Configuration & Guides: `.machine_readable/ai/` ONLY
-
-- `AI.a2ml` - Language-specific or LLM-specific patterns
-- `PLACEHOLDERS.md` - Bootstrap guide
-
-### Community & Forge Metadata: `.github/` ONLY
-
-- `CODEOWNERS` - Review assignments
-- `MAINTAINERS` - Machine-readable contact list
-- `SUPPORT` - Support channels
-- `SECURITY.md` - Technical security policy
-- `CONTRIBUTING.md` - Technical contribution manual
-- `CODE_OF_CONDUCT.md` - Conduct rules
-
-### Agent Instructions
-
-- `0-AI-MANIFEST.a2ml` - THIS FILE (universal entry point)
+- `Justfile` — Task runner
+- `ffi/zig/build.zig` — Zig build configuration
 
 ## CORE INVARIANTS
 
-1. **No state file duplication** - Root must NOT contain STATE.a2ml, META.a2ml, etc.
-2. **Single source of truth** - `.machine_readable/` is authoritative
-3. **No stale metadata** - If root state files exist, they are OUT OF DATE
-4. **License consistency** - All code PMPL-1.0-or-later unless platform requires MPL-2.0
-5. **Author attribution** - Always "{{AUTHOR}} <{{AUTHOR_EMAIL}}>"
-6. **Container images** - MUST use Chainguard base (`cgr.dev/chainguard/wolfi-base:latest` or `cgr.dev/chainguard/static:latest`)
-7. **Container runtime** - Podman, never Docker. Files are `Containerfile`, never `Dockerfile`
-8. **Container orchestration** - `selur-compose`, never `docker-compose`
+1. **No `believe_me`** — Zero instances in any Idris2 code. All proofs are real.
+2. **No `assert_total`** — All functions provably total via `%default total`.
+3. **No `assert_smaller`** — Termination proved structurally.
+4. **No SCM duplication** — `.machine_readable/` is authoritative.
+5. **Idris2 over Ephapax** — When proven Idris2 code conflicts with Ephapax
+   linear types, always choose Idris2. Dependability first.
+6. **License** — PMPL-1.0-or-later throughout.
+7. **Author** — Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+8. **Container images** — Chainguard base, Podman, Containerfile.
 
-## REPOSITORY STRUCTURE
+## THE 10 LEVELS OF TYPE SAFETY
 
-This repo follows the **Dual-Track** architecture:
+### Established (IO-Covered) — Levels 1-6
 
-```
-[YOUR-REPO-NAME]/
-├── 0-AI-MANIFEST.a2ml         # THIS FILE (start here)
-├── README.adoc                 # High-level orientation (Rich Human)
-├── ROADMAP.adoc                # Future direction
-├── CONTRIBUTING.adoc           # Human contribution guide
-├── GOVERNANCE.adoc             # Decision-making model
-├── Justfile                    # Task runner
-├── Containerfile               # OCI build
-├── LICENSE                     # Primary license
-├── src/                        # Source code
-│   └── interface/              # Verified Interface Seams
-│       ├── abi/                # Idris2 ABI (The Spec)
-│       ├── ffi/                # Zig FFI (The Bridge)
-│       └── generated/          # C Headers (The Result)
-├── container/                  # Stapeln container ecosystem
-├── docs/                       # Technical depths
-│   ├── attribution/            # Citations, owners, maintainers (adoc)
-│   ├── architecture/           # Topology, diagrams
-│   ├── theory/                 # Domain theory
-│   └── practice/               # Manuals
-├── docs/legal/                  # Legal exhibits and full texts
-└── .machine_readable/          # ALL machine-readable metadata
-```
+| Level | Name | What it Guarantees |
+|-------|------|--------------------|
+| 1 | Parse-time safety | Malformed queries rejected before processing |
+| 2 | Schema-binding safety | Column/table references validated against live schema |
+| 3 | Type-compatible ops | Arithmetic/comparison only on compatible types |
+| 4 | Null-safety | Nullable vs non-nullable tracked through joins |
+| 5 | Injection-proof | Parameterised queries enforced at type level |
+| 6 | Result-type safety | Return types known at compile time |
+
+### Research-Identified — Levels 7-10
+
+| Level | Name | What it Guarantees |
+|-------|------|--------------------|
+| 7 | Cardinality safety | Return count guarantees in the type system |
+| 8 | Effect-tracking | Read vs write vs DDL distinguished at type level |
+| 9 | Temporal safety | Bi-temporal queries carry time bounds in types |
+| 10 | Linearity safety | Connection/transaction handles are linear types |
+
+### TypeQL-Experimental Extension Mechanisms (for Levels 7-10)
+
+| Mechanism | VQL-UT Syntax | Idris2 Encoding |
+|-----------|---------------|-----------------|
+| Linear types | `CONSUME AFTER N USE` | QTT quantity `1` on `Connection` |
+| Session types | `WITH SESSION protocol` | `Session : SessionState -> Type` |
+| Effect systems | `EFFECTS { Read, Write }` | Effect set with subsumption proofs |
+| Modal types | `IN TRANSACTION` | Box types indexed by world/scope |
+| Proof-carrying | `PROOF ATTACHED theorem` | `ProvedResult` sigma type |
+| Quantitative TT | `USAGE LIMIT n` | Bounded resource tracking via QTT |
+
+## RELATED PROJECTS
+
+| Project | Relationship |
+|---------|-------------|
+| nextgen-databases/verisimdb | Target database engine (6-modal) |
+| nextgen-databases/verisimdb/docs/VQL-SPEC.adoc | Base VQL grammar (26KB) |
+| nextgen-databases/verisimdb/docs/vql-vs-vql-dt.adoc | VQL-DT spec (superseded by VQL-UT) |
+| nextgen-databases/typeql-experimental | 6 extension mechanisms for levels 7-10 |
+| typell | Core type theory (10 levels originate here) |
+| panll | Panel framework (integrates TypeLL type safety) |
+| nextgen-languages/affinescript | Sister showcase for type safety adoption |
 
 ## SESSION STARTUP CHECKLIST
 
 ✅ Read THIS file (0-AI-MANIFEST.a2ml) first
-✅ Understand canonical location: `.machine_readable/`
-✅ State understanding of canonical locations
-
-## ATTESTATION PROOF
-
-**"I have read the AI manifest. All machine-readable content (state files, anchors, policies, bot directives, contractiles, AI guides) is located in `.machine_readable/` ONLY, and community metadata is in `.github/`. I will not create duplicate files in the root directory."**
+✅ Understand: VQL-UT supersedes VQL-DT
+✅ Understand: 10 levels from TypeLL → PanLL → VQL-UT
+✅ NEVER use vql++/vqlpp naming
+✅ Canonical location: `.machine_readable/`
