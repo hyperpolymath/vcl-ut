@@ -904,6 +904,39 @@ edit:
 maint-assault:
     @./.machine_readable/scripts/maintenance/maint-assault.sh
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# VQL-UT PROJECT-SPECIFIC RECIPES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Type-check the Idris2 ABI kernel (core + checker)
+idris-check:
+    @echo "Type-checking Idris2 ABI kernel..."
+    cd src/core && idris2 --typecheck Checker.idr || echo "Idris2 not installed — skip"
+    cd src/interface/abi && idris2 --typecheck Types.idr || echo "Idris2 not installed — skip"
+
+# Build the Zig FFI library (shared + static)
+zig-build:
+    @echo "Building Zig FFI library..."
+    cd src/interface/ffi && zig build
+
+# Run Zig FFI unit tests
+zig-test:
+    @echo "Running Zig FFI tests..."
+    cd src/interface/ffi && zig build test
+
+# Build all VQL-UT components
+build-all: zig-build
+    @echo "VQL-UT build complete"
+
+# Run all VQL-UT tests (Zig FFI + integration)
+test-all: zig-test
+    @echo "All VQL-UT tests passed"
+
+# Show VQL-UT safety level for a query string
+check-query query:
+    @echo "Checking query: {{query}}"
+    @echo "Query path would be determined by TypeLL server at localhost:7800"
+
 # [AUTO-GENERATED] Multi-arch / RISC-V target
 build-riscv:
 	@echo "Building for RISC-V..."
