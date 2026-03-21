@@ -29,26 +29,31 @@ TypeLL (type theory core — defines the 10 levels)
              └──→ VeriSimDB (6-modal execution engine)
 ----
 
-=== The 3 Query Paths in VeriSimDB
+=== The Two-Tier Model
 
-[cols="1,2,2"]
+[cols="1,2,3"]
 |===
-| Path | Use Case | Type Safety
+| Tier | What | How
 
-| **VQL** (Slipstream)
-| Standard routine queries, fast, no overhead
-| None (runtime checks only)
+| **VQL**
+| The query language
+| Parser (ReScript) → AST → execution. What users write.
 
-| **VQL-DT** (Dependent Types)
-| PROOF clauses (6 proof types: Existence, Integrity, Consistency, Provenance, Freshness, Authorization)
-| Dependent types via Lean
-
-| **VQL-UT** (Ultimate Type-Safe)
-| All 10 levels, research → production
-| Full formal verification via Idris2
+| **VQL-UT**
+| The safety pipeline
+| 10 progressive levels. Sits behind VQL, applies automatically. Simple queries
+  short-circuit at L1-L2. Proof-carrying queries (with `PROOF` clause) go through
+  L9-L10. Invisible to the user except when they add a `PROOF` clause.
 |===
 
-If VQL-UT succeeds, it **replaces VQL-DT entirely** as THE type-safe query path for VeriSimDB.
+NOTE: VQL-DT (Dependent Types) was the original name for the proof-carrying execution
+mode (queries with `PROOF` clauses). It is not a separate product — it is now folded
+into VQL-UT's L9 (Proof Attachment) and L10 (Cross-Cutting) levels. All references to
+"VQL-DT" in older documentation should be read as "VQL-UT L9-L10".
+
+The 6 proof types (EXISTENCE, INTEGRITY, CONSISTENCY, PROVENANCE, FRESHNESS,
+AUTHORIZATION) remain — they are activated by VQL's `PROOF` clause and validated
+by VQL-UT levels L9-L10.
 
 === Adoption Strategy
 
