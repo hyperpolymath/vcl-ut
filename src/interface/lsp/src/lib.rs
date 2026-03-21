@@ -51,9 +51,9 @@ impl VqlutLsp {
         // TODO: Parse the VQL-UT file at the given position to find the table/column
         // For now, return a dummy response with schema-based navigation
         if let Some((table, _)) = self.schema.iter().next() {
-            Some(GotoDefinitionResponse::Scalar(GotoDefinitionLink {
-                target_uri: uri,
-                target_range: Range {
+            Some(GotoDefinitionResponse::Scalar(Location {
+                uri,
+                range: Range {
                     start: Position {
                         line: line as u32,
                         character: character as u32,
@@ -63,22 +63,11 @@ impl VqlutLsp {
                         character: character as u32 + table.len() as u32,
                     },
                 },
-                target_selection_range: Some(Range {
-                    start: Position {
-                        line: line as u32,
-                        character: character as u32,
-                    },
-                    end: Position {
-                        line: line as u32,
-                        character: character as u32 + table.len() as u32,
-                    },
-                }),
-                origin_selection_range: None,
             }))
         } else {
-            Some(GotoDefinitionResponse::Scalar(GotoDefinitionLink {
-                target_uri: uri,
-                target_range: Range {
+            Some(GotoDefinitionResponse::Scalar(Location {
+                uri,
+                range: Range {
                     start: Position {
                         line: line as u32,
                         character: character as u32,
@@ -88,17 +77,6 @@ impl VqlutLsp {
                         character: character as u32 + 10,
                     },
                 },
-                target_selection_range: Some(Range {
-                    start: Position {
-                        line: line as u32,
-                        character: character as u32,
-                    },
-                    end: Position {
-                        line: line as u32,
-                        character: character as u32 + 10,
-                    },
-                }),
-                origin_selection_range: None,
             }))
         }
     }
@@ -130,7 +108,7 @@ impl VqlutLsp {
 
     pub fn handle_completion(&self, params: CompletionParams) -> Option<CompletionResponse> {
         // Extract the position from the params
-        let position = params.text_document_position_params.position;
+        let position = params.text_document_position.position;
         let line = position.line as usize;
         let character = position.character as usize;
 
@@ -175,9 +153,6 @@ impl VqlutLsp {
             }
         }
 
-        Some(CompletionResponse {
-            is_incomplete: false,
-            items,
-        })
+        Some(CompletionResponse::Array(items))
     }
 }

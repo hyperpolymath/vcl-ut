@@ -31,7 +31,7 @@ fn main() {
 
     // Write the output file
     let output_path = args.output.unwrap_or(input_path);
-    fs::write(output_path, formatted).expect("Unable to write file");
+    fs::write(&output_path, formatted).expect("Unable to write file");
 
     println!("Formatted {}", output_path.display());
 }

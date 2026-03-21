@@ -18,6 +18,10 @@ vqlut-lint = { path = "src/interface/lint" }
 [workspace]
 members = [
     ".",
+    "src/core",
+    "src/interface",
     "src/interface/fmt",
     "src/interface/lint",
+    "src/interface/lsp",
+    "src/interface/dap",
 ]
