@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+[package]
+name = "vql-ut"
+version = "0.1.0"
+edition = "2021"
+license = "PMPL-1.0-or-later"
+authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
+repository = "https://github.com/hyperpolymath/vql-ut"
+description = "VQL-UT: 10-level type-safe query language for VeriSimDB"
+
+# The top-level crate re-exports the formatter and linter for integration testing.
+# LSP and DAP are separate binaries with heavier dependencies.
+
+[dependencies]
+vqlut-fmt = { path = "src/interface/fmt" }
+vqlut-lint = { path = "src/interface/lint" }
+
+[workspace]
+members = [
+    ".",
+    "src/interface/fmt",
+    "src/interface/lint",
+]

@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+[package]
+name = "vqlut-dap"
+version = "0.1.0"
+edition = "2021"
+license = "PMPL-1.0-or-later"
+authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
+repository = "https://github.com/hyperpolymath/vql-ut"
+
+[lib]
+name = "vqlut_dap"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vqlut-dap"
+path = "src/main.rs"
+
+[dependencies]
+# DAP
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+
+# VQL-UT
+vqlut-core = { path = "../../core" }
+vqlut-interface = { path = "../../interface" }
