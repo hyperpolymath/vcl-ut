@@ -40,3 +40,40 @@ that MUST hold at all times.
 - description: No Makefiles (use Justfile)
 - run: test ! -f Makefile
 - severity: warning
+
+## Invariants
+
+### checker-proof
+- description: Idris2 checker core is present and maintained.
+- run: test -f src/core/Checker.idr
+- severity: critical
+
+### grammar-proof
+- description: The Idris2 grammar definition is available for parser alignment.
+- run: test -f src/core/Grammar.idr
+- severity: critical
+
+### levels-proof
+- description: The 10-level lattice file exists for the type safety hierarchy.
+- run: test -f src/core/Levels.idr
+- severity: warning
+
+### schema-proof
+- description: Schema validation semantics are captured.
+- run: test -f src/core/Schema.idr
+- severity: warning
+
+### bridge-parser
+- description: The ReScript parser bridge file remains tracked.
+- run: test -f src/bridges/VqlUtParser.res
+- severity: critical
+
+### no-template-placeholders
+- description: Template tokens ({{PROJECT}}, {{PLACEHOLDER}}) must not appear in the source tree.
+- run: "! rg '{{PROJECT}}\\|{{PLACEHOLDER}}' -n src -g'*.*' 2>/dev/null | head -1 | grep -q ."
+- severity: error
+
+### placeholder-fuzz
+- description: Remove placeholder fuzz harnesses.
+- run: test ! -f tests/fuzz/placeholder.txt
+- severity: warning
