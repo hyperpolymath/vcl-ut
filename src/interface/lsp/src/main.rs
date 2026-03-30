@@ -10,6 +10,35 @@ use std::error::Error;
 mod lib;
 use lib::VqlutLsp;
 
+/// Send an LSP result response, converting serialization failures to LSP
+/// error responses rather than panicking. This ensures the server never
+/// crashes on a malformed result — it reports the error to the client.
+fn send_result<T: serde::Serialize>(
+    connection: &Connection,
+    id: RequestId,
+    result: &T,
+) -> Result<(), Box<dyn std::error::Error>> {
+    match serde_json::to_value(result) {
+        Ok(value) => {
+            let resp = Response { id, result: Some(value), error: None };
+            connection.sender.send(Message::Response(resp))?;
+        }
+        Err(e) => {
+            let resp = Response {
+                id,
+                result: None,
+                error: Some(lsp_server::ResponseError {
+                    code: -32603, // Internal error (JSON-RPC)
+                    message: format!("Result serialization failed: {}", e),
+                    data: None,
+                }),
+            };
+            connection.sender.send(Message::Response(resp))?;
+        }
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // Create the transport (stdio, TCP, etc.)
@@ -46,35 +75,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 match cast::<request::GotoDefinition>(req.clone()) {
                     Ok((id, params)) => {
                         let result = vqlut_lsp.handle_goto_definition(params);
-                        let result = serde_json::to_value(&result).unwrap();
-                        let resp = Response {
-                            id,
-                            result: Some(result),
-                            error: None,
-                        };
-                        connection.sender.send(Message::Response(resp))?;
+                        send_result(&connection, id, &result)?;
                     }
                     _ => match cast::<request::HoverRequest>(req.clone()) {
                         Ok((id, params)) => {
                             let result = vqlut_lsp.handle_hover(params);
-                            let result = serde_json::to_value(&result).unwrap();
-                            let resp = Response {
-                                id,
-                                result: Some(result),
-                                error: None,
-                            };
-                            connection.sender.send(Message::Response(resp))?;
+                            send_result(&connection, id, &result)?;
                         }
                         _ => match cast::<request::Completion>(req.clone()) {
                             Ok((id, params)) => {
                                 let result = vqlut_lsp.handle_completion(params);
-                                let result = serde_json::to_value(&result).unwrap();
-                                let resp = Response {
-                                    id,
-                                    result: Some(result),
-                                    error: None,
-                                };
-                                connection.sender.send(Message::Response(resp))?;
+                                send_result(&connection, id, &result)?;
                             }
                             _ => {
                                 eprintln!("Unknown request: {:?}", req);
