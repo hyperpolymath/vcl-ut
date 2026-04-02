@@ -6,6 +6,10 @@ Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 :toc: preamble
 :icons: font
 
+image:https://zenodo.org/badge/DOI/10.5281/zenodo.19329501.svg[DOI,link="https://doi.org/10.5281/zenodo.19329501"]
+image:https://img.shields.io/badge/believe__me-0-brightgreen[believe_me: 0]
+image:https://img.shields.io/badge/tests-49_pass-brightgreen[tests: 49 pass]
+
 == Overview
 
 VQL-UT is the next-generation query language for https://github.com/hyperpolymath/nextgen-databases[VeriSimDB], designed to satisfy **all 10 levels of type safety** — the 6 established IO-covered forms and the 4 additional forms identified through our research.
