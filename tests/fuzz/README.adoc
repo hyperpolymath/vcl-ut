@@ -1,0 +1,12 @@
+= Fuzz Surface
+
+This directory contains the QuickCheck-based fuzz harness for VQL-UT.
+
+Run it from the repository root with:
+
+----
+cargo test --test quickcheck -- --nocapture
+----
+
+The harness exercises the public formatter and linter on arbitrary input and
+checks that each tool stays deterministic and stable under repeated calls.

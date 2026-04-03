@@ -15,6 +15,13 @@ description = "VQL-UT: 10-level type-safe query language for VeriSimDB"
 vqlut-fmt = { path = "src/interface/fmt" }
 vqlut-lint = { path = "src/interface/lint" }
 
+[dev-dependencies]
+quickcheck = "1"
+
+[[test]]
+name = "quickcheck"
+path = "tests/fuzz/quickcheck.rs"
+
 [workspace]
 members = [
     ".",
