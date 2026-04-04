@@ -15,6 +15,14 @@ description = "VQL-UT: 10-level type-safe query language for VeriSimDB"
 vqlut-fmt = { path = "src/interface/fmt" }
 vqlut-lint = { path = "src/interface/lint" }
 
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1"
+
+[[bench]]
+name = "vql_bench"
+harness = false
+
 [workspace]
 members = [
     ".",
