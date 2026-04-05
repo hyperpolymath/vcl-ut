@@ -11,7 +11,7 @@ Every year, billions of pounds are lost to bugs that type safety would have
 prevented. Not theoretical bugs. Not edge cases. Bugs that crash stock markets,
 expose the medical records of millions, kill patients, and drain bank accounts.
 
-This document explains what type safety is, why it matters, and how VQL-UT's
+This document explains what type safety is, why it matters, and how VCL-total's
 10 levels of type safety aim to make an entire class of catastrophic failures
 _impossible by construction_ -- not merely unlikely, but mathematically ruled
 out.
@@ -66,7 +66,7 @@ not belong.
 
 == The 10 Levels of Type Safety
 
-VQL-UT defines 10 levels of type safety, each building on the previous. The
+VCL-total defines 10 levels of type safety, each building on the previous. The
 first 6 are well-established in the academic literature. Levels 7-10 are
 additional protections identified through our research, addressing real failure
 modes that the first 6 leave uncovered.
@@ -114,10 +114,10 @@ query = "SELECT * FROM users WHERE name = '" + userInput + "'"
 
 [source]
 ----
--- SAFE (VQL-UT): parsed at compile time, malformed input rejected
+-- SAFE (VCL-total): parsed at compile time, malformed input rejected
 FETCH users WHERE name = ?name
 -- ?name is a typed parameter. It cannot contain SQL. The parser rejects
--- anything that is not a valid VQL-UT query before it reaches the database.
+-- anything that is not a valid VCL-total query before it reaches the database.
 ----
 
 ==== Why It Matters for Databases
@@ -160,7 +160,7 @@ SELECT order_totl FROM orders WHERE status = 'completed'
 
 [source]
 ----
--- SAFE (VQL-UT): schema-bound at compile time
+-- SAFE (VCL-total): schema-bound at compile time
 FETCH orders.order_total WHERE orders.status = "completed"
 -- Compile error: "order_totl" is not a field in schema "orders".
 -- Did you mean "order_total"?
@@ -210,7 +210,7 @@ SELECT * FROM patients WHERE date_of_birth > 42
 
 [source]
 ----
--- SAFE (VQL-UT): types enforced
+-- SAFE (VCL-total): types enforced
 FETCH patients WHERE patients.date_of_birth > 42
 -- Compile error: cannot compare Date with Int.
 -- "date_of_birth" is Date, but 42 is Int.
@@ -265,7 +265,7 @@ SELECT name, age + 1 FROM users
 
 [source]
 ----
--- SAFE (VQL-UT): nullable types explicit
+-- SAFE (VCL-total): nullable types explicit
 FETCH users.name, users.age + 1
 -- Compile error: "users.age" is Nullable<Int>, but (+) requires Int.
 -- Use: COALESCE(users.age, 0) + 1
@@ -318,10 +318,10 @@ query = "SELECT * FROM accounts WHERE id = " + userInput
 
 [source]
 ----
--- SAFE (VQL-UT): injection impossible by construction
+-- SAFE (VCL-total): injection impossible by construction
 FETCH accounts WHERE accounts.id = ?id
 -- ?id has type AccountId. It is not a string.
--- You cannot put SQL or VQL commands inside an AccountId.
+-- You cannot put SQL or VCL commands inside an AccountId.
 -- The type system makes injection structurally impossible.
 ----
 
@@ -371,7 +371,7 @@ console.log(result.rows[0].totl); // undefined -- typo, no error
 
 [source]
 ----
--- SAFE (VQL-UT): result type known at compile time
+-- SAFE (VCL-total): result type known at compile time
 FETCH orders.id, orders.total, orders.status
 -- Return type: List<{id: OrderId, total: Decimal, status: OrderStatus}>
 -- Accessing .totl would be a compile error.
@@ -423,7 +423,7 @@ user = db.query("SELECT * FROM users WHERE id = 42").first()
 
 [source]
 ----
--- SAFE (VQL-UT): cardinality in the type
+-- SAFE (VCL-total): cardinality in the type
 FETCH UNIQUE users WHERE users.id = ?id
 -- Return type: ExactlyOne<User>
 -- The type system PROVES at compile time that the query returns exactly one
@@ -481,7 +481,7 @@ function getReport(db) {
 
 [source]
 ----
--- SAFE (VQL-UT): effects tracked in types
+-- SAFE (VCL-total): effects tracked in types
 FETCH orders.total EFFECTS { Read }
 -- This query is typed as Read-only. It CANNOT modify data.
 -- Attempting to add a DELETE or UPDATE inside a Read context
@@ -536,7 +536,7 @@ SELECT price FROM stocks WHERE ticker = 'FTSE100'
 
 [source]
 ----
--- SAFE (VQL-UT): temporal bounds in types
+-- SAFE (VCL-total): temporal bounds in types
 FETCH stocks.price
   WHERE stocks.ticker = "FTSE100"
   AS OF NOW - 5 SECONDS
@@ -593,7 +593,7 @@ conn.execute("INSERT INTO logs ...")  # USE AFTER CLOSE
 
 [source]
 ----
--- SAFE (VQL-UT): linear types enforce single use
+-- SAFE (VCL-total): linear types enforce single use
 OPEN CONNECTION conn
   INSERT INTO logs ... USING conn
 CLOSE conn
@@ -639,7 +639,7 @@ Imagine a world where:
 This is not science fiction. It is what happens when you apply dependent types,
 linear types, effect systems, and formal verification to a query language.
 
-VQL-UT is the path to that world. Each of the 10 levels brings us closer.
+VCL-total is the path to that world. Each of the 10 levels brings us closer.
 Some levels are well-understood and ready for production. Others are active
 research. But the destination is clear: a database query language where
 correctness is not a goal but a _mathematical guarantee_.
@@ -651,4 +651,4 @@ simple that there are obviously no deficiencies, and the other way is to make
 it so complicated that there are no obvious deficiencies.
 ____
 
-VQL-UT chooses the first way.
+VCL-total chooses the first way.

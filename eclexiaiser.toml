@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
-# eclexiaiser manifest for vql-ut
+# eclexiaiser manifest for vcl-total
 
 [project]
-name = "vql-ut"
+name = "vcl-total"
 
 [[functions]]
 name = "main"

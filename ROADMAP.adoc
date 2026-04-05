@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
-= VQL-UT Roadmap
+= VCL-total Roadmap
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 
 == Current Status
@@ -10,7 +10,7 @@ Parser work not yet started.
 == Milestones
 
 === v0.1.0 — Foundation (Levels 1-3)
-* [ ] VQL-UT grammar specification (EBNF extending VQL v3.0)
+* [ ] VCL-total grammar specification (EBNF extending VCL v3.0)
 * [ ] Idris2 parser with totality proof
 * [ ] Schema representation as dependent types
 * [ ] Type-compatible operation checker
@@ -30,10 +30,10 @@ Parser work not yet started.
 * [ ] Linear types for connections/transactions (Idris2 QTT)
 * [ ] Integrate TypeQL-Experimental mechanisms
 
-=== v0.4.0 — VQL-DT Supersession
-* [ ] All 6 VQL-DT PROOF types expressible in VQL-UT
-* [ ] Migration guide from VQL-DT to VQL-UT
-* [ ] Benchmark: VQL-UT overhead vs VQL-DT overhead
+=== v0.4.0 — VCL-DT Supersession
+* [ ] All 6 VCL-DT PROOF types expressible in VCL-total
+* [ ] Migration guide from VCL-DT to VCL-total
+* [ ] Benchmark: VCL-total overhead vs VCL-DT overhead
 
 === v1.0.0 — Production Release
 * [ ] Performance benchmarks against raw SQL
@@ -43,17 +43,17 @@ Parser work not yet started.
 
 == Dependencies
 
-* **ReScript evangeliser** must prove concept first — VQL-UT and AffineScript
+* **ReScript evangeliser** must prove concept first — VCL-total and AffineScript
   are the two showcase languages that follow
 * **TypeLL** type theory must stabilise for levels 7-10
-* **VeriSimDB** query router must support VQL-UT as a third path alongside
-  Slipstream (VQL) and VQL-DT
+* **VeriSimDB** query router must support VCL-total as a third path alongside
+  Slipstream (VCL) and VCL-DT
 
 == Future Directions
 
 Once v1.0.0 ships:
 
-* Federation support (VQL-UT queries across federated VeriSimDB instances)
-* VQL-UT as LSP language server for IDE integration
+* Federation support (VCL-total queries across federated VeriSimDB instances)
+* VCL-total as LSP language server for IDE integration
 * Formal security audit of injection-proof guarantees (level 5)
 * Academic publication of the 10-level type safety framework

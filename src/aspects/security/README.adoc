@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
-= VQL-UT Security Aspect
+= VCL-total Security Aspect
 
-Security concerns for VQL-UT: injection vector detection at safety level 4,
+Security concerns for VCL-total: injection vector detection at safety level 4,
 schema access control enforcement, and audit logging for all safety level check
 outcomes.

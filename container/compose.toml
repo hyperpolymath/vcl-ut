@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
 #
-# VQL-UT selur-compose configuration
+# VCL-total selur-compose configuration
 #
 # Orchestrates the container stack as verified container bundles (.ctp).
 # Uses selur zero-copy IPC between services on the same host.
@@ -10,7 +10,7 @@
 #   selur-compose up --detach            # Start in background
 #   selur-compose verify                 # Verify all .ctp signatures
 #   selur-compose ps                     # Check status
-#   selur-compose logs -f vql-ut  # Stream logs
+#   selur-compose logs -f vcl-total  # Stream logs
 #   selur-compose down                   # Stop all services
 #
 # Fallback (when selur is not installed):
@@ -23,8 +23,8 @@ version = "1.0"
 # ============================================================================
 
 # Primary application service
-[services.vql-ut]
-image = "ghcr.io/hyperpolymath/vql-ut:latest.ctp"
+[services.vcl-total]
+image = "ghcr.io/hyperpolymath/vcl-total:latest.ctp"
 ports = ["8080:8080"]
 environment = {
   APP_HOST = "[::]",
@@ -32,7 +32,7 @@ environment = {
   APP_LOG_FORMAT = "json",
   APP_DATA_DIR = "/data",
 }
-volumes = ["vql-ut-data:/data"]
+volumes = ["vcl-total-data:/data"]
 restart = "always"
 healthcheck = { test = "curl -sf http://localhost:8080/health", interval = "30s", timeout = "5s", retries = 3 }
 
@@ -41,12 +41,12 @@ healthcheck = { test = "curl -sf http://localhost:8080/health", interval = "30s"
 image = "ghcr.io/hyperpolymath/svalinn:latest.ctp"
 ports = ["443:443", "80:80"]
 environment = {
-  SVALINN_BACKEND = "http://vql-ut:8080",
+  SVALINN_BACKEND = "http://vcl-total:8080",
   SVALINN_POLICY_FILE = "/etc/svalinn/gatekeeper.yaml",
   SVALINN_TLS_AUTO = "true",
 }
 volumes = ["svalinn-config:/etc/svalinn:ro"]
-depends_on = ["vql-ut"]
+depends_on = ["vcl-total"]
 restart = "always"
 healthcheck = { test = "curl -sf http://localhost:80/health", interval = "30s", timeout = "5s", retries = 3 }
 
@@ -54,7 +54,7 @@ healthcheck = { test = "curl -sf http://localhost:80/health", interval = "30s", 
 # Volumes
 # ============================================================================
 
-[volumes.vql-ut-data]
+[volumes.vcl-total-data]
 driver = "local"
 
 [volumes.svalinn-config]

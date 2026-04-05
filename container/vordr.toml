@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
 #
-# Vordr runtime monitoring configuration for VQL-UT
+# Vordr runtime monitoring configuration for VCL-total
 #
 # Vordr watches container health, detects crashes, tracks resource usage,
 # and emits structured logs. It runs alongside the application stack and
@@ -12,7 +12,7 @@
 #   vordr report
 
 [metadata]
-name = "vql-ut"
+name = "vcl-total"
 version = "0.1.0"
 
 # ============================================================================
@@ -79,7 +79,7 @@ format = "json"
 level = "info"
 # Write vordr logs to stdout (captured by Podman) and optionally to file.
 output = "stdout"
-# file = "/var/log/vordr/vql-ut.log"
+# file = "/var/log/vordr/vcl-total.log"
 
 # ============================================================================
 # Notifications (optional)
@@ -95,6 +95,6 @@ output = "stdout"
 
 # [notifications.email]
 # to = "j.d.a.jewell@open.ac.uk"
-# from = "vordr@vql-ut.local"
+# from = "vordr@vcl-total.local"
 # smtp = "smtp://localhost:25"
 # on = ["failure", "resource_critical"]

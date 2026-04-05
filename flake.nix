@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
 # Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 #
-# Nix flake for VQL-UT
+# Nix flake for VCL-total
 #
 # NOTE: guix.scm is the PRIMARY development environment. This flake is provided
 # as a FALLBACK for contributors who use Nix instead of Guix. The .envrc checks
@@ -16,10 +16,10 @@
 # With direnv (.envrc already configured):
 #   direnv allow         # Auto-enters shell on cd
 #
-# TODO: Replace VQL-UT and VQL Ultimate Type-Safety — 10-level query safety checker for VeriSimDB with actual values.
+# TODO: Replace VCL-total and VCL Total Type-Safety — 10-level query safety checker for VeriSimDB with actual values.
 
 {
-  description = "VQL-UT — RSR-compliant project";
+  description = "VCL-total — RSR-compliant project";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -92,19 +92,19 @@
         # Development shell — `nix develop`
         # ---------------------------------------------------------------
         devShells.default = pkgs.mkShell {
-          name = "VQL-UT-dev";
+          name = "VCL-total-dev";
 
           buildInputs = commonTools ++ languageTools;
 
           # Environment variables available inside the shell.
           env = {
-            PROJECT_NAME = "VQL-UT";
+            PROJECT_NAME = "VCL-total";
             RSR_TIER = "infrastructure";
           };
 
           shellHook = ''
             echo ""
-            echo "  VQL-UT — development shell"
+            echo "  VCL-total — development shell"
             echo "  Nix:    $(nix --version 2>/dev/null || echo 'unknown')"
             echo "  Just:   $(just --version 2>/dev/null || echo 'not found')"
             echo ""
@@ -116,7 +116,7 @@
             # consistent whether you enter via 'nix develop' or 'direnv allow'.
             if [ -z "''${DIRENV_IN_ENVRC:-}" ] && [ -f .envrc ]; then
               # Only source the non-nix parts to avoid recursion.
-              export PROJECT_NAME="VQL-UT"
+              export PROJECT_NAME="VCL-total"
               export RSR_TIER="infrastructure"
               if [ -f .env ]; then
                 set -a
@@ -131,7 +131,7 @@
         # Package — `nix build`
         # ---------------------------------------------------------------
         packages.default = pkgs.stdenv.mkDerivation {
-          pname = "VQL-UT";
+          pname = "VCL-total";
           version = "0.1.0";
 
           src = self;
@@ -149,7 +149,7 @@
           #   buildPhase = "zig build -Doptimize=ReleaseSafe";
 
           buildPhase = ''
-            echo "TODO: Add build commands for VQL-UT"
+            echo "TODO: Add build commands for VCL-total"
           '';
 
           installPhase = ''
@@ -158,8 +158,8 @@
           '';
 
           meta = with pkgs.lib; {
-            description = "VQL Ultimate Type-Safety — 10-level query safety checker for VeriSimDB";
-            homepage = "https://github.com/hyperpolymath/VQL-UT";
+            description = "VCL Total Type-Safety — 10-level query safety checker for VeriSimDB";
+            homepage = "https://github.com/hyperpolymath/VCL-total";
             license = licenses.mpl20; # PMPL-1.0-or-later extends MPL-2.0
             maintainers = [];
             platforms = [ "x86_64-linux" "aarch64-linux" ];

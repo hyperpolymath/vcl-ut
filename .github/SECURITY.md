@@ -5,9 +5,9 @@
 TEMPLATE INSTRUCTIONS (delete this block before publishing)
 ============================================================================
 Replace all {{PLACEHOLDER}} values with your information:
-  VQL-UT     - Your project name
+  VCL-total     - Your project name
   hyperpolymath            - GitHub username or org (e.g., hyperpolymath)
-  vql-ut             - Repository name
+  vcl-total             - Repository name
   j.d.a.jewell@open.ac.uk   - Security contact email
   N/A  - Your PGP key fingerprint (40 chars, no spaces)
   https://github.com/hyperpolymath.gpg      - URL to your public PGP key
@@ -203,7 +203,7 @@ If we cannot reach agreement on disclosure timing, we default to 90 days from yo
 
 The following are within scope for security research:
 
-- This repository (`hyperpolymath/vql-ut`) and all its code
+- This repository (`hyperpolymath/vcl-total`) and all its code
 - Official releases and packages published from this repository
 - Documentation that could lead to security issues
 - Build and deployment configurations in this repository
@@ -348,7 +348,7 @@ To stay informed about security updates:
 
 ## Security Best Practices
 
-When using VQL-UT, we recommend:
+When using VCL-total, we recommend:
 
 ### General
 
@@ -399,7 +399,7 @@ This security policy may be updated from time to time. Significant changes will 
 
 ---
 
-*Thank you for helping keep VQL-UT and its users safe.* 🛡️
+*Thank you for helping keep VCL-total and its users safe.* 🛡️
 
 ---
 

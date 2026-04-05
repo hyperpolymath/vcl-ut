@@ -1,9 +1,9 @@
 -- SPDX-License-Identifier: PMPL-1.0-or-later
 -- Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 --
-||| VQL-UT ABI Type Definitions
+||| VCL-total ABI Type Definitions
 |||
-||| Defines the Application Binary Interface for VQL Ultimate Type-Safety,
+||| Defines the Application Binary Interface for VCL Total Type-Safety,
 ||| a 10-level query safety checker for VeriSimDB backends.
 |||
 ||| All type definitions include formal proofs of correctness for
@@ -24,7 +24,7 @@ import Data.Vect
 -- Platform Detection
 --------------------------------------------------------------------------------
 
-||| Supported platforms for VQL-UT ABI
+||| Supported platforms for VCL-total ABI
 public export
 data Platform = Linux | Windows | MacOS | BSD | WASM
 
@@ -38,14 +38,14 @@ thisPlatform =
     pure Linux
 
 --------------------------------------------------------------------------------
--- Query Safety Levels (the 10 levels of VQL-UT)
+-- Query Safety Levels (the 10 levels of VCL-total)
 --------------------------------------------------------------------------------
 
-||| The 10 progressive safety levels that VQL-UT enforces on queries.
+||| The 10 progressive safety levels that VCL-total enforces on queries.
 ||| Each level subsumes all prior levels: a query at level N has passed
 ||| all checks from levels 0 through N.
 |||
-||| Level 0: ParseSafe       — syntactically valid VQL
+||| Level 0: ParseSafe       — syntactically valid VCL
 ||| Level 1: SchemaBound      — all referenced tables/columns exist in schema
 ||| Level 2: TypeCompat       — expression types are compatible (no implicit coercion)
 ||| Level 3: NullSafe         — NULL propagation is explicitly handled
@@ -113,10 +113,10 @@ DecEq SafetyLevel where
   decEq _ _ = No absurd
 
 --------------------------------------------------------------------------------
--- VQL-UT Error Codes
+-- VCL-total Error Codes
 --------------------------------------------------------------------------------
 
-||| Error codes returned by VQL-UT FFI operations.
+||| Error codes returned by VCL-total FFI operations.
 ||| Each maps to a specific failure mode in the safety checking pipeline.
 public export
 data VqlUtError : Type where
@@ -140,7 +140,7 @@ data VqlUtError : Type where
   TemporalBoundsExceeded : VqlUtError
   ||| Linear resource double-consumed (level 9 failure)
   LinearityViolation   : VqlUtError
-  ||| Internal error (bug in VQL-UT itself)
+  ||| Internal error (bug in VCL-total itself)
   InternalError        : VqlUtError
 
 ||| Convert VqlUtError to C-compatible integer tag (0-10)
@@ -194,7 +194,7 @@ DecEq VqlUtError where
 -- Query Mode
 --------------------------------------------------------------------------------
 
-||| VQL-UT query processing modes.
+||| VCL-total query processing modes.
 |||
 ||| Slipstream      — fast path, checks levels 0-4 only (parse through injection)
 ||| DependentTypes  — checks levels 0-7 (adds result typing, cardinality, effects)
@@ -256,7 +256,7 @@ queryHandlePtr (MkQueryHandle ptr) = ptr
 --------------------------------------------------------------------------------
 
 ||| VeriSimDB backend platform detection.
-||| VQL-UT targets VeriSimDB which can run on these platforms.
+||| VCL-total targets VeriSimDB which can run on these platforms.
 public export
 data VeriSimDBBackend = Native | WASM32 | Embedded
 
@@ -350,7 +350,7 @@ cAlignOf p Bits64 = 8
 cAlignOf p Double = 8
 cAlignOf p _      = ptrSize p `div` 8
 
-||| Magic number constant for VQL-UT query plan buffers: "VQLU" in ASCII
+||| Magic number constant for VCL-total query plan buffers: "VQLU" in ASCII
 public export
 vqlutMagic : Bits32
 vqlutMagic = 0x56514C55
@@ -359,7 +359,7 @@ vqlutMagic = 0x56514C55
 -- Verification
 --------------------------------------------------------------------------------
 
-||| Compile-time verification of VQL-UT ABI properties
+||| Compile-time verification of VCL-total ABI properties
 namespace Verify
 
   ||| Verify that all safety level tags are in range [0, 9]

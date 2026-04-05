@@ -1,7 +1,7 @@
 -- SPDX-License-Identifier: PMPL-1.0-or-later
 -- Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 --
-||| VQL-UT Foreign Function Interface Declarations
+||| VCL-total Foreign Function Interface Declarations
 |||
 ||| Declares all C-compatible functions implemented in the Zig FFI layer.
 ||| The pipeline processes queries through progressive safety levels:
@@ -25,7 +25,7 @@ import VqlUt.ABI.Layout
 -- Library Version
 --------------------------------------------------------------------------------
 
-||| Get the VQL-UT ABI version number.
+||| Get the VCL-total ABI version number.
 ||| Returns a semantic version encoded as (major << 16 | minor << 8 | patch).
 export
 %foreign "C:vqlut_abi_version, libvqlut"
@@ -45,10 +45,10 @@ abiVersion = do
 -- Query Pipeline: Parse
 --------------------------------------------------------------------------------
 
-||| Parse a VQL query string into a parse tree handle.
+||| Parse a VCL query string into a parse tree handle.
 ||| This is stage 0 (ParseSafe) of the safety pipeline.
 |||
-||| @param query  Pointer to null-terminated VQL query string
+||| @param query  Pointer to null-terminated VCL query string
 ||| @param mode   QueryMode tag (0=Slipstream, 1=DependentTypes, 2=UltimateTypeSafe)
 ||| @param outHandle  Out-pointer: receives parse tree handle on success
 ||| @return VqlUtError tag (0=Ok, 1=ParseError, ...)
@@ -152,7 +152,7 @@ getSafetyLevel h = do
 -- Resource Cleanup
 --------------------------------------------------------------------------------
 
-||| Destroy (free) any handle returned by VQL-UT.
+||| Destroy (free) any handle returned by VCL-total.
 ||| Safe to call with null (0) — will be a no-op.
 ||| After calling destroy, the handle must not be used again.
 |||
@@ -172,7 +172,7 @@ destroy h = primIO (prim__destroy (queryHandlePtr h))
 
 ||| Get the last error message as a C string.
 ||| Returns null if no error has occurred.
-||| The returned string is valid until the next VQL-UT call on the same thread.
+||| The returned string is valid until the next VCL-total call on the same thread.
 export
 %foreign "C:vqlut_last_error, libvqlut"
 prim__lastError : PrimIO Bits64
@@ -204,4 +204,4 @@ errorDescription CardinalityViolation   = "JOIN cardinality violation"
 errorDescription EffectViolation        = "Untracked side effect"
 errorDescription TemporalBoundsExceeded = "Temporal bounds exceeded"
 errorDescription LinearityViolation     = "Linear resource double-consumed"
-errorDescription InternalError          = "Internal VQL-UT error"
+errorDescription InternalError          = "Internal VCL-total error"

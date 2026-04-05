@@ -7,7 +7,7 @@ Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 :icons: font
 :sectnums:
 
-This document is a detailed walkthrough of all 10 type safety levels in VQL-UT.
+This document is a detailed walkthrough of all 10 type safety levels in VCL-total.
 Each level builds on the previous -- you cannot skip ahead. The foundations
 (levels 1-3) must be solid before the higher levels make sense.
 
@@ -102,17 +102,17 @@ use TypeQL-Experimental extension mechanisms.
 
 === What It Checks
 
-The query conforms to VQL-UT grammar. Keywords are spelt correctly. Brackets
-are balanced. The query is a valid sentence in the VQL-UT language.
+The query conforms to VCL-total grammar. Keywords are spelt correctly. Brackets
+are balanced. The query is a valid sentence in the VCL-total language.
 
 === When It Checks
 
 At **parse time** -- the very first stage of processing, before the query is
 even understood semantically.
 
-=== How VQL-UT Implements It
+=== How VCL-total Implements It
 
-The VQL-UT parser is written in ReScript (extending VeriSimDB's VQL parser)
+The VCL-total parser is written in ReScript (extending VeriSimDB's VCL parser)
 and produces a typed abstract syntax tree (AST). If the input does not match
 the grammar, parsing fails immediately with a clear error message.
 
@@ -146,7 +146,7 @@ their concrete definitions.
 At **compile time**, by comparing the parsed AST against the live database
 schema (or a cached schema snapshot).
 
-=== How VQL-UT Implements It
+=== How VCL-total Implements It
 
 The schema binder is written in Idris2. The database schema is represented as
 a dependent type, meaning the type itself encodes what tables and columns exist:
@@ -186,7 +186,7 @@ a date to a boolean, or take the average of a set of names.
 
 At **compile time**, during type-checking of the bound AST.
 
-=== How VQL-UT Implements It
+=== How VCL-total Implements It
 
 The type checker (Idris2) verifies that operators receive arguments of the
 correct types:
@@ -226,7 +226,7 @@ on nullable values must explicitly handle the `null` case.
 At **compile time**. The null-tracking is integrated into the type system and
 propagated through joins, subqueries, and projections.
 
-=== How VQL-UT Implements It
+=== How VCL-total Implements It
 
 ----
 Schema: users.email is Nullable<Text>
@@ -271,15 +271,15 @@ At **compile time**, by construction. The parser produces a typed AST where
 parameters are typed slots, not string holes. There is no string concatenation
 path that could produce a query.
 
-=== How VQL-UT Implements It
+=== How VCL-total Implements It
 
 ----
--- VQL-UT query with typed parameter
+-- VCL-total query with typed parameter
 FETCH users WHERE users.id = ?id
 
 -- ?id has type Param<UserId>. It is not a string.
 -- The only way to fill ?id is to provide a UserId value.
--- You cannot put VQL commands inside a UserId value because
+-- You cannot put VCL commands inside a UserId value because
 -- UserId is not a string -- it is an opaque type.
 
 -- There is no function that converts String -> Query.
@@ -306,7 +306,7 @@ structured.
 At **compile time**. The type checker infers the result type from the query
 and makes it available to the calling code.
 
-=== How VQL-UT Implements It
+=== How VCL-total Implements It
 
 ----
 Query: FETCH users.name, users.age WHERE users.active = true
@@ -344,13 +344,13 @@ The number of results a query returns is part of the return type:
 At **compile time**, using schema constraints (unique keys, NOT NULL) and query
 structure (LIMIT, DISTINCT, aggregation).
 
-=== How VQL-UT Implements It
+=== How VCL-total Implements It
 
 This level uses the **TypeQL-Experimental** extension mechanisms:
 
 [cols="1,2"]
 |===
-| VQL-UT Syntax | Meaning
+| VCL-total Syntax | Meaning
 
 | `FETCH UNIQUE ...`
 | Returns `ExactlyOne<T>` -- compile error if uniqueness cannot be proved
@@ -409,13 +409,13 @@ enforced at compile time, not by convention.
 
 At **compile time**, using an effect system encoded in Idris2.
 
-=== How VQL-UT Implements It
+=== How VCL-total Implements It
 
 This level uses the **effect system** extension from TypeQL-Experimental:
 
 [cols="1,2"]
 |===
-| VQL-UT Syntax | Effect
+| VCL-total Syntax | Effect
 
 | `EFFECTS { Read }`
 | Read-only. Cannot modify data.
@@ -473,14 +473,14 @@ The compiler ensures:
 
 At **compile time**, using temporal type annotations.
 
-=== How VQL-UT Implements It
+=== How VCL-total Implements It
 
 This level uses the **modal type** and **session type** extensions from
 TypeQL-Experimental:
 
 [cols="1,2"]
 |===
-| VQL-UT Syntax | Temporal Guarantee
+| VCL-total Syntax | Temporal Guarantee
 
 | `AS OF <timestamp>`
 | Point-in-time query -- data as it was at that moment
@@ -546,14 +546,14 @@ handles, cursor positions -- are tracked by the type system. You cannot:
 At **compile time**, using Quantitative Type Theory (QTT) -- the same
 theoretical foundation that powers Idris2's resource tracking.
 
-=== How VQL-UT Implements It
+=== How VCL-total Implements It
 
 This level uses the **linear type** and **QTT** extensions from
 TypeQL-Experimental:
 
 [cols="1,2"]
 |===
-| VQL-UT Syntax | Linearity Guarantee
+| VCL-total Syntax | Linearity Guarantee
 
 | `CONSUME AFTER N USE`
 | Resource is consumed after N uses
@@ -623,7 +623,7 @@ held indefinitely.
 
 == How TypeLL Provides the Foundation
 
-All 10 levels are defined in **TypeLL**, the core type theory. VQL-UT
+All 10 levels are defined in **TypeLL**, the core type theory. VCL-total
 _inherits_ these levels rather than inventing them. This means:
 
 ----
@@ -634,12 +634,12 @@ TypeLL (core type theory)
    ├──→ PanLL (panel framework)
    │       Uses levels 1-10 for UI component safety
    │
-   └──→ VQL-UT (database queries)
+   └──→ VCL-total (database queries)
            Uses levels 1-10 for query safety
 ----
 
 The same mathematical proofs that ensure a PanLL UI panel cannot render invalid
-state also ensure a VQL-UT query cannot execute an invalid operation. The
+state also ensure a VCL-total query cannot execute an invalid operation. The
 theory is shared; only the application domain differs.
 
 == Summary: What Each Level Prevents
@@ -661,7 +661,7 @@ theory is shared; only the application domain differs.
 | Null pointer exceptions, silent blanks in results
 
 | 5 -- Injection
-| SQL/VQL injection attacks -- the #1 web security risk
+| SQL/VCL injection attacks -- the #1 web security risk
 
 | 6 -- Result
 | Runtime type mismatches when processing query results
@@ -680,5 +680,5 @@ theory is shared; only the application domain differs.
 |===
 
 Together, these 10 levels cover the vast majority of database-related bugs
-that have caused real-world catastrophes. The goal of VQL-UT is to eliminate
+that have caused real-world catastrophes. The goal of VCL-total is to eliminate
 all of them at compile time, with zero runtime overhead.

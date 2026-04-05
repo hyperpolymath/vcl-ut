@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
-//! Comprehensive L3 integration tests for VQL-UT.
+//! Comprehensive L3 integration tests for VCL-total.
 //!
 //! Test categories:
 //!   - Point-to-point: test each tool (formatter, linter) individually
 //!   - End-to-end: parse -> format -> lint pipeline
 //!   - Aspect: error messages, edge cases, empty queries, malformed syntax
-//!   - Type levels: exercise the 10 VQL-UT type safety levels where applicable
+//!   - Type levels: exercise the 10 VCL-total type safety levels where applicable
 
-use vql_ut::fmt::format_vqlut;
-use vql_ut::lint::{lint_vqlut, LintIssue};
+use vcl_total::fmt::format_vqlut;
+use vcl_total::lint::{lint_vqlut, LintIssue};
 
 // ============================================================================
 // Point-to-point: Formatter
@@ -426,9 +426,9 @@ fn aspect_lint_keyword_at_line_start_not_surrounded_by_spaces() {
 // ============================================================================
 // Type level conceptual tests
 // ============================================================================
-// VQL-UT defines 10 type safety levels. The formatter and linter operate at
+// VCL-total defines 10 type safety levels. The formatter and linter operate at
 // the surface syntax level. These tests verify that the tools handle queries
-// at varying complexity levels that correspond to VQL-UT's type system.
+// at varying complexity levels that correspond to VCL-total's type system.
 
 #[test]
 fn level_1_parse_time_safety_valid_syntax() {

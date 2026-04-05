@@ -1,25 +1,25 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
-//! E2E tests for the VQL-UT query pipeline.
+//! E2E tests for the VCL-total query pipeline.
 //!
-//! Exercises the full format → lint pipeline for realistic VQL-UT queries.
+//! Exercises the full format → lint pipeline for realistic VCL-total queries.
 //! Focuses on scenarios not covered by the existing integration tests:
 //! - Multi-keyword queries with complex WHERE predicates
-//! - Error handling for invalid VQL-UT (missing semicolons, wrong case)
+//! - Error handling for invalid VCL-total (missing semicolons, wrong case)
 //! - Consecutive round-trip consistency
 //! - Formatter and linter agreement on canonical output
 
-use vql_ut::fmt::format_vqlut;
-use vql_ut::lint::lint_vqlut;
+use vcl_total::fmt::format_vqlut;
+use vcl_total::lint::lint_vqlut;
 
 // ============================================================================
-// Full VQL type-checking pipeline: parse → format → lint → verify
+// Full VCL type-checking pipeline: parse → format → lint → verify
 // ============================================================================
 
 #[test]
 fn e2e_full_pipeline_simple_select_clean() {
-    // A fully correct VQL-UT query should pass the full pipeline cleanly.
+    // A fully correct VCL-total query should pass the full pipeline cleanly.
     let query = "SELECT id;\n";
     let formatted = format_vqlut(query);
     let issues = lint_vqlut(&formatted);
@@ -81,7 +81,7 @@ fn e2e_full_pipeline_complex_multiclause_query() {
 }
 
 // ============================================================================
-// Error handling for invalid VQL-UT
+// Error handling for invalid VCL-total
 // ============================================================================
 
 #[test]

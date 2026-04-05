@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
-= VQL-UT ABI Definitions (Idris2)
+= VCL-total ABI Definitions (Idris2)
 
-Formal ABI definitions for VQL-UT, written in Idris2 with dependent type proofs.
+Formal ABI definitions for VCL-total, written in Idris2 with dependent type proofs.
 
 == Files
 

@@ -7,9 +7,9 @@ Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 :icons: font
 :sectnums:
 
-VQL-UT is a query language for VeriSimDB. Before you can understand VQL-UT,
+VCL-total is a query language for VeriSimDB. Before you can understand VCL-total,
 you need to understand VeriSimDB. This document explains what VeriSimDB is,
-what makes it different, and how VQL-UT fits into the picture.
+what makes it different, and how VCL-total fits into the picture.
 
 == What Is a Database? (30 Seconds)
 
@@ -162,26 +162,26 @@ need:
 |===
 | Path | What It Does | Type Safety | Speed
 
-| **VQL** (Slipstream)
+| **VCL** (Slipstream)
 | Standard queries for everyday use. Fast and simple. No formal proofs.
 | None (runtime checks only)
 | Fastest
 
-| **VQL-DT** (Dependent Types)
+| **VCL-DT** (Dependent Types)
 | Queries with PROOF clauses. The database proves properties of your results.
 | Dependent types (6 proof types)
 | Medium
 
-| **VQL-UT** (Ultimate Type-Safe)
+| **VCL-total** (Total Type-Safe)
 | All 10 levels of type safety. The query is mathematically verified _before_
   execution.
 | Full formal verification
 | Fastest at runtime (checking is compile-time)
 |===
 
-=== VQL (Slipstream) -- The Fast Path
+=== VCL (Slipstream) -- The Fast Path
 
-VQL is VeriSimDB's native query language. It is designed for routine operations
+VCL is VeriSimDB's native query language. It is designed for routine operations
 where speed matters and you trust the query:
 
 [source]
@@ -194,9 +194,9 @@ FETCH users
 This queries the document and graph modalities for users matching "Smith". It
 runs immediately with no compile-time checks beyond basic syntax validation.
 
-=== VQL-DT (Dependent Types) -- The Proof Path
+=== VCL-DT (Dependent Types) -- The Proof Path
 
-VQL-DT adds PROOF clauses that ask the database to prove properties of the
+VCL-DT adds PROOF clauses that ask the database to prove properties of the
 result:
 
 [source]
@@ -221,12 +221,12 @@ There are 6 proof types:
 | **Authorisation** | The caller has permission
 |===
 
-VQL-DT is powerful, but it only covers dependent types -- one dimension of
+VCL-DT is powerful, but it only covers dependent types -- one dimension of
 type safety.
 
-=== VQL-UT (Ultimate Type-Safe) -- The Full Path
+=== VCL-total (Total Type-Safe) -- The Full Path
 
-VQL-UT is where this project lives. It extends VQL with _all 10 levels_ of
+VCL-total is where this project lives. It extends VCL with _all 10 levels_ of
 type safety:
 
 [source]
@@ -253,22 +253,22 @@ This single query:
 
 All of this checking happens at **compile time**. By the time the query reaches
 VeriSimDB's execution engine, it is _proven correct_. There is no runtime
-overhead for the safety -- you get the speed of VQL with the guarantees of
+overhead for the safety -- you get the speed of VCL with the guarantees of
 formal verification.
 
-== How VQL-UT Fits In
+== How VCL-total Fits In
 
-VQL-UT is not a separate database. It is a query language layer that sits on
+VCL-total is not a separate database. It is a query language layer that sits on
 top of VeriSimDB:
 
 ----
                         +---------------+
                         |  Your Query   |
-                        |  (.vqlut)     |
+                        |  (.vcltotal)     |
                         +-------+-------+
                                 |
                     +-----------v-----------+
-                    |  VQL-UT Compiler      |
+                    |  VCL-total Compiler      |
                     |  (10-level checker)   |
                     +-----------+-----------+
                                 |
@@ -278,17 +278,17 @@ top of VeriSimDB:
                     +-----------------------+
 ----
 
-You write queries in VQL-UT. The compiler checks them against all 10 levels.
+You write queries in VCL-total. The compiler checks them against all 10 levels.
 If they pass, they are compiled into an optimised query plan that VeriSimDB
 executes at full speed.
 
-If VQL-UT succeeds as a project, it will **replace VQL-DT entirely**, becoming
-THE type-safe query path for VeriSimDB. VQL (Slipstream) will remain as the
+If VCL-total succeeds as a project, it will **replace VCL-DT entirely**, becoming
+THE type-safe query path for VeriSimDB. VCL (Slipstream) will remain as the
 fast, unverified path for trusted internal queries.
 
 == The Type Theory Foundation
 
-VQL-UT does not invent its own type theory. It inherits from **TypeLL**, a core
+VCL-total does not invent its own type theory. It inherits from **TypeLL**, a core
 type theory that defines the 10 safety levels. TypeLL also feeds into **PanLL**
 (a panel framework for user interfaces). The same mathematical foundation
 powers both database queries and UI safety:
@@ -298,13 +298,13 @@ TypeLL (core type theory -- defines the 10 levels)
    │
    ├──→ PanLL (panel framework type safety)
    │
-   └──→ VQL-UT (database query language type safety)
+   └──→ VCL-total (database query language type safety)
              │
              └──→ VeriSimDB (8-modal execution engine)
 ----
 
 This means advances in the type theory benefit both projects simultaneously.
-A proof technique discovered for VQL-UT can be applied to PanLL, and vice versa.
+A proof technique discovered for VCL-total can be applied to PanLL, and vice versa.
 
 == Summary
 
@@ -320,14 +320,14 @@ A proof technique discovered for VQL-UT can be applied to PanLL, and vice versa.
 | The 8 simultaneous representations of a single entity (graph, vector, tensor,
   semantic, document, temporal, provenance, spatial).
 
-| **VQL**
+| **VCL**
 | The fast, unverified query language for VeriSimDB.
 
-| **VQL-DT**
-| VQL with dependent-type PROOF clauses (6 proof types).
+| **VCL-DT**
+| VCL with dependent-type PROOF clauses (6 proof types).
 
-| **VQL-UT**
-| VQL with all 10 levels of type safety -- the goal of this project.
+| **VCL-total**
+| VCL with all 10 levels of type safety -- the goal of this project.
 
 | **TypeLL**
 | The core type theory that defines the 10 levels.

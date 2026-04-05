@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
-= VQL-UT Interface Layer
+= VCL-total Interface Layer
 
 The interface layer defines the ABI (Application Binary Interface) and FFI
-(Foreign Function Interface) for VQL-UT, following the hyperpolymath
+(Foreign Function Interface) for VCL-total, following the hyperpolymath
 Idris2-ABI / Zig-FFI standard.
 
 == Subdirectories

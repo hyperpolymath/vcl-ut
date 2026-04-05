@@ -12,10 +12,10 @@
 
 ### Query Type Checker (src/core/Checker.idr)
 - Already in Idris2 — verify it type-checks and that the checking algorithm is total
-- Prove: well-typed VQL-UT queries produce well-typed results against a schema
+- Prove: well-typed VCL-total queries produce well-typed results against a schema
 
 ### Grammar Specification (src/core/Grammar.idr)
-- VQL-UT grammar defined in Idris2 — prove the grammar is unambiguous
+- VCL-total grammar defined in Idris2 — prove the grammar is unambiguous
 - Prove: parser (ReScript side) accepts exactly the Idris2-specified grammar
 
 ### Level System (src/core/Levels.idr)
@@ -39,4 +39,4 @@
 
 ## Priority
 
-**HIGH** — VQL-UT is the query language for VeriSimDB. Incorrect type checking could allow queries that corrupt data or return wrong results. The Idris2 core is already in place — completing the proofs is high value for low effort.
+**HIGH** — VCL-total is the query language for VeriSimDB. Incorrect type checking could allow queries that corrupt data or return wrong results. The Idris2 core is already in place — completing the proofs is high value for low effort.

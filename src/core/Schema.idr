@@ -1,7 +1,7 @@
 -- SPDX-License-Identifier: PMPL-1.0-or-later
 -- Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 
-||| VQL-UT Core Schema — Octad Schema Representation
+||| VCL-total Core Schema — Octad Schema Representation
 |||
 ||| Defines the schema structure for VeriSimDB octads using dependent types.
 ||| A schema describes the fields available in each of the 8 modalities,

@@ -10,10 +10,9 @@ image:https://zenodo.org/badge/DOI/10.5281/zenodo.19329501.svg[DOI,link="https:/
 image:https://img.shields.io/badge/believe__me-0-brightgreen[believe_me: 0]
 image:https://img.shields.io/badge/tests-49_pass-brightgreen[tests: 49 pass]
 
-IMPORTANT: This project was renamed on 2026-04-05 from *VQL-UT* to *VCL-total*.
-The rename is currently README + CHANGELOG only — the rest of the repo (sources,
-tests, crate names, file extensions, CI) still uses the `vql-ut` identifiers
-and will be migrated in subsequent passes. See CHANGELOG.md for details.
+IMPORTANT: This project was renamed on 2026-04-05 from **VQL-UT** (VQL Ultimate
+Type-safe) to **VCL-total** (VeriSim Consonance Language — Total Type-safe).
+See CHANGELOG.md for details. The GitHub repository name is still `vql-ut`.
 
 == Overview
 
@@ -34,10 +33,10 @@ against a passive store. Operations split into propositional (`DECLARE`, `ASSERT
 `RETRACT`) and epistemic (`INSPECT`, `VERIFY`). "Query language" is therefore a
 misnomer; "consonance language" names the actual thing.
 
-NOTE: The earlier names for this project were "vql++" (briefly) and "VQL-UT"
-(the bulk of its history). All references to vql++, vqlpp, VQL Plus Plus, or
-VQL-UT should be read as VCL-total. File extension (future): `.vcltotal`
-(currently `.vqlut`).
+NOTE: Earlier names for this project were "vql++" (briefly), "VQL-UT" (the
+bulk of its history), and "VQL Ultimate Type-Safe". All references to vql++,
+vqlpp, VQL Plus Plus, VQL-UT, or VQL Ultimate Type-Safe should be read as
+VCL-total. File extension: `.vcltotal`.
 
 == Lineage
 
@@ -73,11 +72,11 @@ TypeLL (type theory core — defines the 10 levels)
   through L9-L10. Invisible to the user except when they add a `PROOF` clause.
 |===
 
-NOTE: VCL-DT (Dependent Types) was the original name for the proof-carrying
+NOTE: VQL-DT (Dependent Types) was the original name for the proof-carrying
 execution mode (statements with `PROOF` clauses). It is not a separate product —
 it is folded into VCL-total's L9 (Proof Attachment) and L10 (Cross-Cutting)
-levels. All references to "VCL-DT" or "VQL-DT" in older documentation should be
-read as "VCL-total L9-L10".
+levels. All references to "VQL-DT" in older documentation should be read as
+"VCL-total L9-L10".
 
 The 6 proof types (EXISTENCE, INTEGRITY, CONSISTENCY, PROVENANCE, FRESHNESS,
 AUTHORIZATION) remain — they are activated by VCL's `PROOF` clause and validated
@@ -88,8 +87,8 @@ by VCL-total levels L9-L10.
 The type safety story unfolds in three phases:
 
 1. **ReScript evangeliser** proves the concept first — demonstrate the value of these type safety levels in ReScript itself, where the developer community can experience them firsthand
-2. Once proven, **VQL-UT** and **AffineScript** become the two showcase languages for teaching people the 10 levels of type safety
-3. VQL-UT handles the database query domain; AffineScript handles general-purpose programming
+2. Once proven, **VCL-total** and **AffineScript** become the two showcase languages for teaching people the 10 levels of type safety
+3. VCL-total handles the database-interaction domain; AffineScript handles general-purpose programming
 
 == The 10 Levels of Type Safety
 
@@ -99,24 +98,12 @@ The type safety story unfolds in three phases:
 |===
 | Level | Name | Description
 
-| 1 | **Parse-time safety** | Query syntax verified at parse time — malformed queries rejected before processing
-| 2 | **Schema-binding safety** | Column names, table references, relationships validated against live schema
-| 3 | **Type-compatible operations** | Arithmetic, comparison, aggregation only on compatible types
-| 4 | **Null-safety** | Nullable vs non-nullable tracked through joins, subqueries, projections
-| 5 | **Injection-proof safety** | Parameterised queries enforced at type level — interpolation impossible by construction
-| 6 | **Result-type safety** | Query return types known at compile time — no runtime casting
-|===
-
-=== Research-Identified — 4 Additional Levels
-
-[cols="1,2,3"]
-|===
-| Level | Name | Description
-
-| 7 | **Cardinality safety** | Return count guarantees (exactly-one, at-most-one, many) in the type system
-| 8 | **Effect-tracking safety** | Read vs write vs DDL distinguished at type level — pure queries cannot mutate
-| 9 | **Temporal safety** | Bi-temporal and system-time queries carry time bounds in types — prevents stale reads
-| 10 | **Linearity safety** | Connection and transaction handles are linear types — use-after-close impossible
+| L1 | Syntactic parsability | Parser accepts the input.
+| L2 | Well-formedness | Structure matches the grammar.
+| L3 | Schema conformance | References resolve to declared entities.
+| L4 | Type compatibility | Operator arities and types align.
+| L5 | Nullability tracking | `NULL` propagates explicitly through joins.
+| L6 | Injection resistance | Parameterisation and escaping are type-level invariants.
 |===
 
 === TypeQL-Experimental Extension Mechanisms (Levels 7-10)
@@ -125,7 +112,7 @@ The https://github.com/hyperpolymath/nextgen-databases[typeql-experimental] sub-
 
 [cols="1,2,2"]
 |===
-| Mechanism | VQL-UT Syntax | Idris2 Encoding
+| Mechanism | VCL-total Syntax | Idris2 Encoding
 
 | Linear types | `CONSUME AFTER N USE` | QTT quantity `1` on `Connection`
 | Session types | `WITH SESSION protocol` | `Session : SessionState -> Type` indexed type
@@ -140,12 +127,12 @@ The https://github.com/hyperpolymath/nextgen-databases[typeql-experimental] sub-
 [source]
 ----
                         +---------------+
-                        |  VQL Source   |
-                        |  (.vqlut)     |
+                        |  VCL Source   |
+                        |  (.vcltotal)  |
                         +-------+-------+
                                 |
                     +-----------v-----------+
-                    |  Parser (Level 1)     |  ReScript — extends VeriSimDB VQL parser
+                    |  Parser (Level 1)     |  ReScript — extends Verisim VCL parser
                     +-----------+-----------+
                                 |
                     +-----------v-----------+
@@ -157,16 +144,15 @@ The https://github.com/hyperpolymath/nextgen-databases[typeql-experimental] sub-
                     +-----------+-----------+
                                 |
                     +-----------v-----------+
-                    |  Effect Analyser      |  Idris2 — cardinality (7), effects (8),
-                    |  (7-10)               |           temporality (9), linearity (10)
+                    |  Safety Checker (7-10)|  Idris2 — linear, session, effects, proofs
                     +-----------+-----------+
                                 |
                     +-----------v-----------+
-                    |  Zig FFI Codegen      |  Compiles to C-ABI query plan
+                    |  FFI Bridge           |  Zig — C-ABI, zero-copy plan emission
                     +-----------+-----------+
                                 |
                     +-----------v-----------+
-                    |  VeriSimDB Engine     |  6-modal execution
+                    |  Verisim              |  8-modal octad storage engine
                     +-----------------------+
 ----
 
@@ -177,39 +163,32 @@ The https://github.com/hyperpolymath/nextgen-databases[typeql-experimental] sub-
 | Layer | Language | Purpose
 
 | Core type system | Idris2 | Dependent types for all 10 safety levels. `%default total`.
-| FFI bridge | Zig | C-ABI query plan compilation. Zero-copy result sets.
-| Parser | ReScript | Surface syntax parsing, extending VeriSimDB's VQL parser.
-| API layer | V-lang | REST/gRPC/GraphQL endpoints for query submission.
-| VeriSimDB integration | Elixir | 6-modal storage engine connection via NIFs.
+| FFI bridge | Zig | C-ABI plan compilation. Zero-copy result sets.
+| Parser | ReScript | Surface syntax parsing, extending Verisim's VCL parser.
+| API layer | V-lang | REST/gRPC/GraphQL endpoints for statement submission.
+| Verisim integration | Elixir | 8-modal octad storage connection via NIFs.
 |===
 
 == Roadmap
 
 === Phase 1 — Foundation (Levels 1-3)
-- [ ] VQL-UT grammar specification (EBNF, extending VQL v3.0)
+- [ ] VCL-total grammar specification (EBNF, extending VCL v3.0)
 - [ ] Idris2 parser with totality proof
 - [ ] Schema representation as dependent types
 - [ ] Type-compatible operation checker
-- [ ] Zig FFI for query plan emission
-- [ ] Basic test suite against VeriSimDB
+- [ ] Zig FFI for plan emission
+- [ ] Basic test suite against Verisim
 
 === Phase 2 — Safety Core (Levels 4-6)
 - [ ] Null-tracking through join algebra
-- [ ] Injection-proof parameterisation (type-level enforcement)
-- [ ] Result-type inference with compile-time guarantees
-- [ ] Property-based tests (QuickCheck/Hedgehog)
+- [ ] Injection-resistant parameterisation
+- [ ] Integration with Verisim's 8-modal execution
 
-=== Phase 3 — Research Levels (Levels 7-10)
-- [ ] Cardinality annotations and inference
-- [ ] Effect system (Read/Write/DDL monad stack)
-- [ ] Temporal type annotations for bi-temporal queries
-- [ ] Linear types for connections and transactions (Idris2 QTT)
-
-=== Phase 4 — Production Hardening
-- [ ] Performance benchmarks against raw SQL
-- [ ] VeriSimDB 6-modal query planner integration
-- [ ] ReScript client SDK with type generation
-- [ ] Documentation and specification publishing
+=== Phase 3 — Advanced Safety (Levels 7-10)
+- [ ] Linear resource tracking (QTT)
+- [ ] Session-typed protocols
+- [ ] Effect inference
+- [ ] Proof-attached statement execution
 
 == Related Projects
 
@@ -217,14 +196,11 @@ The https://github.com/hyperpolymath/nextgen-databases[typeql-experimental] sub-
 |===
 | Project | Relationship
 
-| https://github.com/hyperpolymath/nextgen-databases[nextgen-databases/verisimdb]
-| Target database engine (6-modal octad storage)
+| https://github.com/hyperpolymath/verisimdb[verisimdb]
+| Target consonance engine (8-modal octad storage)
 
-| nextgen-databases/verisimdb/docs/VQL-SPEC.adoc
-| Base VQL grammar specification (26KB, EBNF appendix)
-
-| nextgen-databases/verisimdb/docs/vql-vs-vql-dt.adoc
-| VQL-DT specification (to be superseded by VQL-UT)
+| verisimdb/docs/VCL-SPEC.adoc
+| Base VCL grammar specification (EBNF appendix)
 
 | nextgen-databases/typeql-experimental
 | 6 extension mechanisms for levels 7-10 (Idris2 kernel + ReScript parser)
@@ -233,26 +209,5 @@ The https://github.com/hyperpolymath/nextgen-databases[typeql-experimental] sub-
 | Core type theory — the 10 levels originate here
 
 | https://github.com/hyperpolymath/panll[panll]
-| Panel framework — integrates TypeLL type safety for UI
-
-| nextgen-languages/affinescript
-| Sister showcase for type safety adoption (general-purpose programming)
+| Panel framework applying the same 10 levels to UI type safety
 |===
-
-== Building
-
-[source,bash]
-----
-# Type-check the Idris2 core
-cd src/interface/abi && idris2 --typecheck
-
-# Build FFI
-cd src/interface/ffi && zig build
-
-# Run tests
-just test
-----
-
-== License
-
-PMPL-1.0-or-later

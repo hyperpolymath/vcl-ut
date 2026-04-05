@@ -1,13 +1,13 @@
 # Clone the repository
 git clone https://github.com/hyperpolymath/vql-ut.git
-cd vql-ut
+cd vcl-total
 
 # Using Nix (recommended for reproducibility)
 nix develop
 
 # Or using toolbox/distrobox
-toolbox create vql-ut-dev
-toolbox enter vql-ut-dev
+toolbox create vcl-total-dev
+toolbox enter vcl-total-dev
 # Install dependencies manually
 
 # Verify setup
@@ -17,7 +17,7 @@ just test    # Run test suite
 
 ### Repository Structure
 ```
-vql-ut/
+vcl-total/
 ├── src/                 # Source code (Perimeter 1-2)
 ├── lib/                 # Library code (Perimeter 1-2)
 ├── extensions/          # Extensions (Perimeter 2)

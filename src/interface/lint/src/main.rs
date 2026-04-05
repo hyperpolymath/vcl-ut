@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
-//! VQL-UT Linting Server
+//! VCL-total Linting Server
 //!
-//! This tool lints VQL-UT query files for syntax and style issues.
+//! This tool lints VCL-total query files for syntax and style issues.
 
 use clap::Parser;
 use std::fs;

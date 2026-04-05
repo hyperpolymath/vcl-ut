@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
-= VQL-UT FFI Implementation (Zig)
+= VCL-total FFI Implementation (Zig)
 
-Zig implementation of the C-compatible FFI layer for VQL-UT.
+Zig implementation of the C-compatible FFI layer for VCL-total.
 Uses a thread-safe, slot-based query context pool for concurrent operation.
 
 == Building

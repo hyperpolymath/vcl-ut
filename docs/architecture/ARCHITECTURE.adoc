@@ -1,24 +1,24 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= VQL-UT Architecture
+= VCL-total Architecture
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 :date: 2026-03-16
 :toc: macro
 :toclevels: 3
 :icons: font
-:description: Comprehensive architecture document for VQL-UT (Verified Query Language — Unified Types)
+:description: Comprehensive architecture document for VCL-total (Verified Query Language — Unified Types)
 
 toc::[]
 
 == System Overview
 
-VQL-UT (Verified Query Language — Unified Types) is a dependently-typed query
+VCL-total (Verified Query Language — Unified Types) is a dependently-typed query
 language compiler that produces machine-checkable proofs of query safety. It
-extends VQL-dt (VeriSimDB's existing dependent type system, ~35% wired) to
+extends VCL-dt (VeriSimDB's existing dependent type system, ~35% wired) to
 cover the full spectrum of safety properties through 10 formally verified
 levels.
 
-Every query entering VQL-UT passes through a six-stage pipeline. Each stage
+Every query entering VCL-total passes through a six-stage pipeline. Each stage
 is responsible for enforcing one or more of the 10 safety levels. The pipeline
 output is not merely a compiled query — it is a *proof certificate* attesting
 that every safety property holds.
@@ -27,7 +27,7 @@ that every safety property holds.
 
 [source]
 ----
-                          VQL-UT PIPELINE
+                          VCL-total PIPELINE
                           ═══════════════
 
   ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
@@ -35,7 +35,7 @@ that every safety property holds.
   │              │    │              │    │              │
   │ ReScript     │    │ Idris2       │    │ Idris2       │
   │ Tokenise &   │    │ Resolve      │    │ Type-check   │
-  │ parse VQL-UT │    │ names &      │    │ all 10       │
+  │ parse VCL-total │    │ names &      │    │ all 10       │
   │ surface      │    │ schema refs  │    │ safety       │
   │ syntax       │    │              │    │ levels       │
   └──────────────┘    └──────────────┘    └──────────────┘
@@ -66,7 +66,7 @@ that every safety property holds.
 
 == The 10 Safety Levels
 
-VQL-UT enforces 10 distinct safety levels, each targeting a specific class of
+VCL-total enforces 10 distinct safety levels, each targeting a specific class of
 bug. The levels are cumulative — a query at Level N has passed all checks from
 Levels 1 through N.
 
@@ -76,7 +76,7 @@ Levels 1 through N.
 
 |L1
 |Construction Safety
-|SQL/VQL injection attacks
+|SQL/VCL injection attacks
 |`Injection.idr`
 |Parse + Bind
 
@@ -230,13 +230,13 @@ consumers via the hyperpolymath ABI/FFI standard.
 
 |**ReScript**
 |Surface syntax parser
-|Consistent with existing VQL parser patterns in VeriSimDB. Compiles to
-JavaScript for browser-based tooling. Extends the VQL v3.0 grammar with 6
+|Consistent with existing VCL parser patterns in VeriSimDB. Compiles to
+JavaScript for browser-based tooling. Extends the VCL v3.0 grammar with 6
 new optional clauses.
 
 |**V-lang**
 |HTTP API gateway
-|Exposes VQL-UT as a REST API for external consumers. Fast compilation,
+|Exposes VCL-total as a REST API for external consumers. Fast compilation,
 minimal runtime. Follows the hyperpolymath V-lang API triple pattern.
 
 |**Elixir**
@@ -291,13 +291,13 @@ tolerance.
 
 == The TypeLL Connection
 
-VQL-UT's 10 safety levels map 1:1 to TypeLL's 10 type theory levels. This is
-not a coincidence — VQL-UT is the *database specialisation* of TypeLL's
+VCL-total's 10 safety levels map 1:1 to TypeLL's 10 type theory levels. This is
+not a coincidence — VCL-total is the *database specialisation* of TypeLL's
 general-purpose type system.
 
 [cols="1,2,2,2"]
 |===
-|Level |TypeLL Concept |VQL-UT Instantiation |Module
+|Level |TypeLL Concept |VCL-total Instantiation |Module
 
 |1
 |Construction Types
@@ -350,9 +350,9 @@ general-purpose type system.
 |`Proofs.idr`
 |===
 
-TypeLL provides the *theory*; VQL-UT provides the *practice*. Every TypeLL level
-has a concrete, tested implementation in VQL-UT's Idris2 kernel. This makes
-VQL-UT both a useful tool and a validation of TypeLL's design.
+TypeLL provides the *theory*; VCL-total provides the *practice*. Every TypeLL level
+has a concrete, tested implementation in VCL-total's Idris2 kernel. This makes
+VCL-total both a useful tool and a validation of TypeLL's design.
 
 == Data Flow
 
@@ -360,7 +360,7 @@ VQL-UT both a useful tool and a validation of TypeLL's design.
 
 [source]
 ----
-  VQL-UT Source Text
+  VCL-total Source Text
   ─────────────────
   "SELECT GRAPH, DOCUMENT
    FROM HEXAD 550e8400-...
@@ -556,13 +556,13 @@ specific obligation that failed, and the source location.
 
 == The Proof Certificate Concept
 
-A proof certificate is a machine-checkable artefact produced by VQL-UT's
+A proof certificate is a machine-checkable artefact produced by VCL-total's
 pipeline. It attests that a query has passed all applicable safety levels.
 
 Properties of a proof certificate:
 
 1. **Independently verifiable**: Any party with the Idris2 type kernel can
-   re-check the certificate without trusting VQL-UT's implementation.
+   re-check the certificate without trusting VCL-total's implementation.
 
 2. **Tamper-evident**: The certificate includes a SHA-256 hash of the query
    AST. Modifying the query invalidates the certificate.
@@ -575,7 +575,7 @@ Properties of a proof certificate:
    compound queries, subject to L10 (cross-cutting invariant) checks.
 
 5. **Versioned**: Certificates are pinned to schema version, Idris2 kernel
-   version, and VQL-UT grammar version. Version mismatches require
+   version, and VCL-total grammar version. Version mismatches require
    re-certification.
 
 === Certificate Format
@@ -587,7 +587,7 @@ Properties of a proof certificate:
   "query_hash": "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
   "schema_version": 3,
   "certified_at": "2026-03-16T10:30:00Z",
-  "kernel_version": "vql-ut-0.1.0",
+  "kernel_version": "vcl-total-0.1.0",
   "idris2_version": "0.8.0",
   "levels": {
     "L1_construction":  { "status": "pass", "module": "Injection.idr" },

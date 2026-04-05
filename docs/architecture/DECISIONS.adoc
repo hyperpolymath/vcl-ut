@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= VQL-UT Architecture Decision Records
+= VCL-total Architecture Decision Records
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 :date: 2026-03-16
 :toc: macro
 :toclevels: 3
 :icons: font
-:description: Architecture Decision Records for VQL-UT design choices
+:description: Architecture Decision Records for VCL-total design choices
 
 toc::[]
 
@@ -32,7 +32,7 @@ toc::[]
 |2026-03-16
 
 |ADR-0004
-|VQL-UT supersedes VQL-DT
+|VCL-total supersedes VCL-DT
 |Accepted
 |2026-03-16
 
@@ -52,7 +52,7 @@ Accepted (2026-03-01)
 
 === Context
 
-VQL-UT requires a dependently-typed language for its type kernel — the
+VCL-total requires a dependently-typed language for its type kernel — the
 component that formally specifies and checks the 10 safety levels. The two
 serious candidates were **Idris2** and **Lean 4**.
 
@@ -80,7 +80,7 @@ Idris2 is built on QTT. Every variable binding carries a quantity:
 - `1` — used exactly once (linear)
 - `omega` — used any number of times (unrestricted)
 
-This means VQL-UT's L3 (Resource Linearity) and L8 (Quantitative Bounds) are
+This means VCL-total's L3 (Resource Linearity) and L8 (Quantitative Bounds) are
 *first-class features of the language*, not encodings. A linear connection is
 simply:
 
@@ -97,7 +97,7 @@ audit.
 
 ==== 2. Erasure Annotations
 
-Idris2's quantity `0` means "erased at runtime". This is critical for VQL-UT's
+Idris2's quantity `0` means "erased at runtime". This is critical for VCL-total's
 proof certificates: the proofs exist at the type level but are erased from the
 compiled output. The compiled query plan carries no proof overhead.
 
@@ -107,7 +107,7 @@ precise and less integrated with the type system.
 ==== 3. Totality Checking Built In
 
 Idris2's `%default total` directive makes totality the default, with explicit
-opt-out via `%default covering` or `partial`. This matches VQL-UT's invariant
+opt-out via `%default covering` or `partial`. This matches VCL-total's invariant
 that all functions must be total.
 
 Lean 4 also has totality checking, but it is less strict by default and requires
@@ -121,7 +121,7 @@ a second formal language, complicating tooling, CI, and developer onboarding.
 
 ==== 5. Practical Concern: Build Speed
 
-Idris2 compiles faster than Lean 4 for the size of modules in VQL-UT (typically
+Idris2 compiles faster than Lean 4 for the size of modules in VCL-total (typically
 100–300 lines). The type-check-edit cycle is noticeably faster.
 
 === Alternatives Considered
@@ -169,13 +169,13 @@ Accepted (2026-03-16)
 
 === Context
 
-The original VQL-dt system had 6 PROOF types. During the design of VQL-UT, the
+The original VCL-dt system had 6 PROOF types. During the design of VCL-total, the
 question arose: why not consolidate into fewer, broader levels? Fewer levels
 would be simpler to explain and implement.
 
 === Decision
 
-VQL-UT has exactly **10 safety levels**, each targeting a distinct class of bug.
+VCL-total has exactly **10 safety levels**, each targeting a distinct class of bug.
 
 === Rationale
 
@@ -243,7 +243,7 @@ the jumps would be larger and harder to adopt incrementally.
 ==== 1:1 Mapping to TypeLL
 
 TypeLL defines exactly 10 type theory levels. The 1:1 mapping between TypeLL
-and VQL-UT means VQL-UT serves as both a useful tool and a concrete validation
+and VCL-total means VCL-total serves as both a useful tool and a concrete validation
 of TypeLL's design. Changing the number of levels would break this alignment.
 
 ==== Independent Modules
@@ -260,7 +260,7 @@ Each level is implemented as an independent Idris2 module. This means:
 |===
 |Alternative |Why Rejected
 
-|**6 levels** (matching VQL-dt's 6 PROOF types)
+|**6 levels** (matching VCL-dt's 6 PROOF types)
 |Misses injection safety (L1), schema pinning (L2), information flow (L7),
 and quantitative bounds (L8). These are critical for production safety.
 
@@ -275,14 +275,14 @@ supported (new levels can be added), but the core 10 are fixed.
 
 === Consequences
 
-- VQL-UT always reports 10 levels in its safety dashboard and proof certificates.
+- VCL-total always reports 10 levels in its safety dashboard and proof certificates.
 - Each level has its own error type, Idris2 module, and documentation section.
-- TypeLL and VQL-UT remain in 1:1 correspondence.
+- TypeLL and VCL-total remain in 1:1 correspondence.
 - The `safety_level` API parameter accepts values 1–10 for graduated checking.
 
 ---
 
-== ADR-0004: VQL-UT Supersedes VQL-DT
+== ADR-0004: VCL-total Supersedes VCL-DT
 
 === Status
 
@@ -292,29 +292,29 @@ Accepted (2026-03-16)
 
 VeriSimDB currently has two query type systems:
 
-- **VQL-DT** (Dependently Typed): covers 6 PROOF types (Pi, Sigma, dependent
+- **VCL-DT** (Dependently Typed): covers 6 PROOF types (Pi, Sigma, dependent
   pattern matching, basic type checking, universe polymorphism, implicit
   arguments). ~35% wired into VeriSimDB.
 
-- **VQL-UT** (Unified Types): covers 10 safety levels with full formal
-  verification. Successor to VQL-dt++ (typeql-experimental).
+- **VCL-total** (Unified Types): covers 10 safety levels with full formal
+  verification. Successor to VCL-dt++ (typeql-experimental).
 
-The question: should VQL-UT replace VQL-DT, or coexist alongside it?
+The question: should VCL-total replace VCL-DT, or coexist alongside it?
 
 === Decision
 
-VQL-UT **supersedes** VQL-DT. VQL-DT remains available as a legacy path but
+VCL-total **supersedes** VCL-DT. VCL-DT remains available as a legacy path but
 receives no further development.
 
 === Rationale
 
-==== VQL-UT is a Strict Superset
+==== VCL-total is a Strict Superset
 
-Every safety property that VQL-DT checks is also checked by VQL-UT:
+Every safety property that VCL-DT checks is also checked by VCL-total:
 
 [cols="2,1,1"]
 |===
-|VQL-DT Feature |VQL-UT Coverage |Level
+|VCL-DT Feature |VCL-total Coverage |Level
 
 |Pi types (function types)
 |Covered
@@ -341,22 +341,22 @@ Every safety property that VQL-DT checks is also checked by VQL-UT:
 |All levels (native Idris2 feature)
 |===
 
-VQL-UT additionally covers linearity (L3), sessions (L4), effects (L5),
+VCL-total additionally covers linearity (L3), sessions (L4), effects (L5),
 modality (L6), information flow (L7), quantitative bounds (L8), and
-compositional invariants (L10) — none of which VQL-DT addresses.
+compositional invariants (L10) — none of which VCL-DT addresses.
 
 ==== Single Codebase Reduces Maintenance
 
 Maintaining two type systems creates confusion about which one to use,
 duplicates testing effort, and risks divergent semantics. A single type system
-(VQL-UT) with configurable safety levels (`--level 1` through `--level 10`)
+(VCL-total) with configurable safety levels (`--level 1` through `--level 10`)
 provides the same flexibility without duplication.
 
 ==== Graduated Migration Path
 
-VQL-DT's existing ~35% wiring in VeriSimDB is not wasted. VQL-UT's L1 and L2
-levels approximately correspond to VQL-DT's type checking. Teams currently
-using VQL-DT can migrate to VQL-UT at level 2 with minimal disruption, then
+VCL-DT's existing ~35% wiring in VeriSimDB is not wasted. VCL-total's L1 and L2
+levels approximately correspond to VCL-DT's type checking. Teams currently
+using VCL-DT can migrate to VCL-total at level 2 with minimal disruption, then
 increase levels over time.
 
 === Alternatives Considered
@@ -369,9 +369,9 @@ increase levels over time.
 |Doubles maintenance, creates confusion about which to use, risks semantic
 divergence.
 
-|**Merge VQL-DT into VQL-UT**
-|VQL-DT's implementation is too different (no Idris2, no formal proofs). A
-clean reimplementation in VQL-UT's framework is more reliable than a merge.
+|**Merge VCL-DT into VCL-total**
+|VCL-DT's implementation is too different (no Idris2, no formal proofs). A
+clean reimplementation in VCL-total's framework is more reliable than a merge.
 
 |**Deprecate without replacement**
 |Removes safety guarantees. Unacceptable.
@@ -379,11 +379,11 @@ clean reimplementation in VQL-UT's framework is more reliable than a merge.
 
 === Consequences
 
-- VQL-DT enters maintenance mode (security fixes only, no new features).
-- The Slipstream (untyped) and VQL-UT paths are the two active query paths.
-- VeriSimDB documentation points to VQL-UT for all new safety-critical work.
+- VCL-DT enters maintenance mode (security fixes only, no new features).
+- The Slipstream (untyped) and VCL-total paths are the two active query paths.
+- VeriSimDB documentation points to VCL-total for all new safety-critical work.
 - The `typeql-experimental` directory in `nextgen-databases` is the historical
-  prototype; `vql-ut` is the production successor.
+  prototype; `vcl-total` is the production successor.
 
 ---
 
@@ -395,24 +395,24 @@ Accepted (2026-03-01)
 
 === Context
 
-VQL-UT needs a parser for its surface syntax. The parser must:
+VCL-total needs a parser for its surface syntax. The parser must:
 
-1. Extend the existing VQL v3.0 grammar with 6 new optional clauses.
+1. Extend the existing VCL v3.0 grammar with 6 new optional clauses.
 2. Run both server-side (API gateway) and client-side (PanLL query editor panel).
 3. Be maintainable by the existing team.
 4. Produce an AST that can be consumed by the Idris2 type kernel.
 
 === Decision
 
-Use **ReScript** for the VQL-UT parser.
+Use **ReScript** for the VCL-total parser.
 
 === Rationale
 
-==== 1. Extends Existing VQL Parser
+==== 1. Extends Existing VCL Parser
 
-VeriSimDB's existing VQL parser is written in ReScript. VQL-UT's parser extends
+VeriSimDB's existing VCL parser is written in ReScript. VCL-total's parser extends
 this parser with new clauses rather than reimplementing from scratch. This
-ensures consistency between VQL and VQL-UT surface syntax and reduces the
+ensures consistency between VCL and VCL-total surface syntax and reduces the
 risk of subtle parsing differences.
 
 ==== 2. Runs Everywhere
@@ -434,12 +434,12 @@ ReScript core team). This reduces ramp-up time and ensures idiomatic code.
 
 ReScript provides OCaml-grade type safety (algebraic data types, exhaustive
 pattern matching, type inference) without TypeScript's unsoundness. This is
-critical for a parser that must correctly represent VQL-UT's rich syntax.
+critical for a parser that must correctly represent VCL-total's rich syntax.
 
 ==== 5. No Keyword Conflicts
 
-VQL-UT's 6 new clause keywords (`CONSUME`, `SESSION`, `EFFECTS`, `TRANSACTION`,
-`ATTACHED`, `USAGE`) were chosen to be disjoint from VQL's 60+ reserved
+VCL-total's 6 new clause keywords (`CONSUME`, `SESSION`, `EFFECTS`, `TRANSACTION`,
+`ATTACHED`, `USAGE`) were chosen to be disjoint from VCL's 60+ reserved
 keywords. The ReScript parser handles these as simple token extensions with no
 ambiguity.
 
@@ -455,12 +455,12 @@ browser would require compilation to JavaScript, which is not well supported.
 
 |**Zig parser**
 |Cannot run in the browser without WASM compilation. Does not extend the
-existing VQL parser.
+existing VCL parser.
 
 |**Rust parser (nom/pest)**
-|Cannot run in the browser without WASM. Does not extend the existing VQL
-parser. Would require maintaining two parser codebases (Rust for VQL-UT,
-ReScript for VQL).
+|Cannot run in the browser without WASM. Does not extend the existing VCL
+parser. Would require maintaining two parser codebases (Rust for VCL-total,
+ReScript for VCL).
 
 |**Tree-sitter grammar**
 |Good for syntax highlighting but not for producing typed ASTs. Would still
@@ -472,13 +472,13 @@ need a separate semantic parser.
 
 === Consequences
 
-- The VQL-UT parser lives in `src/parser/` and is written entirely in ReScript.
+- The VCL-total parser lives in `src/parser/` and is written entirely in ReScript.
 - The parser produces `TQLAst.res` nodes that are serialised to JSON for
   consumption by the Idris2 type kernel.
 - The parser runs in Deno (server), the browser (PanLL panels), and embedded
   V8 (Elixir NIFs).
 - Parser changes require corresponding grammar updates in
-  `docs/vql-dtpp-grammar.ebnf`.
+  `docs/vcl-dtpp-grammar.ebnf`.
 
 == Licence
 

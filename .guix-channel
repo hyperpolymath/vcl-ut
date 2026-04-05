@@ -1,12 +1,12 @@
 ;; SPDX-License-Identifier: PMPL-1.0-or-later
 ;; Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 ;;
-;; Guix channel definition for VQL-UT
+;; Guix channel definition for VCL-total
 ;;
 ;; To use this channel, add to ~/.config/guix/channels.scm:
 ;;
 ;;   (channel
-;;     (name 'VQL-UT)
+;;     (name 'VCL-total)
 ;;     (url "https://github.com/hyperpolymath/VQL-UT")
 ;;     (branch "main"))
 ;;

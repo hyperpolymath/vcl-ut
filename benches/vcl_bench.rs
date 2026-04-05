@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
-//! Criterion benchmarks for the VQL-UT formatter and linter.
+//! Criterion benchmarks for the VCL-total formatter and linter.
 //!
 //! Measures throughput of:
 //! - Query formatting (simple / medium / complex queries)
@@ -9,8 +9,8 @@
 //! - Round-trip pipeline (format then lint)
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use vql_ut::fmt::format_vqlut;
-use vql_ut::lint::lint_vqlut;
+use vcl_total::fmt::format_vqlut;
+use vcl_total::lint::lint_vqlut;
 
 // ============================================================================
 // Sample queries

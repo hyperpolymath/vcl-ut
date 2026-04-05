@@ -1,12 +1,12 @@
 -- SPDX-License-Identifier: PMPL-1.0-or-later
 -- Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 
-||| VQL-UT Core Grammar — Abstract Syntax Tree
+||| VCL-total Core Grammar — Abstract Syntax Tree
 |||
-||| Defines the typed AST for VQL-UT queries. Every node carries type
+||| Defines the typed AST for VCL-total queries. Every node carries type
 ||| information sufficient for the 10-level checker to verify safety.
 |||
-||| The AST extends VQL 3.0 (VeriSimDB's octad query language) with:
+||| The AST extends VCL 3.0 (VeriSimDB's octad query language) with:
 |||   - Safety level annotations on every expression
 |||   - Effect declarations (read/write/consume)
 |||   - Temporal version constraints
@@ -14,7 +14,7 @@
 |||   - PROOF clauses for dependent-type verification
 |||
 ||| This module provides:
-|||   1. AST node types matching the VQL-UT EBNF grammar
+|||   1. AST node types matching the VCL-total EBNF grammar
 |||   2. Well-formedness predicates (structurally valid queries)
 |||   3. Type annotations at every expression node
 
@@ -64,7 +64,7 @@ modalityToInt Spatial    = 7
 -- Value Types (type system for expressions)
 -- ═══════════════════════════════════════════════════════════════════════
 
-||| Types that VQL-UT expressions can evaluate to.
+||| Types that VCL-total expressions can evaluate to.
 public export
 data VqlType
   = TString          -- Text values
@@ -161,7 +161,7 @@ data Source
 public export
 data DriftPolicy = Strict | Repair | Tolerate | Latest
 
-||| PROOF clause type (VQL-DT extension).
+||| PROOF clause type (VCL-DT extension).
 public export
 data ProofClause
   = ProofAttached              -- PROOF ATTACHED (sigma type)
@@ -195,11 +195,11 @@ data LinearAnnotation
 -- Statement (top-level query)
 -- ═══════════════════════════════════════════════════════════════════════
 
-||| A complete VQL-UT query statement.
+||| A complete VCL-total query statement.
 public export
 record Statement where
   constructor MkStatement
-  -- Core clauses (VQL 3.0)
+  -- Core clauses (VCL 3.0)
   selectItems   : List SelectItem
   source        : Source
   whereClause   : Maybe Expr
@@ -208,7 +208,7 @@ record Statement where
   orderBy       : List (FieldRef, Bool)  -- (field, ascending?)
   limit         : Maybe Nat
   offset        : Maybe Nat
-  -- VQL-UT extensions
+  -- VCL-total extensions
   proofClause   : Maybe ProofClause
   effectDecl    : Maybe EffectDecl
   versionConst  : Maybe VersionConstraint

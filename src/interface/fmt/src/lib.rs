@@ -1,12 +1,12 @@
 #![forbid(unsafe_code)]
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
-//! VQL-UT Formatting Library
+//! VCL-total Formatting Library
 //!
-//! Provides formatting capabilities for VQL-UT query files.
+//! Provides formatting capabilities for VCL-total query files.
 //! Keywords are indented with two spaces for readability.
 
-/// Format VQL-UT content by indenting lines that start with recognised keywords.
+/// Format VCL-total content by indenting lines that start with recognised keywords.
 ///
 /// Keywords recognised: SELECT, FROM, WHERE, GROUP, ORDER, HAVING, LIMIT.
 /// Each keyword-leading line is prefixed with two spaces of indentation.

@@ -1,7 +1,7 @@
 -- SPDX-License-Identifier: PMPL-1.0-or-later
 -- Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 
-||| VQL-UT Core Checker — 10-Level Progressive Type Checking Pipeline
+||| VCL-total Core Checker — 10-Level Progressive Type Checking Pipeline
 |||
 ||| Takes a Statement (Grammar.idr) and an OctadSchema (Schema.idr),
 ||| runs 10 sequential safety levels (0 through 9), and produces a
@@ -499,7 +499,7 @@ runPipeline (lvl :: rest) stmt schema state =
 -- Main Entry Point
 -- ═══════════════════════════════════════════════════════════════════════
 
-||| Run the full 10-level VQL-UT type checking pipeline.
+||| Run the full 10-level VCL-total type checking pipeline.
 |||
 ||| Checks levels 0 through 9 in order. Each level either passes (and
 ||| the pipeline advances) or fails (and the pipeline stops). The result
@@ -511,7 +511,7 @@ runPipeline (lvl :: rest) stmt schema state =
 |||   have maxLevel = InjectionProof, levelsPassed = [ParseSafe .. InjectionProof],
 |||   and valid = True.
 |||
-||| @stmt   The parsed VQL-UT statement to check.
+||| @stmt   The parsed VCL-total statement to check.
 ||| @schema The VeriSimDB octad schema to validate against.
 ||| @return A CheckResult with the achieved safety level and diagnostics.
 public export

@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
-# stapeln.toml — Layer-based container build for vql-ut
+# stapeln.toml — Layer-based container build for vcl-total
 #
 # stapeln builds containers as composable layers (German: "to stack").
 # Each layer is independently cacheable, verifiable, and signable.
 
 [metadata]
-name = "vql-ut"
+name = "vcl-total"
 version = "0.1.0"
-description = "vql-ut container service"
+description = "vcl-total container service"
 author = "Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
 license = "PMPL-1.0-or-later"
 registry = "ghcr.io/hyperpolymath"
@@ -32,7 +32,7 @@ packages = []
 cache = true
 
 [layers.build]
-description = "vql-ut build"
+description = "vcl-total build"
 extends = "toolchain"
 commands = []
 
@@ -43,7 +43,7 @@ packages = ["ca-certificates", "curl"]
 copy-from = [
     { layer = "build", src = "/app/", dst = "/app/" },
 ]
-entrypoint = ["/app/vql-ut"]
+entrypoint = ["/app/vcl-total"]
 user = "nonroot"
 
 # ── Security ───────────────────────────────────────────────────

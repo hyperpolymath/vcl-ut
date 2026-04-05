@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
-//! Language Server Protocol (LSP) implementation for VQL-UT
+//! Language Server Protocol (LSP) implementation for VCL-total
 //!
-//! This server provides LSP support for the VQL-UT query language.
+//! This server provides LSP support for the VCL-total query language.
 
 use lsp_server::{Connection, Message, RequestId, Response};
 use lsp_types::*;
@@ -44,7 +44,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Create the transport (stdio, TCP, etc.)
     let (connection, io_threads) = Connection::stdio();
 
-    // Initialize VQL-UT LSP
+    // Initialize VCL-total LSP
     let vqlut_lsp = VqlutLsp::new();
 
     // Run the server and wait for the two threads to end.

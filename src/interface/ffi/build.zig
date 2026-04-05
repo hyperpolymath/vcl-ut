@@ -1,4 +1,4 @@
-// VQL-UT FFI Build Configuration
+// VCL-total FFI Build Configuration
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
@@ -18,7 +18,7 @@ pub fn build(b: *std.Build) void {
     // Shared library (.so, .dylib, .dll)
     const lib = b.addLibrary(.{
         .linkage = .dynamic,
-        .name = "vqlut",
+        .name = "vcltotal",
         .root_module = root_module,
         .version = .{ .major = 0, .minor = 1, .patch = 0 },
     });
@@ -26,7 +26,7 @@ pub fn build(b: *std.Build) void {
     // Static library (.a)
     const lib_static = b.addLibrary(.{
         .linkage = .static,
-        .name = "vqlut",
+        .name = "vcltotal",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
@@ -49,6 +49,6 @@ pub fn build(b: *std.Build) void {
 
     const run_lib_tests = b.addRunArtifact(lib_tests);
 
-    const test_step = b.step("test", "Run VQL-UT FFI unit tests");
+    const test_step = b.step("test", "Run VCL-total FFI unit tests");
     test_step.dependOn(&run_lib_tests.step);
 }

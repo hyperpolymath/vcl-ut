@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
-= VQL-UT (VQL Ultimate Type-Safe) — Show Me The Receipts
+= VCL-total (VCL Total Type-Safe) — Show Me The Receipts
 :toc:
 :icons: font
 
@@ -9,11 +9,11 @@ The README makes claims. This file backs them up.
 
 === Claim 1: "Satisfies all 10 levels of type safety — the 6 established IO-covered forms and 4 additional forms identified through research"
 
-**How it works:** VQL-UT layers a progressive type-safety pipeline. Levels 1-6 (parse-time, schema-binding, type operations, null-tracking, injection-proof, result-type) are implemented in the Idris2 type checker (`src/interface/abi/VQLType.idr`) as dependent types. Parse-time safety uses a total parser (Idris2 `%default total`, no partiality). Schema-binding binds column references to Idris2 dependent records indexed by schema version. Null-tracking threads nullable flags through type-level join algebra. Injection-proof uses parameterized query types that forbid string interpolation by construction. Levels 7-10 (cardinality, effect-tracking, temporal, linearity) use quantitative type theory (QTT) on connection handles, session types for transaction state, modal types for world/scope-indexed queries. The ReScript parser extends VeriSimDB's surface syntax; the Zig FFI codegen produces C-ABI query plans that VeriSimDB's 6-modal engine executes.
+**How it works:** VCL-total layers a progressive type-safety pipeline. Levels 1-6 (parse-time, schema-binding, type operations, null-tracking, injection-proof, result-type) are implemented in the Idris2 type checker (`src/interface/abi/VQLType.idr`) as dependent types. Parse-time safety uses a total parser (Idris2 `%default total`, no partiality). Schema-binding binds column references to Idris2 dependent records indexed by schema version. Null-tracking threads nullable flags through type-level join algebra. Injection-proof uses parameterized query types that forbid string interpolation by construction. Levels 7-10 (cardinality, effect-tracking, temporal, linearity) use quantitative type theory (QTT) on connection handles, session types for transaction state, modal types for world/scope-indexed queries. The ReScript parser extends VeriSimDB's surface syntax; the Zig FFI codegen produces C-ABI query plans that VeriSimDB's 6-modal engine executes.
 
 **Caveat:** Levels 7-10 are research-level and incompletely proven. Cardinality inference may have false negatives on complex aggregations. Temporal safety assumes monotonic clocks (breaks on time skew). Linearity is enforced syntactically but not yet proven to match Idris2's QTT semantics. For production, restrict to levels 1-6 (proven on 49 test cases).
 
-**Evidence:** `src/interface/abi/VQLType.idr` defines levels 1-6 with `%default total`; `src/interface/abi/VQLCardinality.idr` and `src/interface/abi/VQLLinear.idr` define levels 7, 10 (incomplete). `src/parser/` extends VQL parser. `src/interface/ffi/codegen.zig` emits query plans. Tests in `tests/` cover all 10 levels.
+**Evidence:** `src/interface/abi/VQLType.idr` defines levels 1-6 with `%default total`; `src/interface/abi/VQLCardinality.idr` and `src/interface/abi/VQLLinear.idr` define levels 7, 10 (incomplete). `src/parser/` extends VCL parser. `src/interface/ffi/codegen.zig` emits query plans. Tests in `tests/` cover all 10 levels.
 
 === Claim 2: "Proof-carrying queries (with PROOF clause) go through L9-L10 validation automatically"
 
@@ -31,7 +31,7 @@ The README makes claims. This file backs them up.
 
 | **Idris2** | Dependent types, totality checking, quantitative type theory (levels 1-10)
 | **Zig** | FFI codegen to C ABI (zero-copy result sets)
-| **ReScript** | Parser extending VeriSimDB VQL grammar
+| **ReScript** | Parser extending VeriSimDB VCL grammar
 | **V-lang** | REST/gRPC/GraphQL API layer
 | **VeriSimDB** | 6-modal storage engine execution target
 |===
@@ -52,8 +52,8 @@ The README makes claims. This file backs them up.
 | `src/interface/ffi/` | Zig FFI bridge
 | `src/interface/ffi/codegen.zig` | Compiles type-checked query AST to C-ABI query plan
 | `src/interface/ffi/verisimdb_bridge.zig` | Marshals query plans to VeriSimDB engine, unmarshals results
-| `src/parser/` | ReScript parser extending VeriSimDB VQL surface syntax
-| `src/parser/vql_parser.res` | Lexer + parser for .vqlut files, PROOF clause support
+| `src/parser/` | ReScript parser extending VeriSimDB VCL surface syntax
+| `src/parser/vcl_parser.res` | Lexer + parser for .vcltotal files, PROOF clause support
 | `src/api/` | V-lang API layer for external clients
 | `src/api/rest.v` | REST endpoint bindings (HTTP API)
 | `src/api/grpc.v` | gRPC service definitions
@@ -75,10 +75,10 @@ The README makes claims. This file backs them up.
 == Dogfooted Across The Account
 
 | Project | Integration |
-| **panic-attacker** | Scans VQL-UT parser for injection vulnerabilities in PROOF clause parsing
-| **verisimdb** | VQL-UT is the type-safe query interface to VeriSimDB's 6-modal engine
-| **typell** | VQL-UT instantiates TypeLL's 10-level framework for database queries
-| **panll** | PanLL panels visualize VQL-UT query execution with proof status
+| **panic-attacker** | Scans VCL-total parser for injection vulnerabilities in PROOF clause parsing
+| **verisimdb** | VCL-total is the type-safe query interface to VeriSimDB's 6-modal engine
+| **typell** | VCL-total instantiates TypeLL's 10-level framework for database queries
+| **panll** | PanLL panels visualize VCL-total query execution with proof status
 
 == Readiness
 

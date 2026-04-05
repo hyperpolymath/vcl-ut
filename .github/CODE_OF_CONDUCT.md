@@ -5,9 +5,9 @@
 TEMPLATE INSTRUCTIONS (delete this block before publishing)
 ============================================================================
 Replace all {{PLACEHOLDER}} values:
-  VQL-UT     - Your project name
+  VCL-total     - Your project name
   hyperpolymath            - GitHub/GitLab username or org
-  vql-ut             - Repository name
+  vcl-total             - Repository name
   j.d.a.jewell@open.ac.uk    - Email for conduct reports
   Code of Conduct Committee     - Name of conduct team/committee
   48 hours    - Initial response SLA (e.g., 48 hours)
@@ -22,7 +22,7 @@ Review and customise:
 
 ## Our Pledge
 
-We as members, contributors, and leaders pledge to make participation in VQL-UT a harassment-free experience for everyone, regardless of age, body size, visible or invisible disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, caste, colour, religion, or sexual identity and orientation.
+We as members, contributors, and leaders pledge to make participation in VCL-total a harassment-free experience for everyone, regardless of age, body size, visible or invisible disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, caste, colour, religion, or sexual identity and orientation.
 
 We pledge to act and interact in ways that contribute to an open, welcoming, diverse, inclusive, and healthy community.
 

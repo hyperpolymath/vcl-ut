@@ -19,7 +19,7 @@ set positional-arguments := true
 import? "contractile.just"
 
 # Project metadata — customize these
-project := "VQL-UT"
+project := "VCL-total"
 version := "0.1.0"
 tier := "infrastructure"  # 1 | 2 | infrastructure
 
@@ -46,7 +46,7 @@ help recipe="":
 
 # Show this project's info
 info:
-    @echo "Project: vql_ut"
+    @echo "Project: vcl_total"
     @echo "Version: {{version}}"
     @echo "RSR Tier: {{tier}}"
     @echo "Recipes: $(just --summary | wc -w)"
@@ -264,7 +264,7 @@ init:
 
 # Build the project (debug mode)
 build *args:
-    @echo "Building vql_ut (debug)..."
+    @echo "Building vcl_total (debug)..."
     # TODO: Replace with your build command
     # Examples:
     #   cargo build {{args}}                    # Rust
@@ -275,7 +275,7 @@ build *args:
 
 # Build in release mode with optimizations
 build-release *args:
-    @echo "Building vql_ut (release)..."
+    @echo "Building vcl_total (release)..."
     # TODO: Replace with your release build command
     # Examples:
     #   cargo build --release {{args}}
@@ -383,7 +383,7 @@ run-verbose *args: build
 
 # Install to user path
 install: build-release
-    @echo "Installing vql_ut..."
+    @echo "Installing vcl_total..."
     # TODO: Replace with your install command
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -427,7 +427,7 @@ cookbook:
     #!/usr/bin/env bash
     mkdir -p docs
     OUTPUT="docs/just-cookbook.adoc"
-    echo "= vql_ut Justfile Cookbook" > "$OUTPUT"
+    echo "= vcl_total Justfile Cookbook" > "$OUTPUT"
     echo ":toc: left" >> "$OUTPUT"
     echo ":toclevels: 3" >> "$OUTPUT"
     echo "" >> "$OUTPUT"
@@ -453,10 +453,10 @@ cookbook:
 man:
     #!/usr/bin/env bash
     mkdir -p docs/man
-    cat > docs/man/vql_ut.1 << EOF
-    .TH vql_ut 1 "$(date +%Y-%m-%d)" "{{version}}" "vql_ut Manual"
+    cat > docs/man/vcl_total.1 << EOF
+    .TH vcl_total 1 "$(date +%Y-%m-%d)" "{{version}}" "vcl_total Manual"
     .SH NAME
-    vql_ut \- RSR-compliant project
+    vcl_total \- RSR-compliant project
     .SH SYNOPSIS
     .B just
     [recipe] [args...]
@@ -465,7 +465,7 @@ man:
     .SH AUTHOR
     $(git config user.name 2>/dev/null || echo "Author") <$(git config user.email 2>/dev/null || echo "email")>
     EOF
-    echo "Generated: docs/man/vql_ut.1"
+    echo "Generated: docs/man/vcl_total.1"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CONTAINERS (stapeln ecosystem — Podman + Chainguard Wolfi)
@@ -495,8 +495,8 @@ container-init:
     fi
 
     # Prompt for container-specific values
-    read -rp "Service name (e.g. my-api) [vql_ut]: " _SERVICE_NAME
-    SERVICE_NAME="${_SERVICE_NAME:-vql_ut}"
+    read -rp "Service name (e.g. my-api) [vcl_total]: " _SERVICE_NAME
+    SERVICE_NAME="${_SERVICE_NAME:-vcl_total}"
 
     read -rp "Primary port [8080]: " _PORT
     PORT="${_PORT:-8080}"
@@ -545,9 +545,9 @@ container-build *args:
     if [ -f "container/ct-build.sh" ]; then
         cd container && ./ct-build.sh {{args}}
     elif [ -f "container/Containerfile" ]; then
-        podman build -t vql_ut:latest -f container/Containerfile .
+        podman build -t vcl_total:latest -f container/Containerfile .
     elif [ -f "Containerfile" ]; then
-        podman build -t vql_ut:latest -f Containerfile .
+        podman build -t vcl_total:latest -f Containerfile .
     else
         echo "No Containerfile found in container/ or project root"
         exit 1
@@ -609,12 +609,12 @@ container-push:
         cd container && ./ct-build.sh --push
     else
         echo "No container/ct-build.sh found — falling back to podman push"
-        podman push vql_ut:latest
+        podman push vcl_total:latest
     fi
 
 # Run container interactively (for debugging)
 container-run *args:
-    podman run --rm -it vql_ut:latest {{args}}
+    podman run --rm -it vcl_total:latest {{args}}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CI & AUTOMATION
@@ -905,7 +905,7 @@ maint-assault:
     @./.machine_readable/scripts/maintenance/maint-assault.sh
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# VQL-UT PROJECT-SPECIFIC RECIPES
+# VCL-total PROJECT-SPECIFIC RECIPES
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Type-check the Idris2 ABI kernel (core + checker)
@@ -924,15 +924,15 @@ zig-test:
     @echo "Running Zig FFI tests..."
     cd src/interface/ffi && zig build test
 
-# Build all VQL-UT components
+# Build all VCL-total components
 build-all: zig-build
-    @echo "VQL-UT build complete"
+    @echo "VCL-total build complete"
 
-# Run all VQL-UT tests (Zig FFI + integration)
+# Run all VCL-total tests (Zig FFI + integration)
 test-all: zig-test
-    @echo "All VQL-UT tests passed"
+    @echo "All VCL-total tests passed"
 
-# Show VQL-UT safety level for a query string
+# Show VCL-total safety level for a query string
 check-query query:
     @echo "Checking query: {{query}}"
     @echo "Query path would be determined by TypeLL server at localhost:7800"
@@ -948,7 +948,7 @@ assail:
 
 # Self-diagnostic — checks dependencies, permissions, paths
 doctor:
-    @echo "Running diagnostics for vql-ut..."
+    @echo "Running diagnostics for vcl-total..."
     @echo "Checking required tools..."
     @command -v just >/dev/null 2>&1 && echo "  [OK] just" || echo "  [FAIL] just not found"
     @command -v git >/dev/null 2>&1 && echo "  [OK] git" || echo "  [FAIL] git not found"
@@ -958,7 +958,7 @@ doctor:
 
 # Auto-repair common issues
 heal:
-    @echo "Attempting auto-repair for vql-ut..."
+    @echo "Attempting auto-repair for vcl-total..."
     @echo "Fixing permissions..."
     @find . -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
     @echo "Cleaning stale caches..."
@@ -967,7 +967,7 @@ heal:
 
 # Guided tour of key features
 tour:
-    @echo "=== vql-ut Tour ==="
+    @echo "=== vcl-total Tour ==="
     @echo ""
     @echo "1. Project structure:"
     @ls -la
@@ -982,7 +982,7 @@ tour:
 
 # Open feedback channel with diagnostic context
 help-me:
-    @echo "=== vql-ut Help ==="
+    @echo "=== vcl-total Help ==="
     @echo "Platform: $(uname -s) $(uname -m)"
     @echo "Shell: $SHELL"
     @echo ""

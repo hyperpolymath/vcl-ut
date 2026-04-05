@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
 # Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 #
-# k9iser manifest for vql-ut
-# VQL unit testing framework
+# k9iser manifest for vcl-total
+# VCL unit testing framework
 
 [project]
-name = "vql-ut"
+name = "vcl-total"
 safety_tier = "hunt"
 
 [[source]]

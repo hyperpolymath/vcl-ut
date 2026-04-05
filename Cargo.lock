@@ -1186,50 +1186,50 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
-name = "vql-ut"
+name = "vcl-total"
 version = "0.1.0"
 dependencies = [
  "criterion",
  "proptest",
- "vqlut-fmt",
- "vqlut-lint",
+ "vcltotal-fmt",
+ "vcltotal-lint",
 ]
 
 [[package]]
-name = "vqlut-core"
+name = "vcltotal-core"
 version = "0.1.0"
 
 [[package]]
-name = "vqlut-dap"
+name = "vcltotal-dap"
 version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "vqlut-core",
- "vqlut-interface",
+ "vcltotal-core",
+ "vcltotal-interface",
 ]
 
 [[package]]
-name = "vqlut-fmt"
+name = "vcltotal-fmt"
 version = "0.1.0"
 dependencies = [
  "clap",
 ]
 
 [[package]]
-name = "vqlut-interface"
+name = "vcltotal-interface"
 version = "0.1.0"
 
 [[package]]
-name = "vqlut-lint"
+name = "vcltotal-lint"
 version = "0.1.0"
 dependencies = [
  "clap",
 ]
 
 [[package]]
-name = "vqlut-lsp"
+name = "vcltotal-lsp"
 version = "0.1.0"
 dependencies = [
  "lsp-server",
@@ -1237,8 +1237,8 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "vqlut-core",
- "vqlut-interface",
+ "vcltotal-core",
+ "vcltotal-interface",
 ]
 
 [[package]]

@@ -1,12 +1,12 @@
 #![forbid(unsafe_code)]
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
-//! VQL-UT Linting Library
+//! VCL-total Linting Library
 //!
-//! Provides linting capabilities for VQL-UT query files.
+//! Provides linting capabilities for VCL-total query files.
 //! Checks for missing semicolons and lowercase keywords.
 
-/// A single lint issue found in VQL-UT content.
+/// A single lint issue found in VCL-total content.
 #[derive(Debug)]
 pub struct LintIssue {
     /// 1-indexed line number where the issue was found.
@@ -15,7 +15,7 @@ pub struct LintIssue {
     pub message: String,
 }
 
-/// Lint VQL-UT content and return a list of issues.
+/// Lint VCL-total content and return a list of issues.
 ///
 /// Current checks:
 /// - Missing semicolons at the end of non-empty lines

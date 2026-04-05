@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: PMPL-1.0-or-later
 #
-# VQL-UT — Cerro Torre build, sign, and verify pipeline
+# VCL-total — Cerro Torre build, sign, and verify pipeline
 #
 # Builds the container image, packages it as a verified .ctp bundle,
 # signs it with Ed25519, and verifies the result. Gracefully degrades
@@ -18,7 +18,7 @@
 #   CT_KEY_ID=my-key ./ct-build.sh # Use specific signing key
 #
 # Environment variables:
-#   CT_KEY_ID       — Signing key identifier (default: vql-ut-release)
+#   CT_KEY_ID       — Signing key identifier (default: vcl-total-release)
 #   CT_REGISTRY     — OCI registry to push to (default: ghcr.io/hyperpolymath)
 #   CT_TAG          — Image tag (default: latest)
 
@@ -38,15 +38,15 @@ for arg in "$@"; do
     fi
 done
 
-CT_KEY_ID="${CT_KEY_ID:-vql-ut-release}"
+CT_KEY_ID="${CT_KEY_ID:-vcl-total-release}"
 CT_REGISTRY="${CT_REGISTRY:-ghcr.io/hyperpolymath}"
 CT_TAG="${CT_TAG:-latest}"
 
-IMAGE_NAME="vql-ut"
+IMAGE_NAME="vcl-total"
 FULL_IMAGE="${CT_REGISTRY}/${IMAGE_NAME}:${CT_TAG}"
 CTP_FILE="${SCRIPT_DIR}/${IMAGE_NAME}-${CT_TAG}.ctp"
 
-echo "=== VQL-UT Cerro Torre Build Pipeline ==="
+echo "=== VCL-total Cerro Torre Build Pipeline ==="
 echo "  Image:  ${FULL_IMAGE}"
 echo "  Key:    ${CT_KEY_ID}"
 echo "  Bundle: ${CTP_FILE}"

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
-//! VQL-UT Formatting Server
+//! VCL-total Formatting Server
 //!
-//! This tool formats VQL-UT query files.
+//! This tool formats VCL-total query files.
 
 use clap::Parser;
 use std::fs;

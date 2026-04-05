@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
-//! Debug Adapter Protocol (DAP) implementation for VQL-UT
+//! Debug Adapter Protocol (DAP) implementation for VCL-total
 //!
-//! This server provides DAP support for debugging VQL-UT queries.
+//! This server provides DAP support for debugging VCL-total queries.
 
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
@@ -28,7 +28,7 @@ struct DapResponse {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind("127.0.0.1:4715")?;
-    println!("VQL-UT DAP server listening on 127.0.0.1:4715");
+    println!("VCL-total DAP server listening on 127.0.0.1:4715");
 
     for stream in listener.incoming() {
         match stream {
@@ -50,26 +50,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn execute_vql_query(query: &str) -> String {
     // Connect to VeriSimDB via database-mcp cartridge
-    // For now, simulate executing VQL queries and returning results
+    // For now, simulate executing VCL queries and returning results
     // In production, this would use the database-mcp cartridge to execute the query
     // and return the results
     
     if query.to_lowercase().contains("select") {
         if query.to_lowercase().contains("users") {
-            format!("Executing VQL query: {}\nResults: [\"id: 1, name: 'Alice', email: 'alice@example.com'\", \"id: 2, name: 'Bob', email: 'bob@example.com'\"]", query)
+            format!("Executing VCL query: {}\nResults: [\"id: 1, name: 'Alice', email: 'alice@example.com'\", \"id: 2, name: 'Bob', email: 'bob@example.com'\"]", query)
         } else if query.to_lowercase().contains("posts") {
-            format!("Executing VQL query: {}\nResults: [\"id: 1, title: 'Hello World', content: 'First post'\", \"id: 2, title: 'VQL-UT', content: 'Query language'\"]", query)
+            format!("Executing VCL query: {}\nResults: [\"id: 1, title: 'Hello World', content: 'First post'\", \"id: 2, title: 'VCL-total', content: 'Query language'\"]", query)
         } else {
-            format!("Executing VQL query: {}\nResults: []", query)
+            format!("Executing VCL query: {}\nResults: []", query)
         }
     } else if query.to_lowercase().contains("insert") {
-        format!("Executing VQL query: {}\nResults: Inserted 1 row", query)
+        format!("Executing VCL query: {}\nResults: Inserted 1 row", query)
     } else if query.to_lowercase().contains("update") {
-        format!("Executing VQL query: {}\nResults: Updated 1 row", query)
+        format!("Executing VCL query: {}\nResults: Updated 1 row", query)
     } else if query.to_lowercase().contains("delete") {
-        format!("Executing VQL query: {}\nResults: Deleted 1 row", query)
+        format!("Executing VCL query: {}\nResults: Deleted 1 row", query)
     } else {
-        format!("Executing VQL query: {}\nResults: []", query)
+        format!("Executing VCL query: {}\nResults: []", query)
     }
 }
 

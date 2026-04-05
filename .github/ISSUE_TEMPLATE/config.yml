@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
-# Issue template chooser configuration for hyperpolymath/vql-ut
+# Issue template chooser configuration for hyperpolymath/vcl-total
 blank_issues_enabled: true
 contact_links:
   - name: Discussions

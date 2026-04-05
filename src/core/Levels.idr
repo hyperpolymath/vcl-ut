@@ -1,7 +1,7 @@
 -- SPDX-License-Identifier: PMPL-1.0-or-later
 -- Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 
-||| VQL-UT Core Levels — 10-Level Type Safety Checker Proofs
+||| VCL-total Core Levels — 10-Level Type Safety Checker Proofs
 |||
 ||| Formalises the 10 progressive type safety levels as dependent types.
 ||| Each level is a predicate over a Statement + Schema pair, and higher

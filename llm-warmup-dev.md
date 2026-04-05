@@ -1,6 +1,6 @@
-# LLM Warmup — vql-ut (Developer)
+# LLM Warmup — vcl-total (Developer)
 
-## What is vql-ut?
+## What is vcl-total?
 See README.adoc for overview.
 
 ## Key Commands

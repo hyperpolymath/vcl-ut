@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= VQL-UT Quickstart Guide
+= VCL-total Quickstart Guide
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 :date: 2026-03-16
 :toc: macro
 :toclevels: 2
 :icons: font
-:description: Getting started with VQL-UT — the verified query language with 10 safety levels
+:description: Getting started with VCL-total — the verified query language with 10 safety levels
 
 toc::[]
 
 == Prerequisites
 
-VQL-UT requires the following tools. All can be managed via
+VCL-total requires the following tools. All can be managed via
 https://asdf-vm.com[asdf]:
 
 [cols="1,2,2"]
@@ -62,7 +62,7 @@ deno --version      # deno 2.x.x
 
 == Clone and Build
 
-VQL-UT lives inside the `nextgen-databases` monorepo:
+VCL-total lives inside the `nextgen-databases` monorepo:
 
 [source,bash]
 ----
@@ -70,8 +70,8 @@ VQL-UT lives inside the `nextgen-databases` monorepo:
 cd ~/Documents/hyperpolymath-repos
 git clone https://github.com/hyperpolymath/nextgen-databases.git
 
-# Navigate to VQL-UT
-cd nextgen-databases/vql-ut
+# Navigate to VCL-total
+cd nextgen-databases/vcl-total
 ----
 
 === Build Everything
@@ -96,7 +96,7 @@ just test
 [source,bash]
 ----
 # Idris2 type-check only (the most important step)
-idris2 --typecheck vql-ut.ipkg
+idris2 --typecheck vcl-total.ipkg
 
 # Zig FFI tests only
 cd ffi/zig && zig build test
@@ -110,13 +110,13 @@ just audit
 
 == Run the Type Checker on an Example Query
 
-VQL-UT ships with example `.vqlut` files demonstrating each safety level.
+VCL-total ships with example `.vcltotal` files demonstrating each safety level.
 
 === Example: A Fully Typed Query
 
-Create a file called `my-query.vqlut`:
+Create a file called `my-query.vcltotal`:
 
-[source,vql]
+[source,vcl]
 ----
 -- A query that exercises 6 of the 10 safety levels
 SELECT GRAPH, DOCUMENT
@@ -134,7 +134,7 @@ USAGE LIMIT 100
 
 [source,bash]
 ----
-just check-query my-query.vqlut
+just check-query my-query.vcltotal
 ----
 
 This runs the query through all 10 safety levels and reports the result.
@@ -145,10 +145,10 @@ A successful check produces output like this:
 
 [source]
 ----
-VQL-UT Safety Report
+VCL-total Safety Report
 ════════════════════
 
-Query:  my-query.vqlut
+Query:  my-query.vcltotal
 Schema: v3 (2026-03-15)
 
 Safety Levels:
@@ -173,10 +173,10 @@ If a safety level fails, the output includes a structured error:
 
 [source]
 ----
-VQL-UT Safety Report
+VCL-total Safety Report
 ════════════════════
 
-Query:  broken-query.vqlut
+Query:  broken-query.vcltotal
 
 Safety Levels:
   L1  Construction Safety     ✓ PASS
@@ -189,7 +189,7 @@ Safety Levels:
     Declared effects: { Read }
     Actual effects:   { Read, Write }
     Violation: Write effect used but not declared
-    Location: my-query.vqlut:3 (WHERE clause triggers write via side effect)
+    Location: my-query.vcltotal:3 (WHERE clause triggers write via side effect)
     Fix: Add 'Write' to the EFFECTS clause, or remove the write operation
 
   Levels L6–L10: SKIPPED (L5 failed)
@@ -238,9 +238,9 @@ Result: 4/10 levels passed (blocked at L5)
 
 === Writing Your Own Queries
 
-1. Start with a basic VQL query (no extensions).
+1. Start with a basic VCL query (no extensions).
 2. Add one extension at a time and re-check after each addition.
-3. Use `just check-query --level 5 my-query.vqlut` to check only up to a
+3. Use `just check-query --level 5 my-query.vcltotal` to check only up to a
    specific level.
 
 === Extending the Type System
@@ -266,15 +266,15 @@ Start with:
 
 === Running with PanLL
 
-If you have PanLL set up, the VQL-UT panels provide a visual interface:
+If you have PanLL set up, the VCL-total panels provide a visual interface:
 
 [source,bash]
 ----
-# Register VQL-UT panels with PanLL
+# Register VCL-total panels with PanLL
 just register-panels
 
 # Open the safety dashboard
-panll open vql-ut-safety-dashboard
+panll open vcl-total-safety-dashboard
 ----
 
 The safety dashboard shows the 10 levels as a vertical pipeline with

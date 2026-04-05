@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 //
-// Dev Container configuration for VQL-UT
+// Dev Container configuration for VCL-total
 // Works with: VS Code Dev Containers, GitHub Codespaces, Gitpod
 // Container runtime: Podman (recommended) or any OCI-compliant runtime
 {
-  "name": "VQL-UT",
+  "name": "VCL-total",
 
   "build": {
     "dockerfile": "Containerfile",

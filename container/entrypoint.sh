@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: PMPL-1.0-or-later
-# VQL-UT container entrypoint
+# VCL-total container entrypoint
 #
 # Handles signal propagation, startup logging, and health check
 # preparation before exec-ing into the main application process.
@@ -15,7 +15,7 @@ set -e
 # when Podman sends stop signals (e.g. `podman stop`, `selur-compose down`).
 
 cleanup() {
-    echo "Received shutdown signal — stopping vql-ut..."
+    echo "Received shutdown signal — stopping vcl-total..."
     # If the main process is backgrounded, kill it here:
     # kill "$MAIN_PID" 2>/dev/null || true
     # wait "$MAIN_PID" 2>/dev/null || true
@@ -27,7 +27,7 @@ trap cleanup TERM INT
 # Startup logging
 # ---------------------------------------------------------------------------
 
-echo "Starting vql-ut..."
+echo "Starting vcl-total..."
 echo "  Host: ${APP_HOST:-[::]}"
 echo "  Port: ${APP_PORT:-8080}"
 echo "  Data: ${APP_DATA_DIR:-/data}"
@@ -56,8 +56,8 @@ fi
 #
 # TODO: Replace the command below with your application binary.
 # Examples:
-#   exec /app/vql-ut
-#   exec /app/release/bin/vql-ut start
-#   exec /app/vql-ut serve --host "${APP_HOST}" --port "${APP_PORT}"
+#   exec /app/vcl-total
+#   exec /app/release/bin/vcl-total start
+#   exec /app/vcl-total serve --host "${APP_HOST}" --port "${APP_PORT}"
 
 exec "$@"

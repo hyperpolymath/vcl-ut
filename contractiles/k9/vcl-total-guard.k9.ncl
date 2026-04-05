@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
 # Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 #
-# K9 Validator: VQL-UT Guard
-# Ensures the VQL-UT language invariants stay provable and the bridges stay in sync with Idris2.
+# K9 Validator: VCL-total Guard
+# Ensures the VCL-total language invariants stay provable and the bridges stay in sync with Idris2.
 
-let vql_ut_guard = {
-  name = "vql-ut-guard",
+let vcl_ut_guard = {
+  name = "vcl-total-guard",
   version = "1.0.0",
   description = "Checks that the core Idris2 proofs, parser bridges, and schema artifacts exist and that no template placeholders remain.",
 
@@ -61,4 +61,4 @@ let vql_ut_guard = {
     },
   },
 }
-in vql_ut_guard
+in vcl_ut_guard

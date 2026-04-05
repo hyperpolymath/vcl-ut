@@ -1,8 +1,8 @@
 #![forbid(unsafe_code)]
 // SPDX-License-Identifier: PMPL-1.0-or-later
-//! VQL-UT LSP Library
+//! VCL-total LSP Library
 //!
-//! This library provides LSP support for VQL-UT.
+//! This library provides LSP support for VCL-total.
 
 use lsp_types::*;
 use std::collections::HashMap;
@@ -47,7 +47,7 @@ impl VqlutLsp {
 
         // Connect to VeriSimDB via database-mcp cartridge
         // For now, simulate fetching schema from VeriSimDB
-        // In production, this would use the database-mcp cartridge to execute a VQL query
+        // In production, this would use the database-mcp cartridge to execute a VCL query
         // and fetch the schema (tables and columns)
 
         // Simulate fetching schema from VeriSimDB
@@ -69,7 +69,7 @@ impl VqlutLsp {
         let line = position.line as usize;
         let character = position.character as usize;
 
-        // TODO: Parse the VQL-UT file at the given position to find the table/column
+        // TODO: Parse the VCL-total file at the given position to find the table/column
         // For now, return a dummy response with schema-based navigation
         if let Some((table, _)) = self.schema.iter().next() {
             Some(GotoDefinitionResponse::Scalar(Location {
@@ -108,11 +108,11 @@ impl VqlutLsp {
         let line = position.line as usize;
         let character = position.character as usize;
 
-        // TODO: Parse the VQL-UT file at the given position to find the keyword/type
+        // TODO: Parse the VCL-total file at the given position to find the keyword/type
         // For now, return a dummy response
         Some(Hover {
             contents: HoverContents::Scalar(MarkedString::String(
-                "VQL-UT Keyword or Type".to_string(),
+                "VCL-total Keyword or Type".to_string(),
             )),
             range: Some(Range {
                 start: Position {
@@ -133,25 +133,25 @@ impl VqlutLsp {
         let line = position.line as usize;
         let character = position.character as usize;
 
-        // TODO: Parse the VQL-UT file at the given position to suggest completions
-        // For now, return a dummy response with some VQL-UT keywords and schema
+        // TODO: Parse the VCL-total file at the given position to suggest completions
+        // For now, return a dummy response with some VCL-total keywords and schema
         let mut items = vec![
             CompletionItem {
                 label: "SELECT".to_string(),
                 kind: Some(CompletionItemKind::KEYWORD),
-                detail: Some("VQL-UT SELECT keyword".to_string()),
+                detail: Some("VCL-total SELECT keyword".to_string()),
                 ..Default::default()
             },
             CompletionItem {
                 label: "FROM".to_string(),
                 kind: Some(CompletionItemKind::KEYWORD),
-                detail: Some("VQL-UT FROM keyword".to_string()),
+                detail: Some("VCL-total FROM keyword".to_string()),
                 ..Default::default()
             },
             CompletionItem {
                 label: "WHERE".to_string(),
                 kind: Some(CompletionItemKind::KEYWORD),
-                detail: Some("VQL-UT WHERE keyword".to_string()),
+                detail: Some("VCL-total WHERE keyword".to_string()),
                 ..Default::default()
             },
         ];
@@ -161,14 +161,14 @@ impl VqlutLsp {
             items.push(CompletionItem {
                 label: table.clone(),
                 kind: Some(CompletionItemKind::STRUCT),
-                detail: Some("VQL-UT table".to_string()),
+                detail: Some("VCL-total table".to_string()),
                 ..Default::default()
             });
             for column in columns {
                 items.push(CompletionItem {
                     label: format!("{}.{}", table, column),
                     kind: Some(CompletionItemKind::FIELD),
-                    detail: Some("VQL-UT column".to_string()),
+                    detail: Some("VCL-total column".to_string()),
                     ..Default::default()
                 });
             }

@@ -1,29 +1,29 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
-//! Property-based tests for VQL-UT using proptest.
+//! Property-based tests for VCL-total using proptest.
 //!
-//! Verifies algebraic invariants that must hold for all VQL-UT input strings:
+//! Verifies algebraic invariants that must hold for all VCL-total input strings:
 //! - Formatting idempotence: format(format(x)) == format(x)
 //! - Type inference determinism: lint(x) always produces the same count
 //! - Valid queries (correct case, with semicolons) never panic
 
 use proptest::prelude::*;
-use vql_ut::fmt::format_vqlut;
-use vql_ut::lint::lint_vqlut;
+use vcl_total::fmt::format_vqlut;
+use vcl_total::lint::lint_vqlut;
 
 // ============================================================================
 // Arbitrary input generators
 // ============================================================================
 
-/// Generate a random ASCII string that could plausibly appear in a VQL query.
+/// Generate a random ASCII string that could plausibly appear in a VCL query.
 fn arb_query_fragment() -> impl Strategy<Value = String> {
     // Use printable ASCII range to avoid encoding-related panics.
     prop::string::string_regex("[a-zA-Z0-9 _,.*=><;()'\"\\-\n]{1,200}")
         .expect("regex must compile")
 }
 
-/// Generate a string starting with a recognised VQL-UT keyword (uppercase).
+/// Generate a string starting with a recognised VCL-total keyword (uppercase).
 fn arb_keyword_line() -> impl Strategy<Value = String> {
     prop_oneof![
         Just("SELECT id;".to_string()),

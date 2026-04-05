@@ -1,4 +1,4 @@
-# TEST-NEEDS: vql-ut
+# TEST-NEEDS: vcl-total
 
 ## CRG Grade: C — ACHIEVED 2026-04-04
 
@@ -19,10 +19,10 @@
 - [ ] No tests for ReScript parser -> Idris2 checker pipeline
 - [ ] No tests for LSP server handling real editor requests
 - [ ] No tests for DAP server with real debugger
-- [ ] No tests for fmt/lint tools on actual VQL-UT code
+- [ ] No tests for fmt/lint tools on actual VCL-total code
 
 ### E2E Tests (CRITICAL)
-- [ ] No test that parses VQL-UT, type-checks it through all 10 levels, and executes it
+- [ ] No test that parses VCL-total, type-checks it through all 10 levels, and executes it
 - [ ] No test for LSP completion/hover/diagnostics
 - [ ] No test for DAP breakpoints/stepping
 
@@ -30,7 +30,7 @@
 - [ ] **Security**: Query language with no injection tests
 - [ ] **Performance**: No benchmarks for type checking, parsing throughput
 - [ ] **Concurrency**: No concurrent query compilation tests
-- [ ] **Error handling**: No tests for malformed VQL-UT, type errors at each level
+- [ ] **Error handling**: No tests for malformed VCL-total, type errors at each level
 
 ### Build & Execution
 - [ ] 4 Idris2 core modules with 0 Idris2-level tests -- are proofs checked?
@@ -38,13 +38,13 @@
 - [ ] Zig FFI integration_test.zig likely template placeholder
 
 ### Benchmarks Needed
-- [ ] VQL-UT parsing throughput
+- [ ] VCL-total parsing throughput
 - [ ] Type checking per level (L1-L10)
 - [ ] LSP response latency
 - [ ] Query compilation time
 
 ### Self-Tests
-- [ ] No VQL-UT self-consistency check
+- [ ] No VCL-total self-consistency check
 
 ## FLAGGED ISSUES
 - **49 tests for 27 source modules** = thin coverage

@@ -1,4 +1,4 @@
-// VQL-UT FFI Implementation
+// VCL-total FFI Implementation
 //
 // Implements the C-compatible FFI declared in src/interface/abi/Foreign.idr.
 // Thread-safe, slot-based query context pool for concurrent query processing.
@@ -180,15 +180,15 @@ fn freeSlot(handle: u64) void {
 // Exported FFI Functions (C ABI)
 //==============================================================================
 
-/// Get the VQL-UT ABI version.
+/// Get the VCL-total ABI version.
 /// Returns (major << 16 | minor << 8 | patch).
 export fn vqlut_abi_version() u32 {
     return ABI_VERSION;
 }
 
-/// Parse a VQL query string into a parse tree handle.
+/// Parse a VCL query string into a parse tree handle.
 ///
-/// @param query      Pointer to null-terminated VQL query string (unused in stub)
+/// @param query      Pointer to null-terminated VCL query string (unused in stub)
 /// @param mode       QueryMode tag (0-2)
 /// @param out_handle Out-pointer: receives handle on success (pointer to u64)
 /// @return VqlUtError tag
@@ -341,10 +341,10 @@ export fn vqlut_get_safety_level(handle: u64) u32 {
     return @intFromEnum(ctx.achieved_level);
 }
 
-/// Destroy (free) any handle returned by VQL-UT.
+/// Destroy (free) any handle returned by VCL-total.
 /// Safe to call with 0 — will be a no-op.
 ///
-/// @param handle  Any handle from the VQL-UT pipeline
+/// @param handle  Any handle from the VCL-total pipeline
 export fn vqlut_destroy(handle: u64) void {
     freeSlot(handle);
     clearError();
@@ -352,7 +352,7 @@ export fn vqlut_destroy(handle: u64) void {
 
 /// Get the last error message as a pointer to a null-terminated C string.
 /// Returns 0 (null) if no error has occurred.
-/// The string is valid until the next VQL-UT call on the same thread.
+/// The string is valid until the next VCL-total call on the same thread.
 export fn vqlut_last_error() u64 {
     if (last_error_msg) |msg| {
         // Return pointer to the static error string

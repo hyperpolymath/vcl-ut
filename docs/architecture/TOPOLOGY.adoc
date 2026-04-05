@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= VQL-UT System Topology
+= VCL-total System Topology
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 :date: 2026-03-16
 :toc: macro
 :toclevels: 3
 :icons: font
-:description: System topology showing how VQL-UT fits in the broader hyperpolymath ecosystem
+:description: System topology showing how VCL-total fits in the broader hyperpolymath ecosystem
 
 toc::[]
 
 == Position in the Hyperpolymath Ecosystem
 
-VQL-UT sits at the intersection of three major subsystems: the type theory
+VCL-total sits at the intersection of three major subsystems: the type theory
 stack (TypeLL), the database stack (VeriSimDB), and the orchestration layer
 (BoJ server / PanLL). It is the component that makes database queries
 *provably safe* by applying TypeLL's 10-level type system to VeriSimDB's
@@ -20,7 +20,7 @@ query language.
 
 [source]
 ----
-                    HYPERPOLYMATH ECOSYSTEM — VQL-UT POSITION
+                    HYPERPOLYMATH ECOSYSTEM — VCL-total POSITION
                     ═══════════════════════════════════════════
 
   ┌─────────────────────────────────────────────────────────────────┐
@@ -36,7 +36,7 @@ query language.
   │  appropriate query path. Manages cartridge lifecycle.           │
   │                                                                 │
   │  Relevant cartridges:                                           │
-  │    • vql-ut-cartridge     — VQL-UT type checking via MCP        │
+  │    • vcl-total-cartridge     — VCL-total type checking via MCP        │
   │    • verisimdb-cartridge  — Direct VeriSimDB operations         │
   │    • proven-servers-cart  — Verified network primitives          │
   └──────────┬──────────────────────┬───────────────────────────────┘
@@ -46,13 +46,13 @@ query language.
   │      PanLL         │  │            QUERY LAYER                  │
   │  (Panel System)    │  │                                         │
   │                    │  │  Three paths to VeriSimDB:               │
-  │  vql-ut-safety-    │  │                                         │
+  │  vcl-total-safety-    │  │                                         │
   │    dashboard       │  │  ┌───────────┐ ┌──────┐ ┌───────────┐  │
-  │  vql-ut-query-     │  │  │Slipstream │ │VQL-DT│ │  VQL-UT   │  │
+  │  vcl-total-query-     │  │  │Slipstream │ │VCL-DT│ │  VCL-total   │  │
   │    editor          │  │  │           │ │      │ │           │  │
-  │  vql-ut-proof-     │  │  │ Fast,     │ │ 6    │ │ 10 safety │  │
+  │  vcl-total-proof-     │  │  │ Fast,     │ │ 6    │ │ 10 safety │  │
   │    explorer        │  │  │ untyped,  │ │PROOF │ │ levels,   │  │
-  │  vql-ut-horror-    │  │  │ direct    │ │types │ │ full      │  │
+  │  vcl-total-horror-    │  │  │ direct    │ │types │ │ full      │  │
   │    stories         │  │  │ dispatch  │ │only  │ │ proofs    │  │
   │                    │  │  └─────┬─────┘ └──┬───┘ └─────┬─────┘  │
   └────────────────────┘  │        │          │           │         │
@@ -83,12 +83,12 @@ between safety guarantees and performance:
 |Fastest (no type checking overhead)
 |Trusted internal services, batch ingestion, migration scripts
 
-|**VQL-DT**
+|**VCL-DT**
 |6 PROOF types (Pi, Sigma, dependent pattern matching, basic type checking, universe polymorphism, implicit arguments)
 |Moderate (basic type checking)
 |Production queries with standard safety (current VeriSimDB default)
 
-|**VQL-UT**
+|**VCL-total**
 |10 safety levels (construction, schema, linearity, session, effects, modal, information flow, quantitative, proof-carrying, metatheory)
 |Slower (full proof generation), but cached certificates amortise cost
 |Safety-critical queries, audit-grade operations, compliance workloads
@@ -103,17 +103,17 @@ The query path is selected at the API level:
   POST /api/v1/query
   ─────────────────
   {
-    "path": "slipstream" | "vql-dt" | "vql-ut",
+    "path": "slipstream" | "vcl-dt" | "vcl-total",
     "query": "SELECT GRAPH FROM HEXAD ...",
-    "safety_level": 10          // VQL-UT only: 1-10
+    "safety_level": 10          // VCL-total only: 1-10
   }
 ----
 
-For VQL-UT, the `safety_level` parameter controls how many levels are checked.
+For VCL-total, the `safety_level` parameter controls how many levels are checked.
 A query requesting level 5 will pass through L1–L5 only, skipping L6–L10.
 This enables graduated adoption: start at L1 and increase as confidence grows.
 
-== TypeLL → PanLL → VQL-UT → VeriSimDB
+== TypeLL → PanLL → VCL-total → VeriSimDB
 
 The dependency chain from theory to execution:
 
@@ -134,7 +134,7 @@ The dependency chain from theory to execution:
                              │ Specialises
                              ▼
   ┌──────────────────────────────────────────────────────────────┐
-  │                        VQL-UT                                 │
+  │                        VCL-total                                 │
   │                                                               │
   │  TypeLL instantiated for VeriSimDB queries.                   │
   │  Maps each TypeLL level to a concrete Idris2 module.          │
@@ -157,7 +157,7 @@ The dependency chain from theory to execution:
   ┌──────────────────────────────────────────────────────────────┐
   │                        PanLL                                  │
   │                                                               │
-  │  The panel system. Provides real-time UI for VQL-UT.          │
+  │  The panel system. Provides real-time UI for VCL-total.          │
   │                                                               │
   │  Panels:                                                      │
   │    • Safety dashboard (10-level pipeline visualisation)        │
@@ -165,13 +165,13 @@ The dependency chain from theory to execution:
   │    • Proof explorer (obligation discharge status)              │
   │    • Horror stories (what each level prevents)                 │
   │                                                               │
-  │  Connects to VQL-UT via BoJ cartridge + PanLL manifest.       │
+  │  Connects to VCL-total via BoJ cartridge + PanLL manifest.       │
   └──────────────────────────────────────────────────────────────┘
 ----
 
 == BoJ Server Integration
 
-VQL-UT is exposed as a BoJ cartridge, following the standard cartridge
+VCL-total is exposed as a BoJ cartridge, following the standard cartridge
 protocol:
 
 [source]
@@ -179,7 +179,7 @@ protocol:
   BoJ Server
   ──────────
        │
-       ├── vql-ut-cartridge
+       ├── vcl-total-cartridge
        │   ├── tools:
        │   │   ├── vqlut_check     — Type-check a query (returns safety levels)
        │   │   ├── vqlut_compile   — Compile a checked query to a plan
@@ -187,9 +187,9 @@ protocol:
        │   │   └── vqlut_levels    — List safety levels and their status
        │   │
        │   ├── resources:
-       │   │   ├── vqlut://schema/current    — Current schema definition
-       │   │   ├── vqlut://levels/{1..10}    — Individual level documentation
-       │   │   └── vqlut://certificate/{id}  — Retrieve a proof certificate
+       │   │   ├── vcltotal://schema/current    — Current schema definition
+       │   │   ├── vcltotal://levels/{1..10}    — Individual level documentation
+       │   │   └── vcltotal://certificate/{id}  — Retrieve a proof certificate
        │   │
        │   └── prompts:
        │       ├── check_query    — "Check this query for safety"
@@ -201,12 +201,12 @@ protocol:
 
 == proven-servers Integration
 
-VQL-UT depends on proven-servers for verified network primitives when queries
+VCL-total depends on proven-servers for verified network primitives when queries
 span distributed VeriSimDB instances:
 
 [source]
 ----
-  VQL-UT Query Plan
+  VCL-total Query Plan
   ─────────────────
        │
        │ Distributed query (spans multiple VeriSimDB nodes)
@@ -221,16 +221,16 @@ span distributed VeriSimDB instances:
   │    • proven-fsm    — State machines   │
   │    • proven-queueconn — Message queue │
   │                                       │
-  │  VQL-UT uses:                         │
+  │  VCL-total uses:                         │
   │    proven-tls for inter-node queries  │
   │    proven-fsm for session protocols   │
   │    proven-queueconn for async results │
   └──────────────────────────────────────┘
 ----
 
-The Idris2 proofs in proven-servers compose with VQL-UT's L4 (session
+The Idris2 proofs in proven-servers compose with VCL-total's L4 (session
 protocols) and L7 (information flow) levels. A distributed query's safety
-certificate includes attestations from both VQL-UT and proven-servers.
+certificate includes attestations from both VCL-total and proven-servers.
 
 == Deployment Topology
 
@@ -328,15 +328,15 @@ performance-critical type checking in the hot path.
 
 |`nextgen-databases/verisimdb`
 |Target engine
-|VQL-UT compiles queries for this engine
+|VCL-total compiles queries for this engine
 
 |`nextgen-databases/typeql-experimental`
 |Predecessor
-|VQL-dt++ experimental space; VQL-UT is the productionised successor
+|VCL-dt++ experimental space; VCL-total is the productionised successor
 
 |`nextgen-languages/typell`
 |Theory provider
-|10-level type theory that VQL-UT instantiates
+|10-level type theory that VCL-total instantiates
 
 |`proven-servers`
 |Network primitives
@@ -344,15 +344,15 @@ performance-critical type checking in the hot path.
 
 |`boj-server`
 |Cartridge host
-|Exposes VQL-UT as an MCP cartridge
+|Exposes VCL-total as an MCP cartridge
 
 |`panll`
 |UI framework
-|Renders VQL-UT panels (safety dashboard, query editor, etc.)
+|Renders VCL-total panels (safety dashboard, query editor, etc.)
 
 |`developer-ecosystem/rescript-ecosystem`
 |Parser toolchain
-|ReScript compiler and VQL parser patterns
+|ReScript compiler and VCL parser patterns
 
 |`developer-ecosystem/idris2-ecosystem`
 |Type kernel toolchain

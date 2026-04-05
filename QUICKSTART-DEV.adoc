@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Template: QUICKSTART-DEV.adoc — clone → build → test → PR
-// Replace vql-ut, {{BUILD_CMD}}, {{TEST_CMD}}, {{LANG_STACK}} with actuals
-= vql-ut — Quick Start for Developers
+// Replace vcl-total, {{BUILD_CMD}}, {{TEST_CMD}}, {{LANG_STACK}} with actuals
+= vcl-total — Quick Start for Developers
 :toc:
 :toclevels: 2
 
@@ -30,7 +30,7 @@ nix develop
 [source,bash]
 ----
 git clone https://github.com/hyperpolymath/vql-ut.git
-cd vql-ut
+cd vcl-total
 just setup-dev
 ----
 
@@ -52,7 +52,7 @@ just setup-dev
 
 [source]
 ----
-vql-ut/
+vcl-total/
 ├── src/                  # Source code
 ├── src/abi/              # Idris2 ABI definitions (if applicable)
 ├── ffi/zig/              # Zig FFI bridge (if applicable)

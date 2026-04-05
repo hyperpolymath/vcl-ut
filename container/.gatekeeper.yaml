@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
 #
-# Svalinn gatekeeper policy for VQL-UT
+# Svalinn gatekeeper policy for VCL-total
 #
 # Controls which operations are permitted through the edge gateway.
 # This template provides moderate security defaults — not wide-open test
@@ -65,9 +65,9 @@ rate_limits:
 trust:
   # Only accept .ctp bundles signed by these keys.
   trusted_signers:
-    - key_id: "vql-ut-release"
+    - key_id: "vcl-total-release"
       algorithm: "Ed25519"
-      public_key_file: "/etc/svalinn/keys/vql-ut-release.pub"
+      public_key_file: "/etc/svalinn/keys/vcl-total-release.pub"
 
   # Require these attestations on all .ctp bundles.
   required_attestations:

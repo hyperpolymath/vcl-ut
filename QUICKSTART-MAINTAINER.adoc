@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Template: QUICKSTART-MAINTAINER.adoc — packaging, deploying, and maintaining
-// Replace vql-ut, {{PACKAGE_NAME}}, {{DEPS}} with actuals
-= vql-ut — Quick Start for Platform Maintainers
+// Replace vcl-total, {{PACKAGE_NAME}}, {{DEPS}} with actuals
+= vcl-total — Quick Start for Platform Maintainers
 :toc:
 :toclevels: 2
 
 == Overview
 
-This guide covers packaging, deploying, and maintaining vql-ut for
+This guide covers packaging, deploying, and maintaining vcl-total for
 distribution on your platform.
 
 == Runtime Dependencies
@@ -19,7 +19,7 @@ distribution on your platform.
 [source,bash]
 ----
 git clone https://github.com/hyperpolymath/vql-ut.git
-cd vql-ut
+cd vcl-total
 just build-release
 ----
 
@@ -46,7 +46,7 @@ nix build
 [source,bash]
 ----
 just stapeln-export    # Generates Containerfile
-podman build -t vql-ut .
+podman build -t vcl-total .
 ----
 
 === Manual Package

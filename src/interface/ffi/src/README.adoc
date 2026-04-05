@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
-= VQL-UT FFI Source
+= VCL-total FFI Source
 
-`main.zig` implements the complete VQL-UT FFI: a thread-safe slot pool of query
+`main.zig` implements the complete VCL-total FFI: a thread-safe slot pool of query
 contexts, the 5-stage query pipeline (parse, bind_schema, check_types,
 check_effects, compile), safety level inspection, and handle lifecycle management.

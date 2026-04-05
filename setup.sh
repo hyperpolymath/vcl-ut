@@ -1,12 +1,12 @@
 #!/bin/sh
 # SPDX-License-Identifier: PMPL-1.0-or-later
-# setup.sh — Universal setup script for vql-ut
+# setup.sh — Universal setup script for vcl-total
 #
 # Detects your shell, platform, and installs prerequisites.
 # Then hands off to `just setup` for project-specific configuration.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/hyperpolymath/vql-ut/main/setup.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/hyperpolymath/vcl-total/main/setup.sh | sh
 #   # or after cloning:
 #   ./setup.sh
 #
@@ -167,7 +167,7 @@ install_just() {
 
 # ── Main ──
 main() {
-    printf "%s=== vql-ut Setup ===%s\n\n" "$BOLD" "$RESET"
+    printf "%s=== vcl-total Setup ===%s\n\n" "$BOLD" "$RESET"
 
     # Detect environment
     SHELL_NAME=$(detect_shell)
@@ -199,7 +199,7 @@ main() {
     if [ ! -f "Justfile" ] && [ ! -f "justfile" ]; then
         warn "Not in a repo directory (no Justfile found)"
         info "Clone first: git clone https://github.com/hyperpolymath/vql-ut.git"
-        info "Then: cd vql-ut && ./setup.sh"
+        info "Then: cd vcl-total && ./setup.sh"
         exit 1
     fi
 

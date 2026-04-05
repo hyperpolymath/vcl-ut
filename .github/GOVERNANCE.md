@@ -2,13 +2,13 @@
 
 # Project Governance
 
-This document describes the governance model for **VQL-UT**.
+This document describes the governance model for **VCL-total**.
 
 ---
 
 ## Project Governance Model
 
-VQL-UT follows a **Benevolent Dictator For Life (BDFL)** governance model.
+VCL-total follows a **Benevolent Dictator For Life (BDFL)** governance model.
 This model is well-suited for solo maintainers and small project teams where rapid,
 consistent decision-making is more valuable than formal consensus processes.
 

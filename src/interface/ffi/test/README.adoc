@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
-= VQL-UT FFI Integration Tests
+= VCL-total FFI Integration Tests
 
 `integration_test.zig` exercises the full query pipeline through the exported C
 functions, verifying ABI version, lifecycle, error handling, safety level

@@ -1,17 +1,17 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
 #
-# Cerro Torre manifest for VQL-UT .ctp bundle
+# Cerro Torre manifest for VCL-total .ctp bundle
 #
 # This manifest describes the container image for verified
 # container packaging. Used by `ct pack` to create .ctp bundles.
 
 [metadata]
-name = "vql-ut"
+name = "vcl-total"
 version = "0.1.0"
 revision = 1
-summary = "VQL Ultimate Type-Safety — 10-level query safety checker for VeriSimDB"
+summary = "VCL Total Type-Safety — 10-level query safety checker for VeriSimDB"
 description = """
-VQL-UT — containerised service packaged as a verified
+VCL-total — containerised service packaged as a verified
 cerro-torre .ctp bundle with Ed25519 signing and full provenance
 tracking.
 """
@@ -35,7 +35,7 @@ APP_HOST = "[::]"
 APP_PORT = "8080"
 
 [outputs]
-primary = "vql-ut"
+primary = "vcl-total"
 split = []
 
 [attestations]

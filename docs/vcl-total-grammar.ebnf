@@ -1,12 +1,12 @@
 (* SPDX-License-Identifier: PMPL-1.0-or-later *)
 (* Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk> *)
 (*
- * VeriSim Query Language — Unified Type-Safety (VQL-UT) Grammar
+ * VeriSim Consonance Language — Unified Type-Safety (VCL-total) Grammar
  * Format: Extended Backus-Naur Form (EBNF)
  * Version: 1.0
  * Date: 2026-03-16
  *
- * Extends VQL v3.0 with type safety annotations for all 10 levels:
+ * Extends VCL v3.0 with type safety annotations for all 10 levels:
  *   Level  1: Parse-time safety (grammar existence)
  *   Level  2: Schema-binding (TYPED BY)
  *   Level  3: Type-compatible operations (:: annotations)
@@ -26,7 +26,7 @@
 
 statement = query | mutation ;
 
-(* VQL-UT extends the query with optional type-safety clauses at every level *)
+(* VCL-total extends the query with optional type-safety clauses at every level *)
 query = select_clause,
         from_clause,
         [typed_by_clause],         (* Level 2: Schema-binding *)
@@ -403,7 +403,7 @@ linearity_usage = 'USAGE', 'LIMIT', integer ;
 (* ============================================================================
    14. TYPE SYSTEM - Types for Annotations (Levels 3, 5, 6)
    ============================================================================ *)
-(* The VQL-UT type system used in :: annotations, parameter types,
+(* The VCL-total type system used in :: annotations, parameter types,
    and RETURNS declarations. *)
 
 type_name = primitive_type
@@ -527,9 +527,9 @@ comment = '--', { ? any character except newline ? }, '\n'  (* Line comment *)
 (* ============================================================================
    18. RESERVED KEYWORDS
    ============================================================================ *)
-(* Keywords are case-insensitive in VQL-UT *)
+(* Keywords are case-insensitive in VCL-total *)
 
-(* --- VQL v3.0 base keywords --- *)
+(* --- VCL v3.0 base keywords --- *)
 keywords = 'SELECT' | 'FROM' | 'WHERE' | 'PROOF' | 'LIMIT' | 'OFFSET'
          | 'GRAPH' | 'VECTOR' | 'TENSOR' | 'SEMANTIC' | 'DOCUMENT'
          | 'TEMPORAL' | 'PROVENANCE' | 'SPATIAL'
@@ -550,33 +550,33 @@ keywords = 'SELECT' | 'FROM' | 'WHERE' | 'PROOF' | 'LIMIT' | 'OFFSET'
          | 'EXISTS' | 'CONSISTENT'
          | 'true' | 'false'
 
-         (* --- VQL-UT Level 2: Schema-binding --- *)
+         (* --- VCL-total Level 2: Schema-binding --- *)
          | 'TYPED'
 
-         (* --- VQL-UT Level 3: Type-compatible ops --- *)
+         (* --- VCL-total Level 3: Type-compatible ops --- *)
          (* :: is an operator, not a keyword *)
          | 'Int' | 'Float' | 'String' | 'Bool' | 'UUID'
          | 'Timestamp' | 'Duration' | 'Bytes'
          | 'Array' | 'Map'
 
-         (* --- VQL-UT Level 5: Injection-proof --- *)
+         (* --- VCL-total Level 5: Injection-proof --- *)
          (* $ is a sigil, not a keyword *)
 
-         (* --- VQL-UT Level 6: Result-type --- *)
+         (* --- VCL-total Level 6: Result-type --- *)
          | 'RETURNS'
 
-         (* --- VQL-UT Level 7: Cardinality --- *)
+         (* --- VCL-total Level 7: Cardinality --- *)
          | 'EXPECTING' | 'EXACTLY' | 'AT_MOST' | 'AT_LEAST' | 'MANY'
 
-         (* --- VQL-UT Level 8: Effect-tracking --- *)
+         (* --- VCL-total Level 8: Effect-tracking --- *)
          | 'EFFECTS' | 'Read' | 'Write' | 'DDL' | 'Network' | 'Index'
 
-         (* --- VQL-UT Level 9: Temporal safety --- *)
+         (* --- VCL-total Level 9: Temporal safety --- *)
          | 'FRESH'
 
-         (* --- VQL-UT Level 10: Linearity --- *)
+         (* --- VCL-total Level 10: Linearity --- *)
          | 'CONSUME' | 'AFTER' | 'USE' | 'SESSION' | 'USAGE' ;
 
 (* ============================================================================
-   END OF VQL-UT GRAMMAR
+   END OF VCL-total GRAMMAR
    ============================================================================ *)

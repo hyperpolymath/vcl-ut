@@ -1,10 +1,10 @@
 -- SPDX-License-Identifier: PMPL-1.0-or-later
 -- Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 --
-||| VQL-UT Memory Layout Proofs
+||| VCL-total Memory Layout Proofs
 |||
 ||| Formal proofs about memory layout, alignment, and padding for
-||| C-compatible structs crossing the VQL-UT FFI boundary.
+||| C-compatible structs crossing the VCL-total FFI boundary.
 |||
 ||| Covers encoding/decoding roundtrip proofs for SafetyLevel, QueryMode,
 ||| VqlUtError, and the QueryPlanHeader struct layout.
@@ -186,7 +186,7 @@ public export
 PlatformLayout : Platform -> Type -> Type
 PlatformLayout p t = StructLayout
 
-||| For VQL-UT, the QueryPlanHeader layout is uniform across all platforms
+||| For VCL-total, the QueryPlanHeader layout is uniform across all platforms
 ||| because it uses only fixed-width types (Bits32, Bits64).
 public export
 queryPlanHeaderForPlatform : (p : Platform) -> PlatformLayout p QueryPlanHeader
