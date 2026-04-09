@@ -185,12 +185,8 @@ fn lint_detects_lowercase_where() {
 }
 
 #[test]
-fn lint_flags_keywords_case_insensitively() {
-    // The linter lowercases the entire line before searching for ` keyword `.
-    // This means even uppercase keywords surrounded by spaces are flagged,
-    // because "SELECT * FROM users" lowercased contains " from ".
-    // This documents the current behavior: the linter always flags keywords
-    // found via the ` keyword ` pattern regardless of original case.
+fn lint_does_not_flag_uppercase_keywords() {
+    // Keywords that are already uppercase should not be flagged.
     let input = "SELECT * FROM users WHERE id = 1;";
     let issues = lint_vqlut(input);
     let kw_issues: Vec<&LintIssue> = issues
@@ -198,8 +194,9 @@ fn lint_flags_keywords_case_insensitively() {
         .filter(|i| i.message.contains("should be uppercase"))
         .collect();
     assert!(
-        !kw_issues.is_empty(),
-        "Current linter flags keywords found via case-insensitive space-delimited search"
+        kw_issues.is_empty(),
+        "Uppercase keywords should not be flagged. Got: {:?}",
+        kw_issues.iter().map(|i| &i.message).collect::<Vec<_>>()
     );
 }
 
@@ -369,13 +366,13 @@ fn aspect_keyword_in_middle_of_line_not_indented() {
 
 #[test]
 fn aspect_keyword_as_substring_not_indented() {
-    // "SELECTED" starts with SELECT but is not SELECT keyword
-    // Actually it does start with "SELECT" so it WILL be indented by the current logic
+    // "SELECTED" starts with "SELECT" but is not the SELECT keyword.
+    // The formatter checks word boundaries, so it should NOT be indented.
     let output = format_vqlut("SELECTED * FROM users");
-    // This is expected behavior: starts_with("SELECT") matches "SELECTED"
     assert!(
-        output.starts_with("  SELECTED"),
-        "Current logic indents lines starting with keyword prefix"
+        !output.starts_with("  "),
+        "Keyword-prefix words should not be indented. Got: {:?}",
+        output
     );
 }
 

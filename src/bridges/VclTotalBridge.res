@@ -49,18 +49,7 @@ type checkReport = {
 /// against a schema — that requires the TypeLL server.
 let checkQuery = (queryStr: string): result<checkReport, string> => {
   switch VclTotalParser.parse(queryStr) {
-  | Error(msg) =>
-    Ok({
-      valid: false,
-      maxLevel: 0,
-      maxLevelName: "Parse-time safety",
-      queryPath: "VCL (Slipstream)",
-      levelDiagnostics: [`Parse error: ${msg}`],
-      explanation: `Parse failed: ${msg}`,
-      ast: None,
-      effects: [],
-      usage: "omega",
-    })
+  | Error(msg) => Error(`Parse failed: ${msg}`)
   | Ok(stmt) =>
     // Determine max level from present clauses
     let maxLevel = VclTotalAst.safetyLevelToInt(stmt.requestedLevel)
@@ -119,20 +108,30 @@ let checkQuery = (queryStr: string): result<checkReport, string> => {
   }
 }
 
+/// Escape a string for safe inclusion in a JSON string value.
+let escapeJsonString = (s: string): string =>
+  s
+  ->String.replaceAll("\\", "\\\\")
+  ->String.replaceAll("\"", "\\\"")
+  ->String.replaceAll("\n", "\\n")
+  ->String.replaceAll("\r", "\\r")
+  ->String.replaceAll("\t", "\\t")
+
 /// Encode a checkReport as JSON for transport to TypeLL server.
 let reportToJson = (report: checkReport): string => {
   let effectsJson = report.effects
-    ->Array.map(e => `"${e}"`)
+    ->Array.map(e => `"${escapeJsonString(e)}"`)
     ->Array.join(", ")
 
   let diagnosticsJson = report.levelDiagnostics
-    ->Array.map(d => {
-      let escaped = d->String.replaceAll("\"", "\\\"")
-      `"${escaped}"`
-    })
+    ->Array.map(d => `"${escapeJsonString(d)}"`)
     ->Array.join(", ")
 
-  `{"valid":${report.valid ? "true" : "false"},"maxLevel":${Int.toString(report.maxLevel)},"maxLevelName":"${report.maxLevelName}","queryPath":"${report.queryPath}","effects":[${effectsJson}],"usage":"${report.usage}","levelDiagnostics":[${diagnosticsJson}]}`
+  let maxLevelName = escapeJsonString(report.maxLevelName)
+  let queryPath = escapeJsonString(report.queryPath)
+  let usage = escapeJsonString(report.usage)
+
+  `{"valid":${report.valid ? "true" : "false"},"maxLevel":${Int.toString(report.maxLevel)},"maxLevelName":"${maxLevelName}","queryPath":"${queryPath}","effects":[${effectsJson}],"usage":"${usage}","levelDiagnostics":[${diagnosticsJson}]}`
 }
 
 /// Parse a query and return just the safety level (quick check).

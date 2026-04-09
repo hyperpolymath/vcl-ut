@@ -20,6 +20,7 @@ type errorCode =
   | TypeError         // Level 2: incompatible types in comparison
   | NullError         // Level 3: nullable field used without guard
   | InjectionAttempt  // Level 4: raw string literal in unsafe position
+  | ResultTypeError   // Level 5: unresolved result type (TAny in select)
   | CardinalityViolation // Level 6: unbounded result without LIMIT
   | EffectViolation   // Level 7: undeclared effect
   | TemporalBoundsExceeded // Level 8: version constraint violation
@@ -43,11 +44,12 @@ let errorCodeToInt = (code: errorCode): int =>
   | TypeError => 3
   | NullError => 4
   | InjectionAttempt => 5
-  | CardinalityViolation => 6
-  | EffectViolation => 7
-  | TemporalBoundsExceeded => 8
-  | LinearityViolation => 9
-  | InternalError => 10
+  | ResultTypeError => 6
+  | CardinalityViolation => 7
+  | EffectViolation => 8
+  | TemporalBoundsExceeded => 9
+  | LinearityViolation => 10
+  | InternalError => 11
   }
 
 /// Convert an ABI integer tag to an error code.
@@ -58,11 +60,12 @@ let errorCodeFromInt = (n: int): option<errorCode> =>
   | 3 => Some(TypeError)
   | 4 => Some(NullError)
   | 5 => Some(InjectionAttempt)
-  | 6 => Some(CardinalityViolation)
-  | 7 => Some(EffectViolation)
-  | 8 => Some(TemporalBoundsExceeded)
-  | 9 => Some(LinearityViolation)
-  | 10 => Some(InternalError)
+  | 6 => Some(ResultTypeError)
+  | 7 => Some(CardinalityViolation)
+  | 8 => Some(EffectViolation)
+  | 9 => Some(TemporalBoundsExceeded)
+  | 10 => Some(LinearityViolation)
+  | 11 => Some(InternalError)
   | _ => None
   }
 

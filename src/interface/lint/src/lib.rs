@@ -36,16 +36,24 @@ pub fn lint_vqlut(content: &str) -> Vec<LintIssue> {
         }
     }
 
-    // Check for uppercase keywords
+    // Check for lowercase keywords: flag keywords that appear (case-insensitive)
+    // but are not already uppercase in the original text.
     for (i, line) in content.lines().enumerate() {
         let line_num = i + 1;
         let keywords = ["select", "from", "where", "group", "order", "having", "limit"];
         for keyword in keywords {
-            if line.to_lowercase().contains(&format!(" {} ", keyword)) {
-                issues.push(LintIssue {
-                    line: line_num,
-                    message: format!("Keyword '{}' should be uppercase", keyword.to_uppercase()),
-                });
+            let lower_pattern = format!(" {} ", keyword);
+            if line.to_lowercase().contains(&lower_pattern) {
+                let upper_pattern = format!(" {} ", keyword.to_uppercase());
+                if !line.contains(&upper_pattern) {
+                    issues.push(LintIssue {
+                        line: line_num,
+                        message: format!(
+                            "Keyword '{}' should be uppercase",
+                            keyword.to_uppercase()
+                        ),
+                    });
+                }
             }
         }
     }
