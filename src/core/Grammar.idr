@@ -61,10 +61,50 @@ modalityToInt Provenance = 6
 modalityToInt Spatial    = 7
 
 -- ═══════════════════════════════════════════════════════════════════════
+-- Epistemic Agents
+-- ═══════════════════════════════════════════════════════════════════════
+
+||| An epistemic agent — an entity whose knowledge/belief state is tracked.
+||| In VeriSimDB, agents are system components that produce or consume
+||| propositions: provers, validators, the engine itself, or external users.
+public export
+data Agent
+  = AgEngine          -- The VeriSimDB consonance engine itself
+  | AgProver String   -- A named prover (e.g. "lean4", "idris2")
+  | AgValidator       -- The VCL-total validation pipeline
+  | AgUser String     -- A named external user / client
+  | AgFederation      -- The federation consensus layer
+
+||| Convert agent to its string name.
+public export
+agentName : Agent -> String
+agentName AgEngine        = "ENGINE"
+agentName (AgProver name) = "PROVER:" ++ name
+agentName AgValidator     = "VALIDATOR"
+agentName (AgUser name)   = "USER:" ++ name
+agentName AgFederation    = "FEDERATION"
+
+||| Encode agent as C integer (tag only; parameterised agents carry payload separately).
+public export
+agentToInt : Agent -> Int
+agentToInt AgEngine        = 0
+agentToInt (AgProver _)    = 1
+agentToInt AgValidator     = 2
+agentToInt (AgUser _)      = 3
+agentToInt AgFederation    = 4
+
+-- ═══════════════════════════════════════════════════════════════════════
 -- Value Types (type system for expressions)
 -- ═══════════════════════════════════════════════════════════════════════
 
 ||| Types that VCL-total expressions can evaluate to.
+|||
+||| The epistemic type constructors (TKnows, TBelieves, TCommonKnowledge)
+||| encode S5 modal logic operators at the type level:
+|||   - TKnows agent P     : agent has verified knowledge of P
+|||   - TBelieves agent P  : agent holds P as belief (weaker than knowledge)
+|||   - TCommonKnowledge P : all agents in the federation know P,
+|||                          and know that all others know P (ad infinitum)
 public export
 data VqlType
   = TString          -- Text values
@@ -80,6 +120,10 @@ data VqlType
   | TOctad           -- Full octad reference
   | TNull VqlType    -- Nullable version of a type
   | TAny             -- Unresolved type (before type checking)
+  -- Epistemic types (S5 modal logic operators)
+  | TKnows Agent VqlType           -- K_a(P): agent knows proposition of type P
+  | TBelieves Agent VqlType        -- B_a(P): agent believes proposition of type P
+  | TCommonKnowledge VqlType       -- C(P): common knowledge across federation
 
 ||| Proof that two types are compatible for comparison.
 ||| Only same-type comparisons are valid (no implicit coercion).
@@ -127,6 +171,20 @@ data AggFunc = Count | Sum | Avg | Min | Max
 ||| Expression AST node.
 ||| Every expression carries a type annotation (initially TAny,
 ||| resolved during type checking at Level 2+).
+||| Epistemic operators for modal logic expressions.
+public export
+data EpistemicOp
+  = OpKnows             -- K_a: agent knows
+  | OpBelieves          -- B_a: agent believes
+  | OpCommonKnowledge   -- C: common knowledge (all agents, iterated)
+
+||| Encode EpistemicOp as C integer.
+public export
+epistemicOpToInt : EpistemicOp -> Int
+epistemicOpToInt OpKnows           = 0
+epistemicOpToInt OpBelieves        = 1
+epistemicOpToInt OpCommonKnowledge = 2
+
 public export
 data Expr
   = EField FieldRef VqlType              -- Field reference with type
@@ -137,6 +195,16 @@ data Expr
   | EParam String VqlType                -- Parameterised input ($1, $name)
   | EStar                                -- Wildcard (*)
   | ESubquery Statement                  -- Subquery
+  -- Epistemic expression nodes (S5 modal logic)
+  | EEpistemic EpistemicOp Agent Expr VqlType
+      -- ^ Modal operator application: KNOWS agent expr, BELIEVES agent expr,
+      --   or COMMON KNOWLEDGE expr. The VqlType is the epistemic result type
+      --   (TKnows/TBelieves/TCommonKnowledge wrapping the inner type).
+  | EAnnounce Agent Expr Expr VqlType
+      -- ^ Public announcement: ANNOUNCE agent proposition body.
+      --   Models the epistemic effect of an agent publicly declaring a fact.
+      --   After announcement, all agents know the proposition holds.
+      --   Type: the body expression type, evaluated in the updated epistemic state.
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Clauses
@@ -191,6 +259,40 @@ data LinearAnnotation
   | LinUseOnce                 -- CONSUME AFTER 1 USE
   | LinBounded Nat             -- USAGE LIMIT n
 
+||| Epistemic clause for Level 10 (epistemic safety).
+|||
+||| Specifies the epistemic context: which agents are relevant, what they
+||| know/believe, and what epistemic properties must hold for the query
+||| result.  The clause triggers S5 modal checking in the pipeline.
+|||
+||| Syntax:
+|||   EPISTEMIC { AGENTS engine, prover:lean4 ;
+|||               REQUIRES KNOWS engine (status = 'verified') ;
+|||               REQUIRES COMMON KNOWLEDGE (schema_version >= 3) }
+public export
+data EpistemicClause
+  = EpClause
+      (List Agent)               -- Agents in scope
+      (List EpistemicRequirement) -- Requirements that must hold
+
+||| A single epistemic requirement within an EPISTEMIC clause.
+public export
+data EpistemicRequirement
+  = EpReqKnows Agent Expr         -- REQUIRES KNOWS <agent> <prop>
+  | EpReqBelieves Agent Expr      -- REQUIRES BELIEVES <agent> <prop>
+  | EpReqCommon Expr              -- REQUIRES COMMON KNOWLEDGE <prop>
+  | EpReqEntails Agent Agent Expr -- REQUIRES <a1> ENTAILS <a2> <prop>
+      -- ^ Agent a1's knowledge entails agent a2's knowledge of prop.
+      --   Formalises knowledge transfer: K_a1(P) → K_a2(P).
+
+||| Encode EpistemicRequirement tag as C integer.
+public export
+epReqToInt : EpistemicRequirement -> Int
+epReqToInt (EpReqKnows _ _)     = 0
+epReqToInt (EpReqBelieves _ _)  = 1
+epReqToInt (EpReqCommon _)      = 2
+epReqToInt (EpReqEntails _ _ _) = 3
+
 -- ═══════════════════════════════════════════════════════════════════════
 -- Statement (top-level query)
 -- ═══════════════════════════════════════════════════════════════════════
@@ -213,6 +315,7 @@ record Statement where
   effectDecl    : Maybe EffectDecl
   versionConst  : Maybe VersionConstraint
   linearAnnot   : Maybe LinearAnnotation
+  epistemicClause : Maybe EpistemicClause  -- Level 10: epistemic safety
   -- Metadata
   requestedLevel : SafetyLevel
 
@@ -228,9 +331,9 @@ data HasSelectItems : Statement -> Type where
 ||| Proof that a statement has a valid source.
 public export
 data HasSource : Statement -> Type where
-  OctadSource : HasSource (MkStatement _ (SrcOctad _) _ _ _ _ _ _ _ _ _ _ _)
-  FederationSource : HasSource (MkStatement _ (SrcFederation _) _ _ _ _ _ _ _ _ _ _ _)
-  StoreSource : HasSource (MkStatement _ (SrcStore _) _ _ _ _ _ _ _ _ _ _ _)
+  OctadSource : HasSource (MkStatement _ (SrcOctad _) _ _ _ _ _ _ _ _ _ _ _ _)
+  FederationSource : HasSource (MkStatement _ (SrcFederation _) _ _ _ _ _ _ _ _ _ _ _ _)
+  StoreSource : HasSource (MkStatement _ (SrcStore _) _ _ _ _ _ _ _ _ _ _ _ _)
 
 ||| Proof that a statement requesting Level 6+ has a LIMIT clause.
 public export
@@ -250,6 +353,12 @@ data HasVersionIfRequired : Statement -> Type where
   NoVersionNeeded : HasVersionIfRequired stmt
   VersionPresent : (versionConst stmt = Just v) -> HasVersionIfRequired stmt
 
+||| Proof that a statement requesting Level 10 has an epistemic clause.
+public export
+data HasEpistemicIfRequired : Statement -> Type where
+  NoEpistemicNeeded : HasEpistemicIfRequired stmt
+  EpistemicPresent : (epistemicClause stmt = Just ec) -> HasEpistemicIfRequired stmt
+
 ||| A well-formed statement satisfies all structural requirements.
 public export
 data WellFormed : Statement -> Type where
@@ -259,6 +368,7 @@ data WellFormed : Statement -> Type where
     HasLimitIfRequired stmt ->
     HasEffectIfRequired stmt ->
     HasVersionIfRequired stmt ->
+    HasEpistemicIfRequired stmt ->
     WellFormed stmt
 
 -- ═══════════════════════════════════════════════════════════════════════

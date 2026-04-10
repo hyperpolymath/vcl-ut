@@ -64,11 +64,11 @@ that every safety property holds.
   └─────────────────────────────────────────────────────┘
 ----
 
-== The 10 Safety Levels
+== The 11 Safety Levels
 
-VCL-total enforces 10 distinct safety levels, each targeting a specific class of
-bug. The levels are cumulative — a query at Level N has passed all checks from
-Levels 1 through N.
+VCL-total enforces 11 distinct safety levels (L0–L10), each targeting a specific
+class of bug. The levels are cumulative — a query at Level N has passed all
+checks from Levels 0 through N.
 
 [cols="1,2,3,2,2"]
 |===
@@ -133,7 +133,19 @@ Levels 1 through N.
 |Violations of compositional properties
 |`Proofs.idr`
 |Analyse
+
+|L11
+|Epistemic Safety
+|Inconsistent knowledge states across federated agents; unverified claims treated as knowledge; circular epistemic dependencies
+|`Epistemic.idr`
+|Check
 |===
+
+NOTE: Level 11 (Epistemic Safety) uses S5 modal logic with Kripke frame
+semantics embedded in the Idris2 type system. The EPISTEMIC clause specifies
+agents, their knowledge/belief requirements, and common knowledge properties.
+The type checker becomes the epistemic model checker — a term of type
+`Knows a P` is constructive evidence that agent `a` knows `P`.
 
 === Level Detail
 

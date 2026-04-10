@@ -239,3 +239,6 @@ vqlTypeToInt (TRecord _)   = 9
 vqlTypeToInt TOctad        = 10
 vqlTypeToInt (TNull _)     = 11
 vqlTypeToInt TAny          = 12
+vqlTypeToInt (TKnows _ _)         = 13
+vqlTypeToInt (TBelieves _ _)      = 14
+vqlTypeToInt (TCommonKnowledge _) = 15

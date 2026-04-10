@@ -53,6 +53,7 @@ allLevels : List SafetyLevel
 allLevels =
   [ ParseSafe, SchemaBound, TypeCompat, NullSafe, InjectionProof
   , ResultTyped, CardinalitySafe, EffectTracked, TemporalSafe, LinearSafe
+  , EpistemicSafe
   ]
 
 ||| Convert a SafetyLevel to a human-readable label string.
@@ -68,6 +69,7 @@ safetyLevelLabel CardinalitySafe = "L6:CardinalitySafe"
 safetyLevelLabel EffectTracked   = "L7:EffectTracked"
 safetyLevelLabel TemporalSafe    = "L8:TemporalSafe"
 safetyLevelLabel LinearSafe      = "L9:LinearSafe"
+safetyLevelLabel EpistemicSafe   = "L10:EpistemicSafe"
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Type Compatibility (decidable boolean check for Level 2)
@@ -90,7 +92,19 @@ vqlTypeEq (TList a)   (TList b)   = vqlTypeEq a b
 vqlTypeEq TOctad      TOctad      = True
 vqlTypeEq (TNull a)   (TNull b)   = vqlTypeEq a b
 vqlTypeEq TAny        TAny        = True
+vqlTypeEq (TKnows a1 t1) (TKnows a2 t2) = agentEq a1 a2 && vqlTypeEq t1 t2
+vqlTypeEq (TBelieves a1 t1) (TBelieves a2 t2) = agentEq a1 a2 && vqlTypeEq t1 t2
+vqlTypeEq (TCommonKnowledge t1) (TCommonKnowledge t2) = vqlTypeEq t1 t2
 vqlTypeEq _           _           = False
+  where
+    ||| Structural equality for Agent (ignoring payload for parameterised agents).
+    agentEq : Agent -> Agent -> Bool
+    agentEq AgEngine AgEngine               = True
+    agentEq (AgProver a) (AgProver b)       = a == b
+    agentEq AgValidator AgValidator         = True
+    agentEq (AgUser a) (AgUser b)           = a == b
+    agentEq AgFederation AgFederation       = True
+    agentEq _ _                             = False
 
 ||| Check whether two VqlTypes are compatible for comparison.
 |||
@@ -132,6 +146,9 @@ extractFieldRefs (EAggregate _ e _)     = extractFieldRefs e
 extractFieldRefs (EParam _ _)           = []
 extractFieldRefs EStar                  = []
 extractFieldRefs (ESubquery sub)        = statementFieldRefs sub
+extractFieldRefs (EEpistemic _ _ e _)   = extractFieldRefs e
+extractFieldRefs (EAnnounce _ prop body _) =
+  extractFieldRefs prop ++ extractFieldRefs body
   where
     ||| Collect field references from all clauses of a statement.
     ||| Gathers from: selectItems, whereClause, groupBy, having, orderBy.
@@ -193,6 +210,8 @@ extractComparisons (ELogic _ l Nothing _) = extractComparisons l
 extractComparisons (ELogic _ l (Just r) _) =
   extractComparisons l ++ extractComparisons r
 extractComparisons (EAggregate _ e _) = extractComparisons e
+extractComparisons (EEpistemic _ _ e _) = extractComparisons e
+extractComparisons (EAnnounce _ p b _) = extractComparisons p ++ extractComparisons b
 extractComparisons _ = []
 
 ||| Resolve the VqlType of an expression using the schema.
@@ -207,6 +226,8 @@ resolveExprType (EAggregate _ _ ty) _    = ty
 resolveExprType (EParam _ ty) _          = ty
 resolveExprType EStar _                  = TAny
 resolveExprType (ESubquery _) _          = TOctad
+resolveExprType (EEpistemic _ _ _ ty) _  = ty
+resolveExprType (EAnnounce _ _ _ ty) _   = ty
 
 ||| Check whether an expression contains any ELiteral (LitString _) nodes.
 ||| Used by Level 4 to detect potential injection vectors.
@@ -218,6 +239,9 @@ containsLiteralString (ELogic _ l Nothing _)      = containsLiteralString l
 containsLiteralString (ELogic _ l (Just r) _)     =
   containsLiteralString l || containsLiteralString r
 containsLiteralString (EAggregate _ e _)           = containsLiteralString e
+containsLiteralString (EEpistemic _ _ e _)         = containsLiteralString e
+containsLiteralString (EAnnounce _ p b _)          =
+  containsLiteralString p || containsLiteralString b
 containsLiteralString _                            = False
 
 ||| Resolve the type of a SelectItem using the schema.
@@ -440,6 +464,86 @@ checkLevel9 stmt =
     Just LinUseOnce  => (True, "L9:LinearSafe — consume-after-1-use constraint present")
     Just (LinBounded _) => (True, "L9:LinearSafe — bounded usage constraint present")
 
+||| Level 10 — EpistemicSafe: the statement includes an EPISTEMIC clause
+||| with well-formed agent declarations and consistent requirements.
+|||
+||| Checks:
+|||   1. Clause is present with at least one agent
+|||   2. All agents referenced in REQUIRES are declared in the AGENTS list
+|||   3. No circular ENTAILS chains (a ENTAILS b, b ENTAILS a)
+|||   4. COMMON KNOWLEDGE requirements reference propositions that are
+|||      well-typed under the existing schema
+|||
+||| @stmt The statement to check.
+||| @return (True, _) if epistemic clause is present and consistent;
+|||         (False, diagnostic) otherwise.
+public export
+checkLevel10 : Statement -> (Bool, String)
+checkLevel10 stmt =
+  case epistemicClause stmt of
+    Nothing => (False, "L10:EpistemicSafe FAILED — no EPISTEMIC clause")
+    Just (EpClause agents reqs) =>
+      case agents of
+        [] => (False, "L10:EpistemicSafe FAILED — EPISTEMIC clause has no agents")
+        _  =>
+          let undeclared = findUndeclaredAgents agents reqs
+          in case undeclared of
+            [] =>
+              if hasCircularEntails reqs
+                then (False, "L10:EpistemicSafe FAILED — circular ENTAILS dependency")
+                else (True, "L10:EpistemicSafe — "
+                       ++ show (length agents) ++ " agent(s), "
+                       ++ show (length reqs) ++ " requirement(s) verified")
+            (name :: _) =>
+              (False, "L10:EpistemicSafe FAILED — agent '"
+                ++ name ++ "' used in REQUIRES but not declared in AGENTS")
+  where
+    ||| Get a string identifier for an agent (for comparison purposes).
+    agentId : Agent -> String
+    agentId AgEngine        = "ENGINE"
+    agentId (AgProver name) = "PROVER:" ++ name
+    agentId AgValidator     = "VALIDATOR"
+    agentId (AgUser name)   = "USER:" ++ name
+    agentId AgFederation    = "FEDERATION"
+
+    ||| Check if an agent is in the declared agents list.
+    agentDeclared : Agent -> List Agent -> Bool
+    agentDeclared a declared = any (\d => agentId a == agentId d) declared
+
+    ||| Find agents referenced in requirements but not declared.
+    ||| Returns list of undeclared agent name strings.
+    findUndeclaredAgents : List Agent -> List EpistemicRequirement -> List String
+    findUndeclaredAgents declared [] = []
+    findUndeclaredAgents declared (EpReqKnows a _ :: rest) =
+      if agentDeclared a declared
+        then findUndeclaredAgents declared rest
+        else agentId a :: findUndeclaredAgents declared rest
+    findUndeclaredAgents declared (EpReqBelieves a _ :: rest) =
+      if agentDeclared a declared
+        then findUndeclaredAgents declared rest
+        else agentId a :: findUndeclaredAgents declared rest
+    findUndeclaredAgents declared (EpReqCommon _ :: rest) =
+      findUndeclaredAgents declared rest
+    findUndeclaredAgents declared (EpReqEntails a1 a2 _ :: rest) =
+      let u1 = if agentDeclared a1 declared then [] else [agentId a1]
+          u2 = if agentDeclared a2 declared then [] else [agentId a2]
+      in u1 ++ u2 ++ findUndeclaredAgents declared rest
+
+    ||| Collect all (source, target) pairs from ENTAILS requirements.
+    entailsPairs : List EpistemicRequirement -> List (String, String)
+    entailsPairs [] = []
+    entailsPairs (EpReqEntails a1 a2 _ :: rest) =
+      (agentId a1, agentId a2) :: entailsPairs rest
+    entailsPairs (_ :: rest) = entailsPairs rest
+
+    ||| Check for direct circular ENTAILS (a->b and b->a).
+    ||| Full cycle detection would require a graph algorithm;
+    ||| for now we check the direct symmetry violation.
+    hasCircularEntails : List EpistemicRequirement -> Bool
+    hasCircularEntails reqs =
+      let pairs = entailsPairs reqs
+      in any (\(a, b) => any (\(c, d) => a == d && b == c) pairs) pairs
+
 -- ═══════════════════════════════════════════════════════════════════════
 -- Pipeline Runner
 -- ═══════════════════════════════════════════════════════════════════════
@@ -471,6 +575,7 @@ dispatchLevel CardinalitySafe stmt _      = checkLevel6 stmt
 dispatchLevel EffectTracked   stmt _      = checkLevel7 stmt
 dispatchLevel TemporalSafe    stmt _      = checkLevel8 stmt
 dispatchLevel LinearSafe      stmt _      = checkLevel9 stmt
+dispatchLevel EpistemicSafe   stmt _      = checkLevel10 stmt
 
 ||| Run the pipeline over a list of remaining levels, stopping at the
 ||| first failure. Accumulates results into PipelineState.

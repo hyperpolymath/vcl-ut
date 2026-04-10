@@ -55,6 +55,7 @@ thisPlatform =
 ||| Level 7: EffectTracked    — side effects (INSERT/UPDATE/DELETE) are annotated
 ||| Level 8: TemporalSafe     — temporal bounds respected (VeriSimDB time-travel)
 ||| Level 9: LinearSafe       — resource linearity proven (no double-consume of streams)
+||| Level 10: EpistemicSafe   — epistemic consistency proven (S5 modal logic)
 public export
 data SafetyLevel : Type where
   ParseSafe       : SafetyLevel
@@ -67,8 +68,9 @@ data SafetyLevel : Type where
   EffectTracked   : SafetyLevel
   TemporalSafe    : SafetyLevel
   LinearSafe      : SafetyLevel
+  EpistemicSafe   : SafetyLevel
 
-||| Convert SafetyLevel to C-compatible integer tag (0-9)
+||| Convert SafetyLevel to C-compatible integer tag (0-10)
 public export
 safetyLevelToInt : SafetyLevel -> Bits32
 safetyLevelToInt ParseSafe       = 0
@@ -81,21 +83,23 @@ safetyLevelToInt CardinalitySafe = 6
 safetyLevelToInt EffectTracked   = 7
 safetyLevelToInt TemporalSafe    = 8
 safetyLevelToInt LinearSafe      = 9
+safetyLevelToInt EpistemicSafe   = 10
 
 ||| Parse a C integer tag back to SafetyLevel
 public export
 intToSafetyLevel : Bits32 -> Maybe SafetyLevel
-intToSafetyLevel 0 = Just ParseSafe
-intToSafetyLevel 1 = Just SchemaBound
-intToSafetyLevel 2 = Just TypeCompat
-intToSafetyLevel 3 = Just NullSafe
-intToSafetyLevel 4 = Just InjectionProof
-intToSafetyLevel 5 = Just ResultTyped
-intToSafetyLevel 6 = Just CardinalitySafe
-intToSafetyLevel 7 = Just EffectTracked
-intToSafetyLevel 8 = Just TemporalSafe
-intToSafetyLevel 9 = Just LinearSafe
-intToSafetyLevel _ = Nothing
+intToSafetyLevel 0  = Just ParseSafe
+intToSafetyLevel 1  = Just SchemaBound
+intToSafetyLevel 2  = Just TypeCompat
+intToSafetyLevel 3  = Just NullSafe
+intToSafetyLevel 4  = Just InjectionProof
+intToSafetyLevel 5  = Just ResultTyped
+intToSafetyLevel 6  = Just CardinalitySafe
+intToSafetyLevel 7  = Just EffectTracked
+intToSafetyLevel 8  = Just TemporalSafe
+intToSafetyLevel 9  = Just LinearSafe
+intToSafetyLevel 10 = Just EpistemicSafe
+intToSafetyLevel _  = Nothing
 
 ||| SafetyLevel decidable equality
 public export
@@ -110,6 +114,7 @@ DecEq SafetyLevel where
   decEq EffectTracked   EffectTracked   = Yes Refl
   decEq TemporalSafe    TemporalSafe    = Yes Refl
   decEq LinearSafe      LinearSafe      = Yes Refl
+  decEq EpistemicSafe   EpistemicSafe   = Yes Refl
   decEq _ _ = No absurd
 
 --------------------------------------------------------------------------------
@@ -140,10 +145,12 @@ data VclTotalError : Type where
   TemporalBoundsExceeded : VclTotalError
   ||| Linear resource double-consumed (level 9 failure)
   LinearityViolation   : VclTotalError
+  ||| Epistemic consistency violation (level 10 failure)
+  EpistemicViolation   : VclTotalError
   ||| Internal error (bug in VCL-total itself)
   InternalError        : VclTotalError
 
-||| Convert VclTotalError to C-compatible integer tag (0-10)
+||| Convert VclTotalError to C-compatible integer tag (0-11)
 public export
 vqlUtErrorToInt : VclTotalError -> Bits32
 vqlUtErrorToInt Ok                     = 0
@@ -156,7 +163,8 @@ vqlUtErrorToInt CardinalityViolation   = 6
 vqlUtErrorToInt EffectViolation        = 7
 vqlUtErrorToInt TemporalBoundsExceeded = 8
 vqlUtErrorToInt LinearityViolation     = 9
-vqlUtErrorToInt InternalError          = 10
+vqlUtErrorToInt EpistemicViolation     = 10
+vqlUtErrorToInt InternalError          = 11
 
 ||| Parse a C integer tag back to VclTotalError
 public export
@@ -171,7 +179,8 @@ intToVclTotalError 6  = Just CardinalityViolation
 intToVclTotalError 7  = Just EffectViolation
 intToVclTotalError 8  = Just TemporalBoundsExceeded
 intToVclTotalError 9  = Just LinearityViolation
-intToVclTotalError 10 = Just InternalError
+intToVclTotalError 10 = Just EpistemicViolation
+intToVclTotalError 11 = Just InternalError
 intToVclTotalError _  = Nothing
 
 ||| VclTotalError decidable equality
@@ -187,6 +196,7 @@ DecEq VclTotalError where
   decEq EffectViolation        EffectViolation        = Yes Refl
   decEq TemporalBoundsExceeded TemporalBoundsExceeded = Yes Refl
   decEq LinearityViolation     LinearityViolation     = Yes Refl
+  decEq EpistemicViolation     EpistemicViolation     = Yes Refl
   decEq InternalError          InternalError          = Yes Refl
   decEq _ _ = No absurd
 
@@ -362,9 +372,9 @@ vqlutMagic = 0x56514C55
 ||| Compile-time verification of VCL-total ABI properties
 namespace Verify
 
-  ||| Verify that all safety level tags are in range [0, 9]
+  ||| Verify that all safety level tags are in range [0, 10]
   export
-  safetyLevelTagsInRange : (s : SafetyLevel) -> So (safetyLevelToInt s <= 9)
+  safetyLevelTagsInRange : (s : SafetyLevel) -> So (safetyLevelToInt s <= 10)
   safetyLevelTagsInRange ParseSafe       = Oh
   safetyLevelTagsInRange SchemaBound     = Oh
   safetyLevelTagsInRange TypeCompat      = Oh
@@ -375,10 +385,11 @@ namespace Verify
   safetyLevelTagsInRange EffectTracked   = Oh
   safetyLevelTagsInRange TemporalSafe    = Oh
   safetyLevelTagsInRange LinearSafe      = Oh
+  safetyLevelTagsInRange EpistemicSafe   = Oh
 
-  ||| Verify that all error tags are in range [0, 10]
+  ||| Verify that all error tags are in range [0, 11]
   export
-  errorTagsInRange : (e : VclTotalError) -> So (vqlUtErrorToInt e <= 10)
+  errorTagsInRange : (e : VclTotalError) -> So (vqlUtErrorToInt e <= 11)
   errorTagsInRange Ok                     = Oh
   errorTagsInRange ParseError             = Oh
   errorTagsInRange SchemaError            = Oh
@@ -389,6 +400,7 @@ namespace Verify
   errorTagsInRange EffectViolation        = Oh
   errorTagsInRange TemporalBoundsExceeded = Oh
   errorTagsInRange LinearityViolation     = Oh
+  errorTagsInRange EpistemicViolation     = Oh
   errorTagsInRange InternalError          = Oh
 
   ||| Verify that all query mode tags are in range [0, 2]

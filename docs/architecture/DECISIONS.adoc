@@ -40,6 +40,11 @@ toc::[]
 |ReScript for the parser
 |Accepted
 |2026-03-01
+
+|ADR-0006
+|Epistemic types via S5 modal logic
+|Accepted
+|2026-04-10
 |===
 
 ---
@@ -479,6 +484,78 @@ need a separate semantic parser.
   V8 (Elixir NIFs).
 - Parser changes require corresponding grammar updates in
   `docs/vcl-dtpp-grammar.ebnf`.
+
+---
+
+== ADR-0006: Epistemic Types via S5 Modal Logic
+
+=== Status
+
+Accepted (2026-04-10)
+
+=== Context
+
+VCL-total's 10 safety levels (L0–L9) cover syntactic, type-theoretic, and
+resource-level properties. However, in a federated consonance engine where
+multiple agents (provers, validators, users) interact, there is no mechanism
+to reason about *what agents know* about the system state.
+
+Without epistemic types, a prover's verification result and a user's
+unverified claim have the same type. This conflation undermines the trust
+model of the consonance engine.
+
+=== Decision
+
+Introduce Level 10 (EpistemicSafe) using S5 epistemic modal logic embedded
+in Idris2's dependent type system. The implementation includes:
+
+1. **Kripke frame semantics** with S5 equivalence relation proofs
+   (reflexive, symmetric, transitive accessibility)
+2. **Knowledge (K) and Belief (B) type constructors** as first-class VqlTypes
+   (`TKnows`, `TBelieves`, `TCommonKnowledge`)
+3. **Common knowledge (C)** for federation-wide consensus properties
+4. **Public Announcement Logic (PAL)** for modelling epistemic state changes
+5. **Knowledge transfer proofs** (ENTAILS) for inter-agent reasoning
+
+The S5 axioms (T, K, 4, 5) are encoded as dependent types, making the
+Idris2 type checker the epistemic model checker.
+
+=== Rationale
+
+==== 1. The Trust Gap
+
+In VeriSimDB, a prover verifying a theorem and a user claiming a theorem
+produce structurally identical data. Without epistemic types, the system
+cannot distinguish:
+
+- `Knows ENGINE (status = 'verified')` — the engine has checked this
+- `Believes USER:alice (status = 'verified')` — Alice claims this
+
+This distinction is fundamental to the consonance model.
+
+==== 2. S5 is the Right Logic
+
+S5 epistemic logic (with equivalence relation accessibility) is the
+standard for knowledge representation. The key axiom is T (veridicality):
+`K_a(P) → P` — what is known is true. Belief (KD45) relaxes this,
+allowing agents to hold false beliefs. This precisely models the
+prover vs user distinction.
+
+==== 3. Type-Level Encoding
+
+Embedding the Kripke semantics at the type level means:
+
+- The type checker IS the model checker (no separate verification step)
+- Proofs are erased at runtime (zero overhead)
+- Epistemic properties compose with all other safety levels
+
+=== Consequences
+
+- Queries can now distinguish verified knowledge from unverified belief
+- Federation consensus properties are machine-checkable
+- The EPISTEMIC clause syntax extends VCL-total without breaking existing queries
+- The accessibility relation proofs add compile-time cost for L10 queries
+- VCL-total becomes the first query language with formal epistemic types
 
 == Licence
 
