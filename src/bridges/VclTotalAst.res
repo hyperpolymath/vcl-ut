@@ -23,6 +23,19 @@
 type modality = Graph | Vector | Tensor | Semantic | Document | Temporal | Provenance | Spatial
 
 // ═══════════════════════════════════════════════════════════════════════
+// Epistemic Agents
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Epistemic agents whose knowledge/belief state is tracked.
+/// Maps to VclTotal.Core.Grammar.Agent (Idris2).
+type agent =
+  | AgEngine
+  | AgProver(string)
+  | AgValidator
+  | AgUser(string)
+  | AgFederation
+
+// ═══════════════════════════════════════════════════════════════════════
 // Value Types (type system for expressions)
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -47,6 +60,9 @@ type rec vqlType =
   | TOctad
   | TNull(vqlType)
   | TAny
+  | TKnows(agent, vqlType)
+  | TBelieves(agent, vqlType)
+  | TCommonKnowledge(vqlType)
 
 // ═══════════════════════════════════════════════════════════════════════
 // Expressions — Field References and Literals
@@ -86,6 +102,10 @@ type logicOp = And | Or | Not
 /// Maps to VclTotal.Core.Grammar.AggFunc (Idris2).
 type aggFunc = Count | Sum | Avg | Min | Max
 
+/// Epistemic operators for modal logic expressions.
+/// Maps to VclTotal.Core.Grammar.EpistemicOp (Idris2).
+type epistemicOp = OpKnows | OpBelieves | OpCommonKnowledge
+
 // ═══════════════════════════════════════════════════════════════════════
 // Expression AST
 // ═══════════════════════════════════════════════════════════════════════
@@ -114,6 +134,8 @@ type rec expr =
   | EParam(string, vqlType)
   | EStar
   | ESubquery(statement)
+  | EEpistemic(epistemicOp, agent, expr, vqlType)
+  | EAnnounce(agent, expr, expr, vqlType)
 
 // ═══════════════════════════════════════════════════════════════════════
 // Clauses
@@ -185,11 +207,23 @@ and linearAnnotation =
   | LinUseOnce
   | LinBounded(int)
 
+/// An epistemic requirement within an EPISTEMIC clause.
+/// Maps to VclTotal.Core.Grammar.EpistemicRequirement (Idris2).
+and epistemicRequirement =
+  | EpReqKnows(agent, expr)
+  | EpReqBelieves(agent, expr)
+  | EpReqCommon(expr)
+  | EpReqEntails(agent, agent, expr)
+
+/// Epistemic clause for Level 10 (epistemic safety).
+/// Maps to VclTotal.Core.Grammar.EpistemicClause (Idris2).
+and epistemicClause = EpClause(array<agent>, array<epistemicRequirement>)
+
 // ═══════════════════════════════════════════════════════════════════════
 // Safety Levels
 // ═══════════════════════════════════════════════════════════════════════
 
-/// The 10 progressive safety levels (0-9).
+/// The 11 progressive safety levels (0-10).
 /// Maps to VclTotal.ABI.Types.SafetyLevel (Idris2).
 ///
 /// Each level subsumes all prior levels: a query at level N has passed
@@ -205,6 +239,7 @@ and safetyLevel =
   | EffectTracked
   | TemporalSafe
   | LinearSafe
+  | EpistemicSafe
 
 // ═══════════════════════════════════════════════════════════════════════
 // Statement (top-level query)
@@ -242,6 +277,8 @@ and statement = {
   versionConst: option<versionConstraint>,
   /// VCL-total extension: linearity annotation (Level 9)
   linearAnnot: option<linearAnnotation>,
+  /// VCL-total extension: epistemic clause (Level 10)
+  epistemicClause: option<epistemicClause>,
   /// Highest safety level inferred from present clauses
   requestedLevel: safetyLevel,
 }
@@ -250,7 +287,7 @@ and statement = {
 // Conversion helpers
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Convert a safety level to its integer tag (0-9).
+/// Convert a safety level to its integer tag (0-10).
 /// Matches VclTotal.ABI.Types.safetyLevelToInt (Idris2).
 let safetyLevelToInt = (level: safetyLevel): int =>
   switch level {
@@ -264,6 +301,7 @@ let safetyLevelToInt = (level: safetyLevel): int =>
   | EffectTracked => 7
   | TemporalSafe => 8
   | LinearSafe => 9
+  | EpistemicSafe => 10
   }
 
 /// Convert a modality to its string name.
@@ -340,4 +378,35 @@ let maxSafetyLevel = (a: safetyLevel, b: safetyLevel): safetyLevel =>
     a
   } else {
     b
+  }
+
+/// Convert an agent to its string name.
+/// Matches VclTotal.Core.Grammar.agentName (Idris2).
+let agentName = (a: agent): string =>
+  switch a {
+  | AgEngine => "ENGINE"
+  | AgProver(name) => "PROVER:" ++ name
+  | AgValidator => "VALIDATOR"
+  | AgUser(name) => "USER:" ++ name
+  | AgFederation => "FEDERATION"
+  }
+
+/// Convert an agent to its integer tag (0-4).
+/// Matches VclTotal.Core.Grammar.agentToInt (Idris2).
+let agentToInt = (a: agent): int =>
+  switch a {
+  | AgEngine => 0
+  | AgProver(_) => 1
+  | AgValidator => 2
+  | AgUser(_) => 3
+  | AgFederation => 4
+  }
+
+/// Convert an epistemic operator to its integer tag (0-2).
+/// Matches VclTotal.Core.Grammar.epistemicOpToInt (Idris2).
+let epistemicOpToInt = (op: epistemicOp): int =>
+  switch op {
+  | OpKnows => 0
+  | OpBelieves => 1
+  | OpCommonKnowledge => 2
   }

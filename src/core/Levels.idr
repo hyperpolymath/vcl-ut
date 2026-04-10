@@ -108,6 +108,20 @@ data L9_LinearSafe : Statement -> Type where
           (linearAnnot stmt = Just la) ->
           L9_LinearSafe stmt
 
+||| Level 10: Epistemic Safe — epistemic clause is present and consistent.
+||| The epistemic clause specifies agents, their knowledge/belief requirements,
+||| and the S5 modal properties that must hold. The checker verifies:
+|||   1. All referenced agents are declared in the clause's agent list
+|||   2. Each REQUIRES KNOWS/BELIEVES/COMMON references valid propositions
+|||   3. ENTAILS requirements respect the S5 knowledge transfer axiom
+|||   4. No circular knowledge dependencies exist
+public export
+data L10_EpistemicSafe : Statement -> Type where
+  MkL10 : (stmt : Statement) ->
+           (ec : EpistemicClause) ->
+           (epistemicClause stmt = Just ec) ->
+           L10_EpistemicSafe stmt
+
 -- ═══════════════════════════════════════════════════════════════════════
 -- Helper Predicates
 -- ═══════════════════════════════════════════════════════════════════════
@@ -254,6 +268,19 @@ data SafetyCertificate : Statement -> OctadSchema -> SafetyLevel -> Type where
             L9_LinearSafe stmt ->
             SafetyCertificate stmt schema LinearSafe
 
+  CertL10 : L0_ParseSafe stmt ->
+             L1_SchemaBound stmt schema ->
+             L2_TypeCompat stmt schema ->
+             L3_NullSafe stmt schema ->
+             L4_InjectionProof stmt ->
+             L5_ResultTyped stmt schema ->
+             L6_CardinalitySafe stmt ->
+             L7_EffectTracked stmt ->
+             L8_TemporalSafe stmt ->
+             L9_LinearSafe stmt ->
+             L10_EpistemicSafe stmt ->
+             SafetyCertificate stmt schema EpistemicSafe
+
 -- ═══════════════════════════════════════════════════════════════════════
 -- Monotonicity Proof
 -- ═══════════════════════════════════════════════════════════════════════
@@ -272,7 +299,8 @@ data CanWeaken : SafetyLevel -> SafetyLevel -> Type where
   WeakenCard   : CanWeaken CardinalitySafe ResultTyped
   WeakenEffect : CanWeaken EffectTracked CardinalitySafe
   WeakenTemp   : CanWeaken TemporalSafe EffectTracked
-  WeakenLinear : CanWeaken LinearSafe TemporalSafe
+  WeakenLinear    : CanWeaken LinearSafe TemporalSafe
+  WeakenEpistemic : CanWeaken EpistemicSafe LinearSafe
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- C ABI: Level Check Result

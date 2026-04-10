@@ -311,7 +311,7 @@ let isKeyword = (word: string): bool => {
   upper == "OR" || upper == "NOT" || upper == "LIKE" ||
   upper == "IN" || upper == "BY" || upper == "ASC" ||
   upper == "DESC" || upper == "PROOF" || upper == "EFFECTS" ||
-  upper == "AT" || upper == "CONSUME" || upper == "USAGE" ||
+  upper == "AT" || upper == "CONSUME" || upper == "USAGE" || upper == "EPISTEMIC" ||
   upper == "HEXAD" || upper == "FEDERATION" || upper == "STORE" ||
   upper == "ATTACHED" || upper == "WITNESS" || upper == "ASSERT" ||
   upper == "VERSION" || upper == "LATEST" || upper == "BETWEEN" ||
@@ -914,6 +914,209 @@ and parseLinearClause = (state: parserState, keyword: string): result<linearAnno
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// Epistemic clause parsing
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Parse an agent identifier.
+///
+/// Valid forms:
+///   ENGINE | VALIDATOR | FEDERATION
+///   PROVER:<name> (e.g. PROVER:lean4)
+///   USER:<name> (e.g. USER:alice)
+and parseAgent = (state: parserState): result<agent, string> => {
+  switch peek(state) {
+  | Some(TWord(w)) =>
+    let upper = String.toUpperCase(w)
+    if upper == "ENGINE" {
+      let _ = advance(state)
+      Ok(AgEngine)
+    } else if upper == "VALIDATOR" {
+      let _ = advance(state)
+      Ok(AgValidator)
+    } else if upper == "FEDERATION" {
+      let _ = advance(state)
+      Ok(AgFederation)
+    } else if String.length(upper) > 7 && String.slice(upper, ~start=0, ~end=7) == "PROVER:" {
+      let _ = advance(state)
+      Ok(AgProver(String.sliceToEnd(w, ~start=7)))
+    } else if String.length(upper) > 5 && String.slice(upper, ~start=0, ~end=5) == "USER:" {
+      let _ = advance(state)
+      Ok(AgUser(String.sliceToEnd(w, ~start=5)))
+    } else {
+      parseError(state, `Expected agent, got "${w}"`)
+    }
+  | _ => parseError(state, "Expected agent identifier")
+  }
+}
+
+/// Parse a comma-separated list of agents until a semicolon.
+and parseAgentList = (state: parserState): result<array<agent>, string> => {
+  let agents = []
+  switch parseAgent(state) {
+  | Ok(a) => {
+      let _ = Array.push(agents, a)
+      let continue = ref(true)
+      while continue.contents {
+        switch peek(state) {
+        | Some(TPunct(",")) =>
+          let _ = advance(state)
+          switch parseAgent(state) {
+          | Ok(a2) => let _ = Array.push(agents, a2)
+          | Error(e) => return Error(e)
+          }
+        | _ => continue := false
+        }
+      }
+      Ok(agents)
+    }
+  | Error(e) => Error(e)
+  }
+}
+
+/// Parse an epistemic requirement.
+///
+/// Forms:
+///   KNOWS <agent> ( <expr> )
+///   BELIEVES <agent> ( <expr> )
+///   COMMON KNOWLEDGE ( <expr> )
+///   <agent> ENTAILS <agent> ( <expr> )
+and parseEpistemicRequirement = (state: parserState): result<epistemicRequirement, string> => {
+  switch peek(state) {
+  | Some(TWord(w)) =>
+    let upper = String.toUpperCase(w)
+    if upper == "KNOWS" {
+      let _ = advance(state)
+      switch parseAgent(state) {
+      | Ok(agent) =>
+        switch expectPunct(state, "(") {
+        | Ok(_) =>
+          switch parseExpr(state) {
+          | Ok(expr) =>
+            switch expectPunct(state, ")") {
+            | Ok(_) => Ok(EpReqKnows(agent, expr))
+            | Error(e) => Error(e)
+            }
+          | Error(e) => Error(e)
+          }
+        | Error(e) => Error(e)
+        }
+      | Error(e) => Error(e)
+      }
+    } else if upper == "BELIEVES" {
+      let _ = advance(state)
+      switch parseAgent(state) {
+      | Ok(agent) =>
+        switch expectPunct(state, "(") {
+        | Ok(_) =>
+          switch parseExpr(state) {
+          | Ok(expr) =>
+            switch expectPunct(state, ")") {
+            | Ok(_) => Ok(EpReqBelieves(agent, expr))
+            | Error(e) => Error(e)
+            }
+          | Error(e) => Error(e)
+          }
+        | Error(e) => Error(e)
+        }
+      | Error(e) => Error(e)
+      }
+    } else if upper == "COMMON" {
+      let _ = advance(state)
+      switch peek(state) {
+      | Some(TWord(kw)) if String.toUpperCase(kw) == "KNOWLEDGE" =>
+        let _ = advance(state)
+        switch expectPunct(state, "(") {
+        | Ok(_) =>
+          switch parseExpr(state) {
+          | Ok(expr) =>
+            switch expectPunct(state, ")") {
+            | Ok(_) => Ok(EpReqCommon(expr))
+            | Error(e) => Error(e)
+            }
+          | Error(e) => Error(e)
+          }
+        | Error(e) => Error(e)
+        }
+      | _ => parseError(state, "Expected KNOWLEDGE after COMMON")
+      }
+    } else {
+      // Try <agent> ENTAILS <agent> ( <expr> )
+      switch parseAgent(state) {
+      | Ok(a1) =>
+        switch peek(state) {
+        | Some(TWord(ew)) if String.toUpperCase(ew) == "ENTAILS" =>
+          let _ = advance(state)
+          switch parseAgent(state) {
+          | Ok(a2) =>
+            switch expectPunct(state, "(") {
+            | Ok(_) =>
+              switch parseExpr(state) {
+              | Ok(expr) =>
+                switch expectPunct(state, ")") {
+                | Ok(_) => Ok(EpReqEntails(a1, a2, expr))
+                | Error(e) => Error(e)
+                }
+              | Error(e) => Error(e)
+              }
+            | Error(e) => Error(e)
+            }
+          | Error(e) => Error(e)
+          }
+        | _ => parseError(state, "Expected ENTAILS after agent in epistemic requirement")
+        }
+      | Error(e) => Error(e)
+      }
+    }
+  | _ => parseError(state, "Expected epistemic requirement keyword")
+  }
+}
+
+/// Parse an EPISTEMIC clause.
+///
+/// Syntax:
+///   EPISTEMIC { AGENTS <agent_list> ; REQUIRES <req> [; REQUIRES <req>]* }
+and parseEpistemicClause = (state: parserState): result<epistemicClause, string> => {
+  switch expectPunct(state, "{") {
+  | Error(e) => Error(e)
+  | Ok(_) =>
+    // Parse AGENTS keyword
+    switch peek(state) {
+    | Some(TWord(w)) if String.toUpperCase(w) == "AGENTS" =>
+      let _ = advance(state)
+      switch parseAgentList(state) {
+      | Error(e) => Error(e)
+      | Ok(agents) =>
+        // Expect semicolon after agent list
+        let reqs = []
+        let continue = ref(true)
+        while continue.contents {
+          switch peek(state) {
+          | Some(TPunct(";")) =>
+            let _ = advance(state)
+            // Check for REQUIRES
+            switch peek(state) {
+            | Some(TWord(rw)) if String.toUpperCase(rw) == "REQUIRES" =>
+              let _ = advance(state)
+              switch parseEpistemicRequirement(state) {
+              | Ok(req) => let _ = Array.push(reqs, req)
+              | Error(e) => return Error(e)
+              }
+            | _ => continue := false
+            }
+          | _ => continue := false
+          }
+        }
+        switch expectPunct(state, "}") {
+        | Ok(_) => Ok(EpClause(agents, reqs))
+        | Error(e) => Error(e)
+        }
+      }
+    | _ => parseError(state, "Expected AGENTS keyword in EPISTEMIC clause")
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // Statement parsing
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -1060,6 +1263,7 @@ and parseStatementInner = (state: parserState): result<statement, string> => {
   let effectDecl: ref<option<effectDecl>> = ref(None)
   let versionConst: ref<option<versionConstraint>> = ref(None)
   let linearAnnot: ref<option<linearAnnotation>> = ref(None)
+  let epistemicClause: ref<option<epistemicClause>> = ref(None)
 
   // Parse extension clauses in a loop — they can appear in any order
   let parsing = ref(true)
@@ -1091,6 +1295,12 @@ and parseStatementInner = (state: parserState): result<statement, string> => {
           | Ok(la) => linearAnnot := Some(la)
           | Error(e) => return Error(e)
           }
+        } else if upper == "EPISTEMIC" && epistemicClause.contents == None {
+          let _ = advance(state)
+          switch parseEpistemicClause(state) {
+          | Ok(ec) => epistemicClause := Some(ec)
+          | Error(e) => return Error(e)
+          }
         } else if upper == "WITH" {
           // WITH SESSION <mode> — informational, skip for now
           let _ = advance(state)
@@ -1119,6 +1329,9 @@ and parseStatementInner = (state: parserState): result<statement, string> => {
   if linearAnnot.contents != None {
     level := maxSafetyLevel(level.contents, LinearSafe)
   }
+  if epistemicClause.contents != None {
+    level := maxSafetyLevel(level.contents, EpistemicSafe)
+  }
 
   Ok({
     selectItems,
@@ -1133,6 +1346,7 @@ and parseStatementInner = (state: parserState): result<statement, string> => {
     effectDecl: effectDecl.contents,
     versionConst: versionConst.contents,
     linearAnnot: linearAnnot.contents,
+    epistemicClause: epistemicClause.contents,
     requestedLevel: level.contents,
   })
 }
@@ -1156,6 +1370,7 @@ and parseStatementInner = (state: parserState): result<statement, string> => {
 ///   - EFFECTS clause:    EffectTracked   (Level 7)
 ///   - AT VERSION clause: TemporalSafe    (Level 8)
 ///   - CONSUME/USAGE:     LinearSafe      (Level 9)
+///   - EPISTEMIC clause:  EpistemicSafe   (Level 10)
 ///
 /// Example:
 ///   parse("SELECT * FROM HEXAD abc-123 WHERE GRAPH.name = 'hello' LIMIT 10")

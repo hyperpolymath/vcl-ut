@@ -71,6 +71,7 @@ safetyLevelRoundtrip CardinalitySafe = Refl
 safetyLevelRoundtrip EffectTracked   = Refl
 safetyLevelRoundtrip TemporalSafe    = Refl
 safetyLevelRoundtrip LinearSafe      = Refl
+safetyLevelRoundtrip EpistemicSafe   = Refl
 
 --------------------------------------------------------------------------------
 -- QueryMode Tag Encoding (0-2)
@@ -89,7 +90,7 @@ queryModeRoundtrip DependentTypes   = Refl
 queryModeRoundtrip UltimateTypeSafe = Refl
 
 --------------------------------------------------------------------------------
--- VclTotalError Tag Encoding (0-10)
+-- VclTotalError Tag Encoding (0-11)
 --------------------------------------------------------------------------------
 
 ||| Size constant: VclTotalError is encoded as a single Bits32 (4 bytes)
@@ -110,6 +111,7 @@ vqlUtErrorRoundtrip CardinalityViolation   = Refl
 vqlUtErrorRoundtrip EffectViolation        = Refl
 vqlUtErrorRoundtrip TemporalBoundsExceeded = Refl
 vqlUtErrorRoundtrip LinearityViolation     = Refl
+vqlUtErrorRoundtrip EpistemicViolation     = Refl
 vqlUtErrorRoundtrip InternalError          = Refl
 
 --------------------------------------------------------------------------------
