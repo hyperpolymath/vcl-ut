@@ -27,7 +27,7 @@ fn main() {
     let content = fs::read_to_string(&input_path).expect("Unable to read file");
 
     // Format the content (basic indentation for now)
-    let formatted = vqlut_fmt::format_vqlut(&content);
+    let formatted = vcltotal_fmt::format_vqlut(&content);
 
     // Write the output file
     let output_path = args.output.unwrap_or(input_path);

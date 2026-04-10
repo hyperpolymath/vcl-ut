@@ -23,7 +23,7 @@ fn main() {
     let content = fs::read_to_string(&input_path).expect("Unable to read file");
 
     // Lint the content
-    let issues = vqlut_lint::lint_vqlut(&content);
+    let issues = vcltotal_lint::lint_vqlut(&content);
 
     // Print the issues
     for issue in &issues {

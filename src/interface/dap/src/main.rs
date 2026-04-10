@@ -165,23 +165,35 @@ fn handle_client(stream: TcpStream) -> Result<(), Box<dyn std::error::Error>> {
                 })?
             }
             "continue" => {
-                // TODO: Execute the query using database-mcp cartridge
-                // For now, return a dummy response
-                let query = if let Some(args) = &request.arguments {
-                    args.get("query").and_then(|q| q.as_str()).unwrap_or("").to_string()
+                let query = request.arguments
+                    .as_ref()
+                    .and_then(|args| args.get("query"))
+                    .and_then(|q| q.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                if query.is_empty() {
+                    serde_json::to_string(&DapResponse {
+                        seq: 9,
+                        r#type: "response".to_string(),
+                        request_seq: request.seq,
+                        command: "continue".to_string(),
+                        success: false,
+                        message: Some("Missing or invalid 'query' argument".to_string()),
+                        body: None,
+                    })?
                 } else {
-                    "".to_string()
-                };
-                let result = execute_vql_query(&query);
-                serde_json::to_string(&DapResponse {
-                    seq: 9,
-                    r#type: "response".to_string(),
-                    request_seq: request.seq,
-                    command: "continue".to_string(),
-                    success: true,
-                    message: Some(format!("Query executed: {}", result)),
-                    body: None,
-                })?
+                    let result = execute_vql_query(&query);
+                    serde_json::to_string(&DapResponse {
+                        seq: 9,
+                        r#type: "response".to_string(),
+                        request_seq: request.seq,
+                        command: "continue".to_string(),
+                        success: true,
+                        message: Some(format!("Query executed: {}", result)),
+                        body: None,
+                    })?
+                }
             }
             "disconnect" => {
                 serde_json::to_string(&DapResponse {

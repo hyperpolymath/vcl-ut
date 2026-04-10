@@ -149,29 +149,6 @@ extractFieldRefs (ESubquery sub)        = statementFieldRefs sub
 extractFieldRefs (EEpistemic _ _ e _)   = extractFieldRefs e
 extractFieldRefs (EAnnounce _ prop body _) =
   extractFieldRefs prop ++ extractFieldRefs body
-  where
-    ||| Collect field references from all clauses of a statement.
-    ||| Gathers from: selectItems, whereClause, groupBy, having, orderBy.
-    statementFieldRefs : Statement -> List FieldRef
-    statementFieldRefs stmt =
-      let selRefs : List FieldRef
-          selRefs = concatMap selItemRefs (selectItems stmt)
-          whereRefs : List FieldRef
-          whereRefs = maybe [] extractFieldRefs (whereClause stmt)
-          groupRefs : List FieldRef
-          groupRefs = groupBy stmt
-          havingRefs : List FieldRef
-          havingRefs = maybe [] extractFieldRefs (having stmt)
-          orderRefs : List FieldRef
-          orderRefs = map fst (orderBy stmt)
-      in selRefs ++ whereRefs ++ groupRefs ++ havingRefs ++ orderRefs
-
-    ||| Extract field references from a single SELECT item.
-    selItemRefs : SelectItem -> List FieldRef
-    selItemRefs (SelField ref)       = [ref]
-    selItemRefs (SelModality _)      = []
-    selItemRefs (SelAggregate _ e)   = extractFieldRefs e
-    selItemRefs SelStar              = []
 
 ||| Collect all field references from every clause of a statement.
 ||| Delegates to extractFieldRefs for each expression-bearing clause.

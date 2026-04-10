@@ -154,7 +154,7 @@ cargo-build:
   stage: build
   image: rust:latest
   script:
-    - cargo build --release
+    - cargo build --workspace --all-targets --release
   artifacts:
     paths:
       - target/release/

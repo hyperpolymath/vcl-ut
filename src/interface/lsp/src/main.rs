@@ -2,13 +2,13 @@
 //! Language Server Protocol (LSP) implementation for VCL-total
 //!
 //! This server provides LSP support for the VCL-total query language.
+//! Uses lsp-server (synchronous) for the transport layer.
 
 use lsp_server::{Connection, Message, RequestId, Response};
 use lsp_types::*;
 use std::error::Error;
 
-mod lib;
-use lib::VqlutLsp;
+use vcltotal_lsp::VqlutLsp;
 
 /// Send an LSP result response, converting serialization failures to LSP
 /// error responses rather than panicking. This ensures the server never
@@ -39,18 +39,30 @@ fn send_result<T: serde::Serialize>(
     Ok(())
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    // Create the transport (stdio, TCP, etc.)
+fn cast<R>(req: lsp_server::Request) -> Result<(RequestId, R::Params), lsp_server::Request>
+where
+    R: lsp_types::request::Request,
+{
+    req.extract(R::METHOD).map_err(|e| match e {
+        lsp_server::ExtractError::MethodMismatch(req) => req,
+        lsp_server::ExtractError::JsonError { method: _, error: _ } => {
+            // Deserialization failed — treat as unhandled (cannot recover the original request)
+            panic!("JSON deserialization failed for LSP request")
+        }
+    })
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    // Create the transport (stdio)
     let (connection, io_threads) = Connection::stdio();
 
     // Initialize VCL-total LSP
     let vqlut_lsp = VqlutLsp::new();
 
-    // Run the server and wait for the two threads to end.
+    // Declare server capabilities
     let server_capabilities = serde_json::to_value(ServerCapabilities {
         text_document_sync: Some(TextDocumentSyncCapability::Kind(
-            TextDocumentSyncKind::Incremental,
+            TextDocumentSyncKind::FULL,
         )),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         completion_provider: Some(CompletionOptions {
@@ -62,14 +74,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         ..Default::default()
     })?;
 
-    let initialization_params = connection.initialize(server_capabilities).await?;
-    let _initialized = initialization_params;
+    let _initialization_params = connection.initialize(server_capabilities)?;
 
-    // Main loop
-    while let Some(msg) = connection.receiver.recv().await {
+    // Main message loop (lsp-server is synchronous)
+    for msg in &connection.receiver {
         match msg {
             Message::Request(req) => {
-                if connection.handle_shutdown(&req).await? {
+                if connection.handle_shutdown(&req)? {
                     return Ok(());
                 }
                 match cast::<request::GotoDefinition>(req.clone()) {
@@ -77,40 +88,32 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         let result = vqlut_lsp.handle_goto_definition(params);
                         send_result(&connection, id, &result)?;
                     }
-                    _ => match cast::<request::HoverRequest>(req.clone()) {
+                    Err(req) => match cast::<request::HoverRequest>(req) {
                         Ok((id, params)) => {
                             let result = vqlut_lsp.handle_hover(params);
                             send_result(&connection, id, &result)?;
                         }
-                        _ => match cast::<request::Completion>(req.clone()) {
+                        Err(req) => match cast::<request::Completion>(req) {
                             Ok((id, params)) => {
                                 let result = vqlut_lsp.handle_completion(params);
                                 send_result(&connection, id, &result)?;
                             }
-                            _ => {
-                                eprintln!("Unknown request: {:?}", req);
+                            Err(req) => {
+                                eprintln!("Unhandled request: {:?}", req.method);
                             }
                         },
                     },
                 }
             }
-            Message::Notification(not) => {
-                if connection.handle_shutdown(&not).await? {
-                    return Ok(());
-                }
+            Message::Notification(_not) => {
+                // Notifications are fire-and-forget; no response needed.
             }
             Message::Response(resp) => {
-                eprintln!("Got response: {:?}", resp);
+                eprintln!("Unexpected response: {:?}", resp);
             }
         }
     }
 
+    io_threads.join()?;
     Ok(())
-}
-
-fn cast<U>(req: request::Request) -> Result<(RequestId, U::Params), request::Request>
-where
-    U: lsp_types::request::Request,
-{
-    req.extract(U::METHOD)
 }

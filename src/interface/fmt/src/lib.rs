@@ -13,11 +13,20 @@
 /// All lines are trimmed of leading/trailing whitespace before processing.
 pub fn format_vqlut(content: &str) -> String {
     let mut formatted = String::new();
-    let keywords = ["SELECT", "FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT"];
+    let keywords = [
+        "SELECT", "FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT",
+        "OFFSET", "EFFECTS", "PROOF", "CONSUME",
+    ];
 
     for line in content.lines() {
         let trimmed = line.trim();
-        if keywords.iter().any(|&kw| trimmed.starts_with(kw)) {
+        if keywords.iter().any(|&kw| {
+            trimmed.starts_with(kw)
+                && trimmed
+                    .as_bytes()
+                    .get(kw.len())
+                    .map_or(true, |&b| !b.is_ascii_alphanumeric() && b != b'_')
+        }) {
             formatted.push_str("  ");
         }
         formatted.push_str(trimmed);

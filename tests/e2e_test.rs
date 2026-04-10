@@ -191,9 +191,6 @@ fn e2e_formatter_does_not_introduce_semicolon_issues() {
     // The formatter must not strip semicolons from the input.
     // A single-line query with a semicolon, once formatted, must not acquire
     // a 'missing semicolon' lint issue.
-    // Note: the linter uses a space-delimited, case-insensitive keyword check,
-    // so even well-formatted queries may trigger keyword-case issues — that is
-    // documented linter behaviour, not a bug introduced by the formatter.
     let query = "SELECT id;";
     let formatted = format_vqlut(query);
     let issues = lint_vqlut(&formatted);
