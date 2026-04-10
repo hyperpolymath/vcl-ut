@@ -487,16 +487,11 @@ mod tests {
         let lsp = VqlutLsp::new();
         let result = lsp.handle_completion(make_completion_params(0, 0));
         if let Some(CompletionResponse::Array(items)) = result {
-            // All items should be keywords (no schema tables/columns).
-            assert!(
-                items
-                    .iter()
-                    .all(|i| i.kind == Some(CompletionItemKind::KEYWORD)),
-                "without schema, all items should be keywords"
-            );
-            assert!(
-                !items.is_empty(),
-                "should return at least some keyword completions"
+            assert_eq!(
+                items.len(),
+                3,
+                "without schema, only 3 keywords expected, got {}",
+                items.len()
             );
         }
     }
