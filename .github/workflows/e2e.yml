@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+name: E2E, Property and Aspect Tests
+on:
+  push: { branches: [main] }
+  pull_request: { branches: ['**'] }
+permissions:
+  contents: read
+jobs:
+  e2e:
+    name: E2E structural validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+      - name: Run E2E validation
+        run: bash tests/e2e.sh
+  property:
+    name: Property and integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+      - name: Run property tests
+        run: cargo test --test property_test
+      - name: Run integration tests
+        run: cargo test --test integration_test
+  aspect:
+    name: Aspect tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Run aspect tests
+        run: bash tests/aspect_tests.sh

@@ -306,26 +306,21 @@ clean-all: clean
 # TEST & QUALITY
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Run all tests
+# Run all tests (unit + integration + property + e2e)
 test *args:
-    @echo "Running tests..."
-    # TODO: Replace with your test command
-    # Examples:
-    #   cargo test {{args}}
-    #   mix test {{args}}
-    #   zig build test {{args}}
-    #   deno test {{args}}
-    @echo "Tests passed!"
+    cargo test {{args}}
+
+# End-to-end and structural validation
+e2e:
+    bash tests/e2e.sh
 
 # Run tests with verbose output
 test-verbose:
-    @echo "Running tests (verbose)..."
-    # TODO: Replace with verbose test command
+    cargo test -- --nocapture
 
 # Smoke test
 test-smoke:
-    @echo "Smoke test..."
-    # TODO: Add basic sanity checks
+    cargo test e2e_full_pipeline_simple_select_clean -- --nocapture
 
 # Run all quality checks
 quality: fmt-check lint test
