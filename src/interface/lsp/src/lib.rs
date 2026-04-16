@@ -308,9 +308,9 @@ mod tests {
     fn test_fetch_schema_populates_columns() {
         let mut lsp = VqlutLsp::new();
         lsp.connect_verisimdb("http://localhost:9090");
-        lsp.fetch_schema().unwrap();
+        lsp.fetch_schema().expect("TODO: handle error");
 
-        let users_cols = lsp.schema.get("users").unwrap();
+        let users_cols = lsp.schema.get("users").expect("TODO: handle error");
         assert!(users_cols.contains(&"id".to_string()));
         assert!(users_cols.contains(&"name".to_string()));
         assert!(users_cols.contains(&"email".to_string()));
@@ -322,7 +322,7 @@ mod tests {
         lsp.schema
             .insert("old_table".to_string(), vec!["col".to_string()]);
         lsp.connect_verisimdb("http://localhost:9090");
-        lsp.fetch_schema().unwrap();
+        lsp.fetch_schema().expect("TODO: handle error");
 
         assert!(
             !lsp.schema.contains_key("old_table"),
@@ -339,7 +339,7 @@ mod tests {
         HoverParams {
             text_document_position_params: TextDocumentPositionParams {
                 text_document: TextDocumentIdentifier {
-                    uri: Url::parse("file:///test.vcltotal").unwrap(),
+                    uri: Url::parse("file:///test.vcltotal").expect("TODO: handle error"),
                 },
                 position: Position { line, character },
             },
@@ -359,7 +359,7 @@ mod tests {
     #[test]
     fn test_handle_hover_contains_vcl_total_text() {
         let lsp = VqlutLsp::new();
-        let hover = lsp.handle_hover(make_hover_params(0, 0)).unwrap();
+        let hover = lsp.handle_hover(make_hover_params(0, 0)).expect("TODO: handle error");
         match &hover.contents {
             HoverContents::Scalar(MarkedString::String(s)) => {
                 assert!(
@@ -374,7 +374,7 @@ mod tests {
     #[test]
     fn test_handle_hover_range_matches_position() {
         let lsp = VqlutLsp::new();
-        let hover = lsp.handle_hover(make_hover_params(5, 10)).unwrap();
+        let hover = lsp.handle_hover(make_hover_params(5, 10)).expect("TODO: handle error");
         let range = hover.range.expect("hover should have a range");
         assert_eq!(range.start.line, 5);
         assert_eq!(range.start.character, 10);
@@ -388,7 +388,7 @@ mod tests {
         GotoDefinitionParams {
             text_document_position_params: TextDocumentPositionParams {
                 text_document: TextDocumentIdentifier {
-                    uri: Url::parse("file:///test.vcltotal").unwrap(),
+                    uri: Url::parse("file:///test.vcltotal").expect("TODO: handle error"),
                 },
                 position: Position { line, character },
             },
@@ -412,7 +412,7 @@ mod tests {
     fn test_goto_definition_with_schema_uses_table_name() {
         let mut lsp = VqlutLsp::new();
         lsp.connect_verisimdb("http://localhost:9090");
-        lsp.fetch_schema().unwrap();
+        lsp.fetch_schema().expect("TODO: handle error");
 
         let result = lsp.handle_goto_definition(make_goto_params(2, 5));
         assert!(result.is_some());
@@ -430,7 +430,7 @@ mod tests {
         CompletionParams {
             text_document_position: TextDocumentPositionParams {
                 text_document: TextDocumentIdentifier {
-                    uri: Url::parse("file:///test.vcltotal").unwrap(),
+                    uri: Url::parse("file:///test.vcltotal").expect("TODO: handle error"),
                 },
                 position: Position { line, character },
             },
@@ -464,7 +464,7 @@ mod tests {
     fn test_completion_includes_schema_tables_and_columns() {
         let mut lsp = VqlutLsp::new();
         lsp.connect_verisimdb("http://localhost:9090");
-        lsp.fetch_schema().unwrap();
+        lsp.fetch_schema().expect("TODO: handle error");
 
         let result = lsp.handle_completion(make_completion_params(0, 0));
         if let Some(CompletionResponse::Array(items)) = result {

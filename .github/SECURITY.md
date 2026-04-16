@@ -4,7 +4,7 @@
 ============================================================================
 TEMPLATE INSTRUCTIONS (delete this block before publishing)
 ============================================================================
-Replace all {{PLACEHOLDER}} values with your information:
+Replace all  values with your information:
   VCL-total     - Your project name
   hyperpolymath            - GitHub username or org (e.g., hyperpolymath)
   vcl-total             - Repository name

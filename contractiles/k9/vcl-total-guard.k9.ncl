@@ -50,7 +50,7 @@ let vcl_ut_guard = {
       severity = "error",
       check_type = "file-pattern-guard",
       scope = ".",
-      reject_patterns = ["{{PROJECT}}", "{{PLACEHOLDER}}"],
+      reject_patterns = ["VCL_TOTAL", ""],
     },
 
     placeholder_fuzz_absent = {

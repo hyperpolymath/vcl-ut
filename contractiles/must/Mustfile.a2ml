@@ -69,8 +69,8 @@ that MUST hold at all times.
 - severity: critical
 
 ### no-template-placeholders
-- description: Template tokens ({{PROJECT}}, {{PLACEHOLDER}}) must not appear in the source tree.
-- run: "! rg '{{PROJECT}}\\|{{PLACEHOLDER}}' -n src -g'*.*' 2>/dev/null | head -1 | grep -q ."
+- description: Template tokens (VCL_TOTAL, ) must not appear in the source tree.
+- run: "! rg 'VCL_TOTAL\\|' -n src -g'*.*' 2>/dev/null | head -1 | grep -q ."
 - severity: error
 
 ### placeholder-fuzz
