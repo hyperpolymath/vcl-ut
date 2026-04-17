@@ -105,3 +105,11 @@ sync_report*.txt
 .hypatia/
 .zig-cache/
 zig-out/
+target/
+node_modules/
+_build/
+deps/
+.elixir_ls/
+.cache/
+build/
+dist/
