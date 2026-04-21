@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
-= VCL-total (VeriSim Consonance Languae)
+= VCL-total (VeriSim Consonance Language)
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 :spdx: PMPL-1.0-or-later
 :status: Pre-Alpha
