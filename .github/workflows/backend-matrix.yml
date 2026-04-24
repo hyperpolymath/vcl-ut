@@ -1,0 +1,96 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+#
+# backend-matrix.yml — Per-prover smoke matrix for vcl-ut → echidna wire.
+#
+# One matrix job per ProverKind variant. Authoritative list comes from
+# echidna's .machine_readable/provers.a2ml (source-of-truth: the
+# ProverKind enum in echidna/src/rust/provers/mod.rs). The prep job
+# parses provers.a2ml and emits a matrix JSON ephemerally as a GHA
+# output — no committed JSON artefact (memory rule: tools emit A2ML,
+# not JSON).
+#
+# Current scope of per-job work:
+#   - Runs the vcltotal-echidna-client wiremock integration suite
+#     with the target prover slug injected as ECHIDNA_PROVER env.
+#   - When echidna's REST surface expands to all 105 backends (today
+#     it exposes 17), each job can diverge per slug to exercise a
+#     live echidna container. That upgrade is tracked as Package 4
+#     step 7; the matrix shape here is ready for it.
+#
+# Resource budget: max-parallel=3 per the user's standing constraint
+# on parallel subagents / bash invocations applied to CI.
+
+name: Backend Matrix
+
+on:
+  pull_request:
+    branches: ['**']
+  push:
+    branches: [main, master]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  prep:
+    name: Derive matrix from echidna provers.a2ml
+    runs-on: ubuntu-latest
+    outputs:
+      provers: ${{ steps.parse.outputs.provers }}
+      count:   ${{ steps.parse.outputs.count }}
+    steps:
+      - name: Checkout vcl-ut
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Checkout echidna (authoritative ProverKind source)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: hyperpolymath/echidna
+          path: echidna
+          fetch-depth: 1
+
+      - name: Parse provers.a2ml → matrix JSON (ephemeral GHA output only)
+        id: parse
+        run: |
+          set -euo pipefail
+          a2ml=echidna/.machine_readable/provers.a2ml
+          test -f "$a2ml"
+          # Extract `slug = "..."` values from each [prover.X] section.
+          # Keep only the slug; nothing else is needed by the matrix yet.
+          slugs=$(grep -E '^slug = ' "$a2ml" | sed -E 's/slug = "(.+)"/\1/')
+          count=$(echo "$slugs" | wc -l | tr -d ' ')
+          # Convert to JSON array for GitHub Actions matrix consumption.
+          # (GHA matrix strategies require JSON; this is runtime
+          # marshalling, not a persisted artefact.)
+          json=$(printf '%s\n' "$slugs" | jq -R . | jq -sc .)
+          echo "provers=$json" >> "$GITHUB_OUTPUT"
+          echo "count=$count"  >> "$GITHUB_OUTPUT"
+          echo "Derived matrix: $count provers"
+
+  smoke:
+    name: Smoke (${{ matrix.prover }})
+    needs: prep
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        prover: ${{ fromJson(needs.prep.outputs.provers) }}
+    env:
+      ECHIDNA_PROVER: ${{ matrix.prover }}
+    steps:
+      - name: Checkout vcl-ut
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
+
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+        with:
+          shared-key: backend-matrix
+
+      - name: Client wiremock suite (ECHIDNA_PROVER=${{ matrix.prover }})
+        run: cargo test -p vcltotal-echidna-client --tests --locked
