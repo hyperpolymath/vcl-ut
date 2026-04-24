@@ -291,6 +291,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "echidna-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1220,6 +1228,9 @@ dependencies = [
 [[package]]
 name = "vcltotal-interface"
 version = "0.1.0"
+dependencies = [
+ "echidna-core",
+]
 
 [[package]]
 name = "vcltotal-lint"

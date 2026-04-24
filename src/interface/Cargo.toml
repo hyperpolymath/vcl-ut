@@ -13,3 +13,12 @@ path = "lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+# Canonical proof-surface types (Term, Goal, ProofState, Tactic, TypeInfo).
+# Package 4 decision: echidna-core owns the proof surface; vcl-ut owns the
+# query surface (Statement, SafetyLevel, Schema). Both sides re-export the
+# other's types so downstream consumers pick one crate and get both halves
+# of the vcl-ut ↔ echidna seam.
+#
+# Path dep works because every hyperpolymath repo lives under
+# /mnt/eclipse/repos/, so this resolves the same on every estate clone.
+echidna-core = { path = "../../../echidna/crates/echidna-core" }
