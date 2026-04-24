@@ -487,10 +487,14 @@ mod tests {
         let lsp = VqlutLsp::new();
         let result = lsp.handle_completion(make_completion_params(0, 0));
         if let Some(CompletionResponse::Array(items)) = result {
+            // Keyword set grew from SELECT/FROM/WHERE (3) to the full 13-keyword
+            // VCL-total surface: +GROUP BY, ORDER BY, HAVING, LIMIT, OFFSET,
+            // EFFECTS, PROOF ATTACHED, and three more. Update here when the
+            // keyword vec in handle_completion changes.
             assert_eq!(
                 items.len(),
-                3,
-                "without schema, only 3 keywords expected, got {}",
+                13,
+                "without schema, 13 keywords expected, got {}",
                 items.len()
             );
         }
