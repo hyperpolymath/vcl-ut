@@ -5,11 +5,11 @@
 
 [metadata]
 version = "1.0.0"
-last-updated = "2026-03-16"
+last-updated = "2026-04-25"
 
 [anchor]
 schema = "hyperpolymath.anchor/1"
-repo = "hyperpolymath/vcl-total"
+repo = "hyperpolymath/vcl-ut"
 authority = "upstream-canonical"
 
 purpose = [
@@ -19,7 +19,7 @@ purpose = [
 ]
 
 [identity]
-project = "VCL-total"
+project = "VCL-ut"
 kind = "library"                # language | library | service | tool
 one-sentence = "VCL Ultimate Type-Safety — 10-level query safety checker for VeriSimDB"
 domain = "databases"
