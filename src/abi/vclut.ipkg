@@ -1,0 +1,14 @@
+package vclut
+
+-- SPDX-License-Identifier: PMPL-1.0-or-later
+-- VCL-ut Idris2 ABI package. Builds the formal-proof + FFI-declaration
+-- modules that bind Rust's vcl-ut crate to non-Rust callers.
+
+version = 0.1.0
+authors = "Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+brief   = "VCL-ut ABI: type definitions + FFI declarations for the 10-level type-safe query language"
+license = "PMPL-1.0-or-later"
+
+sourcedir = "."
+modules = VclTypes
+        , Foreign
