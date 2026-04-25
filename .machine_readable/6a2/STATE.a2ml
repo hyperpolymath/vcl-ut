@@ -1,22 +1,18 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
 # Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 #
-# STATE.a2ml — Project state checkpoint (META-TEMPLATE)
-#
-# This is the STATE file for rsr-template-repo itself.
-# When consumed by a new project, replace  tokens
-# and customize sections below for the target project.
+# STATE.a2ml — Project state checkpoint for vcl-ut (VCL Ultimate Type-Safety).
 
 [metadata]
-project = "rsr-template-repo"
-version = "0.2.0"
-last-updated = "2026-02-28"
+project = "vcl-ut"
+version = "0.1.0"
+last-updated = "2026-04-25"
 status = "active"  # active | paused | archived
 
 [project-context]
-name = "rsr-template-repo"
-purpose = "Canonical RSR-compliant repository template providing scaffolding for all hyperpolymath projects — including CI/CD, AI manifests, ABI/FFI standards, container ecosystem, and governance infrastructure."
-completion-percentage = 95
+name = "VCL-ut"
+purpose = "VCL Ultimate Type-Safety — 10-level type-safe query language for VeriSimDB. Provides queries plus formatter/linter/LSP/DAP tooling."
+completion-percentage = 75
 
 [position]
 phase = "maintenance"      # design | implementation | testing | maintenance | archived
