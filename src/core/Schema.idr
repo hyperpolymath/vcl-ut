@@ -140,10 +140,7 @@ lookupModality Spatial    s = spatial s
 ||| Look up a field definition by name within a modality schema.
 public export
 lookupField : String -> ModalitySchema -> Maybe FieldDef
-lookupField name ms = find (\f => name f == name) (fields ms)
-  where
-    name : FieldDef -> String
-    name fd = fd.name
+lookupField target ms = find (\f => f.name == target) (fields ms)
 
 ||| Look up a field reference in an octad schema.
 ||| Returns the FieldDef if the modality and field both exist.

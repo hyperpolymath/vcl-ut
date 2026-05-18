@@ -25,6 +25,11 @@ import Data.Maybe
 
 %default total
 
+-- `Levels.CheckResult` (the proof-carrying Passed/Failed datatype) and this
+-- module's own `CheckResult` record share a name; this module only uses its
+-- own. Hide the imported one so `checkQuery`'s signature is unambiguous.
+%hide VclTotal.Core.Levels.CheckResult
+
 -- ═══════════════════════════════════════════════════════════════════════
 -- Check Result
 -- ═══════════════════════════════════════════════════════════════════════
@@ -77,6 +82,19 @@ safetyLevelLabel EpistemicSafe   = "L10:EpistemicSafe"
 -- ═══════════════════════════════════════════════════════════════════════
 
 ||| Decidable structural equality for VqlType.
+||| Structural equality for Agent (ignoring payload for parameterised
+||| agents). Hoisted to the top level: a `where` block after the final
+||| clause of a multi-clause function is not in scope for the earlier
+||| clauses that referenced it.
+private
+agentEq : Agent -> Agent -> Bool
+agentEq AgEngine AgEngine               = True
+agentEq (AgProver a) (AgProver b)       = a == b
+agentEq AgValidator AgValidator         = True
+agentEq (AgUser a) (AgUser b)           = a == b
+agentEq AgFederation AgFederation       = True
+agentEq _ _                             = False
+
 ||| Returns True when two types are the same constructor with matching
 ||| arguments — used by Level 2 to verify comparison operand types.
 public export
@@ -97,15 +115,6 @@ vqlTypeEq (TKnows a1 t1) (TKnows a2 t2) = agentEq a1 a2 && vqlTypeEq t1 t2
 vqlTypeEq (TBelieves a1 t1) (TBelieves a2 t2) = agentEq a1 a2 && vqlTypeEq t1 t2
 vqlTypeEq (TCommonKnowledge t1) (TCommonKnowledge t2) = vqlTypeEq t1 t2
 vqlTypeEq _           _           = False
-  where
-    ||| Structural equality for Agent (ignoring payload for parameterised agents).
-    agentEq : Agent -> Agent -> Bool
-    agentEq AgEngine AgEngine               = True
-    agentEq (AgProver a) (AgProver b)       = a == b
-    agentEq AgValidator AgValidator         = True
-    agentEq (AgUser a) (AgUser b)           = a == b
-    agentEq AgFederation AgFederation       = True
-    agentEq _ _                             = False
 
 ||| Check whether two VqlTypes are compatible for comparison.
 |||
@@ -134,46 +143,47 @@ typesCompatible a b =
 -- Field Reference Extraction
 -- ═══════════════════════════════════════════════════════════════════════
 
-||| Recursively extract all FieldRef nodes from an expression tree.
-||| Traverses EField, ECompare, ELogic, EAggregate, and ESubquery nodes.
-public export
-extractFieldRefs : Expr -> List FieldRef
-extractFieldRefs (EField ref _)         = [ref]
-extractFieldRefs (ELiteral _ _)         = []
-extractFieldRefs (ECompare _ l r _)     = extractFieldRefs l ++ extractFieldRefs r
-extractFieldRefs (ELogic _ l Nothing _) = extractFieldRefs l
-extractFieldRefs (ELogic _ l (Just r) _) = extractFieldRefs l ++ extractFieldRefs r
-extractFieldRefs (EAggregate _ e _)     = extractFieldRefs e
-extractFieldRefs (EParam _ _)           = []
-extractFieldRefs EStar                  = []
-extractFieldRefs (ESubquery sub)        = statementFieldRefs sub
-extractFieldRefs (EEpistemic _ _ e _)   = extractFieldRefs e
-extractFieldRefs (EAnnounce _ prop body _) =
-  extractFieldRefs prop ++ extractFieldRefs body
+mutual
+  ||| Recursively extract all FieldRef nodes from an expression tree.
+  ||| Traverses EField, ECompare, ELogic, EAggregate, and ESubquery nodes.
+  public export
+  extractFieldRefs : Expr -> List FieldRef
+  extractFieldRefs (EField ref _)         = [ref]
+  extractFieldRefs (ELiteral _ _)         = []
+  extractFieldRefs (ECompare _ l r _)     = extractFieldRefs l ++ extractFieldRefs r
+  extractFieldRefs (ELogic _ l Nothing _) = extractFieldRefs l
+  extractFieldRefs (ELogic _ l (Just r) _) = extractFieldRefs l ++ extractFieldRefs r
+  extractFieldRefs (EAggregate _ e _)     = extractFieldRefs e
+  extractFieldRefs (EParam _ _)           = []
+  extractFieldRefs EStar                  = []
+  extractFieldRefs (ESubquery sub)        = statementFieldRefs sub
+  extractFieldRefs (EEpistemic _ _ e _)   = extractFieldRefs e
+  extractFieldRefs (EAnnounce _ prop body _) =
+    extractFieldRefs prop ++ extractFieldRefs body
 
-||| Collect all field references from every clause of a statement.
-||| Delegates to extractFieldRefs for each expression-bearing clause.
-public export
-statementFieldRefs : Statement -> List FieldRef
-statementFieldRefs stmt =
-  let selRefs : List FieldRef
-      selRefs = concatMap selItemFieldRefs (selectItems stmt)
-      whereRefs : List FieldRef
-      whereRefs = maybe [] extractFieldRefs (whereClause stmt)
-      groupRefs : List FieldRef
-      groupRefs = groupBy stmt
-      havingRefs : List FieldRef
-      havingRefs = maybe [] extractFieldRefs (having stmt)
-      orderRefs : List FieldRef
-      orderRefs = map fst (orderBy stmt)
-  in selRefs ++ whereRefs ++ groupRefs ++ havingRefs ++ orderRefs
-  where
-    ||| Extract field references from a single SELECT item.
-    selItemFieldRefs : SelectItem -> List FieldRef
-    selItemFieldRefs (SelField ref)       = [ref]
-    selItemFieldRefs (SelModality _)      = []
-    selItemFieldRefs (SelAggregate _ e)   = extractFieldRefs e
-    selItemFieldRefs SelStar              = []
+  ||| Collect all field references from every clause of a statement.
+  ||| Delegates to extractFieldRefs for each expression-bearing clause.
+  public export
+  statementFieldRefs : Statement -> List FieldRef
+  statementFieldRefs stmt =
+    let selRefs : List FieldRef
+        selRefs = concatMap selItemFieldRefs (selectItems stmt)
+        whereRefs : List FieldRef
+        whereRefs = maybe [] extractFieldRefs (whereClause stmt)
+        groupRefs : List FieldRef
+        groupRefs = groupBy stmt
+        havingRefs : List FieldRef
+        havingRefs = maybe [] extractFieldRefs (having stmt)
+        orderRefs : List FieldRef
+        orderRefs = map fst (orderBy stmt)
+    in selRefs ++ whereRefs ++ groupRefs ++ havingRefs ++ orderRefs
+    where
+      ||| Extract field references from a single SELECT item.
+      selItemFieldRefs : SelectItem -> List FieldRef
+      selItemFieldRefs (SelField ref)       = [ref]
+      selItemFieldRefs (SelModality _)      = []
+      selItemFieldRefs (SelAggregate _ e)   = extractFieldRefs e
+      selItemFieldRefs SelStar              = []
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Expression Scanning Helpers
@@ -621,7 +631,8 @@ checkQuery : Statement -> OctadSchema -> CheckResult
 checkQuery stmt schema =
   let initState : PipelineState
       initState = MkPipelineState ParseSafe [] []
-      (finalState, mFailure) = runPipeline allLevels stmt schema initState
+      finalState : PipelineState
+      finalState = fst (runPipeline allLevels stmt schema initState)
   in case finalState.passed of
     [] =>
       -- Level 0 itself failed — should not happen (ParseSafe always passes)

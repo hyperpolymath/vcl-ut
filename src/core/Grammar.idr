@@ -185,139 +185,140 @@ epistemicOpToInt OpKnows           = 0
 epistemicOpToInt OpBelieves        = 1
 epistemicOpToInt OpCommonKnowledge = 2
 
-public export
-data Expr
-  = EField FieldRef VqlType              -- Field reference with type
-  | ELiteral Literal VqlType             -- Literal with type
-  | ECompare CompOp Expr Expr VqlType    -- Comparison (left op right)
-  | ELogic LogicOp Expr (Maybe Expr) VqlType -- Logical (And/Or need two, Not needs one)
-  | EAggregate AggFunc Expr VqlType      -- Aggregate function
-  | EParam String VqlType                -- Parameterised input ($1, $name)
-  | EStar                                -- Wildcard (*)
-  | ESubquery Statement                  -- Subquery
-  -- Epistemic expression nodes (S5 modal logic)
-  | EEpistemic EpistemicOp Agent Expr VqlType
-      -- ^ Modal operator application: KNOWS agent expr, BELIEVES agent expr,
-      --   or COMMON KNOWLEDGE expr. The VqlType is the epistemic result type
-      --   (TKnows/TBelieves/TCommonKnowledge wrapping the inner type).
-  | EAnnounce Agent Expr Expr VqlType
-      -- ^ Public announcement: ANNOUNCE agent proposition body.
-      --   Models the epistemic effect of an agent publicly declaring a fact.
-      --   After announcement, all agents know the proposition holds.
-      --   Type: the body expression type, evaluated in the updated epistemic state.
+mutual
+  public export
+  data Expr
+    = EField FieldRef VqlType              -- Field reference with type
+    | ELiteral Literal VqlType             -- Literal with type
+    | ECompare CompOp Expr Expr VqlType    -- Comparison (left op right)
+    | ELogic LogicOp Expr (Maybe Expr) VqlType -- Logical (And/Or need two, Not needs one)
+    | EAggregate AggFunc Expr VqlType      -- Aggregate function
+    | EParam String VqlType                -- Parameterised input ($1, $name)
+    | EStar                                -- Wildcard (*)
+    | ESubquery Statement                  -- Subquery
+    -- Epistemic expression nodes (S5 modal logic)
+    | EEpistemic EpistemicOp Agent Expr VqlType
+        -- ^ Modal operator application: KNOWS agent expr, BELIEVES agent expr,
+        --   or COMMON KNOWLEDGE expr. The VqlType is the epistemic result type
+        --   (TKnows/TBelieves/TCommonKnowledge wrapping the inner type).
+    | EAnnounce Agent Expr Expr VqlType
+        -- ^ Public announcement: ANNOUNCE agent proposition body.
+        --   Models the epistemic effect of an agent publicly declaring a fact.
+        --   After announcement, all agents know the proposition holds.
+        --   Type: the body expression type, evaluated in the updated epistemic state.
 
--- ═══════════════════════════════════════════════════════════════════════
--- Clauses
--- ═══════════════════════════════════════════════════════════════════════
+  -- ═══════════════════════════════════════════════════════════════════════
+  -- Clauses
+  -- ═══════════════════════════════════════════════════════════════════════
 
-||| SELECT clause item.
-public export
-data SelectItem
-  = SelField FieldRef         -- Single field
-  | SelModality Modality      -- Entire modality
-  | SelAggregate AggFunc Expr -- Aggregate expression
-  | SelStar                   -- All modalities (*)
+  ||| SELECT clause item.
+  public export
+  data SelectItem
+    = SelField FieldRef         -- Single field
+    | SelModality Modality      -- Entire modality
+    | SelAggregate AggFunc Expr -- Aggregate expression
+    | SelStar                   -- All modalities (*)
 
-||| FROM clause source.
-public export
-data Source
-  = SrcOctad String             -- HEXAD <uuid>
-  | SrcFederation String        -- FEDERATION <pattern>
-  | SrcStore String             -- STORE <id>
+  ||| FROM clause source.
+  public export
+  data Source
+    = SrcOctad String             -- HEXAD <uuid>
+    | SrcFederation String        -- FEDERATION <pattern>
+    | SrcStore String             -- STORE <id>
 
-||| Drift policy for federation queries.
-public export
-data DriftPolicy = Strict | Repair | Tolerate | Latest
+  ||| Drift policy for federation queries.
+  public export
+  data DriftPolicy = Strict | Repair | Tolerate | Latest
 
-||| PROOF clause type (VCL-DT extension).
-public export
-data ProofClause
-  = ProofAttached              -- PROOF ATTACHED (sigma type)
-  | ProofWitness String        -- PROOF WITNESS <name>
-  | ProofAssert Expr           -- PROOF ASSERT <condition>
+  ||| PROOF clause type (VCL-DT extension).
+  public export
+  data ProofClause
+    = ProofAttached              -- PROOF ATTACHED (sigma type)
+    | ProofWitness String        -- PROOF WITNESS <name>
+    | ProofAssert Expr           -- PROOF ASSERT <condition>
 
-||| Effect declaration for Level 7 (effect tracking).
-public export
-data EffectDecl
-  = EffRead                    -- EFFECTS { Read }
-  | EffWrite                   -- EFFECTS { Write }
-  | EffReadWrite               -- EFFECTS { Read, Write }
-  | EffConsume                 -- EFFECTS { Consume } (linear)
+  ||| Effect declaration for Level 7 (effect tracking).
+  public export
+  data EffectDecl
+    = EffRead                    -- EFFECTS { Read }
+    | EffWrite                   -- EFFECTS { Write }
+    | EffReadWrite               -- EFFECTS { Read, Write }
+    | EffConsume                 -- EFFECTS { Consume } (linear)
 
-||| Version constraint for Level 8 (temporal safety).
-public export
-data VersionConstraint
-  = VerLatest                  -- AT LATEST
-  | VerAtLeast Nat             -- AT VERSION >= n
-  | VerExact Nat               -- AT VERSION = n
-  | VerRange Nat Nat           -- AT VERSION BETWEEN n AND m
+  ||| Version constraint for Level 8 (temporal safety).
+  public export
+  data VersionConstraint
+    = VerLatest                  -- AT LATEST
+    | VerAtLeast Nat             -- AT VERSION >= n
+    | VerExact Nat               -- AT VERSION = n
+    | VerRange Nat Nat           -- AT VERSION BETWEEN n AND m
 
-||| Linearity annotation for Level 9.
-public export
-data LinearAnnotation
-  = LinUnlimited               -- Default (no constraint)
-  | LinUseOnce                 -- CONSUME AFTER 1 USE
-  | LinBounded Nat             -- USAGE LIMIT n
+  ||| Linearity annotation for Level 9.
+  public export
+  data LinearAnnotation
+    = LinUnlimited               -- Default (no constraint)
+    | LinUseOnce                 -- CONSUME AFTER 1 USE
+    | LinBounded Nat             -- USAGE LIMIT n
 
-||| Epistemic clause for Level 10 (epistemic safety).
-|||
-||| Specifies the epistemic context: which agents are relevant, what they
-||| know/believe, and what epistemic properties must hold for the query
-||| result.  The clause triggers S5 modal checking in the pipeline.
-|||
-||| Syntax:
-|||   EPISTEMIC { AGENTS engine, prover:lean4 ;
-|||               REQUIRES KNOWS engine (status = 'verified') ;
-|||               REQUIRES COMMON KNOWLEDGE (schema_version >= 3) }
-public export
-data EpistemicClause
-  = EpClause
-      (List Agent)               -- Agents in scope
-      (List EpistemicRequirement) -- Requirements that must hold
+  ||| Epistemic clause for Level 10 (epistemic safety).
+  |||
+  ||| Specifies the epistemic context: which agents are relevant, what they
+  ||| know/believe, and what epistemic properties must hold for the query
+  ||| result.  The clause triggers S5 modal checking in the pipeline.
+  |||
+  ||| Syntax:
+  |||   EPISTEMIC { AGENTS engine, prover:lean4 ;
+  |||               REQUIRES KNOWS engine (status = 'verified') ;
+  |||               REQUIRES COMMON KNOWLEDGE (schema_version >= 3) }
+  public export
+  data EpistemicClause
+    = EpClause
+        (List Agent)               -- Agents in scope
+        (List EpistemicRequirement) -- Requirements that must hold
 
-||| A single epistemic requirement within an EPISTEMIC clause.
-public export
-data EpistemicRequirement
-  = EpReqKnows Agent Expr         -- REQUIRES KNOWS <agent> <prop>
-  | EpReqBelieves Agent Expr      -- REQUIRES BELIEVES <agent> <prop>
-  | EpReqCommon Expr              -- REQUIRES COMMON KNOWLEDGE <prop>
-  | EpReqEntails Agent Agent Expr -- REQUIRES <a1> ENTAILS <a2> <prop>
-      -- ^ Agent a1's knowledge entails agent a2's knowledge of prop.
-      --   Formalises knowledge transfer: K_a1(P) → K_a2(P).
+  ||| A single epistemic requirement within an EPISTEMIC clause.
+  public export
+  data EpistemicRequirement
+    = EpReqKnows Agent Expr         -- REQUIRES KNOWS <agent> <prop>
+    | EpReqBelieves Agent Expr      -- REQUIRES BELIEVES <agent> <prop>
+    | EpReqCommon Expr              -- REQUIRES COMMON KNOWLEDGE <prop>
+    | EpReqEntails Agent Agent Expr -- REQUIRES <a1> ENTAILS <a2> <prop>
+        -- ^ Agent a1's knowledge entails agent a2's knowledge of prop.
+        --   Formalises knowledge transfer: K_a1(P) → K_a2(P).
 
-||| Encode EpistemicRequirement tag as C integer.
-public export
-epReqToInt : EpistemicRequirement -> Int
-epReqToInt (EpReqKnows _ _)     = 0
-epReqToInt (EpReqBelieves _ _)  = 1
-epReqToInt (EpReqCommon _)      = 2
-epReqToInt (EpReqEntails _ _ _) = 3
+  ||| Encode EpistemicRequirement tag as C integer.
+  public export
+  epReqToInt : EpistemicRequirement -> Int
+  epReqToInt (EpReqKnows _ _)     = 0
+  epReqToInt (EpReqBelieves _ _)  = 1
+  epReqToInt (EpReqCommon _)      = 2
+  epReqToInt (EpReqEntails _ _ _) = 3
 
--- ═══════════════════════════════════════════════════════════════════════
--- Statement (top-level query)
--- ═══════════════════════════════════════════════════════════════════════
+  -- ═══════════════════════════════════════════════════════════════════════
+  -- Statement (top-level query)
+  -- ═══════════════════════════════════════════════════════════════════════
 
-||| A complete VCL-total query statement.
-public export
-record Statement where
-  constructor MkStatement
-  -- Core clauses (VCL 3.0)
-  selectItems   : List SelectItem
-  source        : Source
-  whereClause   : Maybe Expr
-  groupBy       : List FieldRef
-  having        : Maybe Expr
-  orderBy       : List (FieldRef, Bool)  -- (field, ascending?)
-  limit         : Maybe Nat
-  offset        : Maybe Nat
-  -- VCL-total extensions
-  proofClause   : Maybe ProofClause
-  effectDecl    : Maybe EffectDecl
-  versionConst  : Maybe VersionConstraint
-  linearAnnot   : Maybe LinearAnnotation
-  epistemicClause : Maybe EpistemicClause  -- Level 10: epistemic safety
-  -- Metadata
-  requestedLevel : SafetyLevel
+  ||| A complete VCL-total query statement.
+  public export
+  record Statement where
+    constructor MkStatement
+    -- Core clauses (VCL 3.0)
+    selectItems   : List SelectItem
+    source        : Source
+    whereClause   : Maybe Expr
+    groupBy       : List FieldRef
+    having        : Maybe Expr
+    orderBy       : List (FieldRef, Bool)  -- (field, ascending?)
+    limit         : Maybe Nat
+    offset        : Maybe Nat
+    -- VCL-total extensions
+    proofClause   : Maybe ProofClause
+    effectDecl    : Maybe EffectDecl
+    versionConst  : Maybe VersionConstraint
+    linearAnnot   : Maybe LinearAnnotation
+    epistemicClause : Maybe EpistemicClause  -- Level 10: epistemic safety
+    -- Metadata
+    requestedLevel : SafetyLevel
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Injection-safety primitive (canonical single source of truth)
