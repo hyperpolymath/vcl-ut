@@ -13,7 +13,7 @@ image:https://img.shields.io/badge/tests-49_pass-brightgreen[tests: 49 pass]
 IMPORTANT: This project was renamed on 2026-04-05. Its former name used
 the letter sequence "V-Q-L-hyphen-U-T" (read: "vee-queue-ell-you-tee") and
 stood for "Ultimate Type-safe". The canonical name is now **VCL-total**
-(VeriSim Consonance Language — Total Type-safe). See CHANGELOG.md for
+(VeriSim Consonance Language — Ubiquitous Type-safe). See CHANGELOG.md for
 the full rename scope. The GitHub repository URL is unchanged.
 
 == Overview
