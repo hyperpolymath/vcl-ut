@@ -519,6 +519,42 @@ l10Compose (MkL10 _ (EpClause as1 rs1) prf1) (MkL10 _ (EpClause as2 rs2) prf2) =
   MkL10 (composeJoin _ _) (EpClause (as1 ++ as2) (rs1 ++ rs2)) $
     rewrite prf1 in rewrite prf2 in Refl
 
+-- ── L4 injection-freedom is genuinely closed under join ──────────────
+
+||| Level-4 injection-freedom is **genuinely** preserved by join
+||| composition — not merely vacuously, as it was when `NoRawUserInput`
+||| had the catch-all `AllParameterised` constructor.
+|||
+||| `joinWhere` (Composition.idr) maps the two WHERE clauses to one of:
+||| `Nothing`, one side verbatim, or `ELogic And w1 (Just w2) TBool`.
+||| None of these introduces a string literal that was not already in
+||| `w1` or `w2`, so `hasStringLit` of the joined clause is exactly the
+||| disjunction of the two sides — `False` whenever both inputs are
+||| injection-free. No `believe_me`/`postulate`/`assert_total`.
+export
+noRawUserInputCompose :
+  (q1, q2 : Statement) ->
+  NoRawUserInput q1 -> NoRawUserInput q2 ->
+  NoRawUserInput (composeJoin q1 q2)
+noRawUserInputCompose q1 q2 (MkNoRawUserInput n1) (MkNoRawUserInput n2) =
+  MkNoRawUserInput (joinFree (whereClause q1) (whereClause q2) n1 n2)
+  where
+    -- `whereHasStringLit s` reduces to `maybe False hasStringLit
+    -- (whereClause s)`; `whereClause (composeJoin q1 q2)` reduces to
+    -- `joinWhere (whereClause q1) (whereClause q2)`.  So the goal is
+    -- exactly `joinFree (whereClause q1) (whereClause q2) n1 n2`.
+    joinFree :
+      (w1m, w2m : Maybe Expr) ->
+      maybe False hasStringLit w1m = False ->
+      maybe False hasStringLit w2m = False ->
+      maybe False hasStringLit (joinWhere w1m w2m) = False
+    joinFree Nothing   Nothing   _  _  = Refl
+    joinFree (Just _)  Nothing   p1 _  = p1
+    joinFree Nothing   (Just _)  _  p2 = p2
+    joinFree (Just a)  (Just b)  p1 p2 =
+      -- goal reduces to: hasStringLit a || hasStringLit b = False
+      rewrite p1 in p2
+
 -- ── The main theorem ─────────────────────────────────────────────────
 
 ||| Theorem [Composition Preservation]
@@ -575,28 +611,33 @@ compositionPreservation _ _ schema NullSafe _
          (MkL2 (composeJoin _ _) schema (WhereTypeSafe LogicSafe))
          (MkL3 (composeJoin _ _) schema GuardedNull)
 
-compositionPreservation _ _ schema InjectionProof _
-    (CertL4 _ l1a _ _ _)
-    (CertL4 _ l1b _ _ _) =
-  -- L4: AllParameterised holds for any statement (it asserts all user values
-  -- come through EParam, a structural invariant maintained by the parser;
-  -- composeJoin does not introduce raw user input).
+compositionPreservation q1 q2 schema InjectionProof _
+    (CertL4 _ l1a _ _ (MkL4 _ nri1))
+    (CertL4 _ l1b _ _ (MkL4 _ nri2)) =
+  -- L4: GENUINE compositional proof. `joinWhere` either keeps one side
+  -- verbatim or combines with `ELogic And`, introducing no new string
+  -- literal, so injection-freedom of both inputs gives injection-freedom
+  -- of the join (noRawUserInputCompose). This replaces the previous
+  -- `MkL4 _ AllParameterised`, which type-checked only because the
+  -- Level-4 predicate was vacuous. See standards#124.
   CertL4 (MkL0 (composeJoin _ _))
          (l1Compose l1a l1b)
          (MkL2 (composeJoin _ _) schema (WhereTypeSafe LogicSafe))
          (MkL3 (composeJoin _ _) schema GuardedNull)
-         (MkL4 (composeJoin _ _) AllParameterised)
+         (MkL4 (composeJoin q1 q2) (noRawUserInputCompose q1 q2 nri1 nri2))
 
-compositionPreservation _ _ schema ResultTyped _
-    (CertL5 _ l1a _ _ _ _)
-    (CertL5 _ l1b _ _ _ _) =
-  -- L5: the combined select list is typed item-by-item;
-  -- ConsTyped/NilTyped witnesses hold for any list structure.
+compositionPreservation q1 q2 schema ResultTyped _
+    (CertL5 _ l1a _ _ (MkL4 _ nri1) _)
+    (CertL5 _ l1b _ _ (MkL4 _ nri2) _) =
+  -- L5: the L4 sub-certificate is now the GENUINE
+  -- noRawUserInputCompose proof (not the old vacuous AllParameterised).
+  -- L5's own ConsTyped/NilTyped witnesses remain structurally vacuous
+  -- and are scoped OWED in verification/proofs/VERIFICATION-STANCE.adoc.
   CertL5 (MkL0 (composeJoin _ _))
          (l1Compose l1a l1b)
          (MkL2 (composeJoin _ _) schema (WhereTypeSafe LogicSafe))
          (MkL3 (composeJoin _ _) schema GuardedNull)
-         (MkL4 (composeJoin _ _) AllParameterised)
+         (MkL4 (composeJoin q1 q2) (noRawUserInputCompose q1 q2 nri1 nri2))
          (MkL5 (composeJoin _ _) schema (selectItemsTypedCompose _ _))
   where
     -- Combined select items are typed because each piece is typed

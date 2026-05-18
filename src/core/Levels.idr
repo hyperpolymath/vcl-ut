@@ -178,11 +178,26 @@ data AllNullableFieldsGuarded : Maybe Expr -> OctadSchema -> Type where
   NoWhereNull : AllNullableFieldsGuarded Nothing schema
   GuardedNull : AllNullableFieldsGuarded (Just expr) schema
 
-||| Proof that no raw user input appears in the query.
-||| User values must be EParam nodes, not embedded in strings.
+||| Proof that no raw user input appears in the query's WHERE clause.
+||| User values must arrive via `EParam` nodes, never as embedded string
+||| literals (the canonical SQL-injection vector).
+|||
+||| HISTORY (standards#124, vcl-ut HOLE remediation): this used to be
+|||
+|||   data NoRawUserInput : Statement -> Type where
+|||     AllParameterised : NoRawUserInput stmt
+|||
+||| which is *vacuous* — `AllParameterised` inhabits `NoRawUserInput stmt`
+||| for *every* statement, including one whose WHERE is pure string
+||| interpolation. Level 4 therefore proved nothing about the property it
+||| names. It now carries real structural evidence: the WHERE clause
+||| embeds no string literal (`Grammar.whereHasStringLit stmt = False`).
+||| `Checker.checkLevel4` decides exactly this predicate
+||| (see `checkLevel4Sound`), and it is genuinely closed under join
+||| composition (see `Composition.noRawUserInputCompose`).
 public export
 data NoRawUserInput : Statement -> Type where
-  AllParameterised : NoRawUserInput stmt
+  MkNoRawUserInput : whereHasStringLit stmt = False -> NoRawUserInput stmt
 
 ||| Proof that all select items have known types.
 public export

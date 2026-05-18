@@ -320,6 +320,38 @@ record Statement where
   requestedLevel : SafetyLevel
 
 -- ═══════════════════════════════════════════════════════════════════════
+-- Injection-safety primitive (canonical single source of truth)
+-- ═══════════════════════════════════════════════════════════════════════
+
+||| Whether an expression embeds a string literal anywhere in its tree.
+|||
+||| A string literal in a predicate position is the canonical SQL-injection
+||| vector: user-controlled text concatenated into the query instead of
+||| being bound through an `EParam` placeholder. The Level-4 injection
+||| witness (`Levels.NoRawUserInput`) is defined as the *negation* of this
+||| over the WHERE clause, and `Checker.checkLevel4` decides it. Keeping
+||| the function here (in Grammar, the AST home) makes it the single
+||| source of truth shared by the proof predicate and the decision
+||| procedure, so the soundness lemma is a direct equality, not a
+||| re-implementation that could drift.
+public export
+hasStringLit : Expr -> Bool
+hasStringLit (ELiteral (LitString _) _) = True
+hasStringLit (ECompare _ l r _)         = hasStringLit l || hasStringLit r
+hasStringLit (ELogic _ l Nothing _)     = hasStringLit l
+hasStringLit (ELogic _ l (Just r) _)    = hasStringLit l || hasStringLit r
+hasStringLit (EAggregate _ e _)         = hasStringLit e
+hasStringLit (EEpistemic _ _ e _)       = hasStringLit e
+hasStringLit (EAnnounce _ p b _)        = hasStringLit p || hasStringLit b
+hasStringLit _                          = False
+
+||| The WHERE clause of a statement embeds a string literal. `Nothing`
+||| (no WHERE) is injection-free by construction.
+public export
+whereHasStringLit : Statement -> Bool
+whereHasStringLit stmt = maybe False hasStringLit (whereClause stmt)
+
+-- ═══════════════════════════════════════════════════════════════════════
 -- Well-Formedness Predicates
 -- ═══════════════════════════════════════════════════════════════════════
 
