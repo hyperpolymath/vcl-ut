@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+#
+# proof-corpus.yml — Machine-checks the VclTotal Idris2 proof corpus.
+#
+# vcl-ut is the doubly-trusted hypatia<->verisim interface. This gate
+# fails the build if the Phase-1 corpus (ABI.Types + Core.*) stops
+# typechecking under idris2 0.8.0, or if a proof-escape symbol is
+# introduced. Tracked: hyperpolymath/standards#124.
+#
+# Scope note: VclTotal.ABI.Layout / .Foreign are intentionally NOT in
+# verification/proofs/vclut-core.ipkg (pre-existing, out-of-Phase-1
+# breakage — see verification/proofs/VERIFICATION-STANCE.adoc, OWED).
+
+name: Proof Corpus
+
+on:
+  pull_request:
+    branches: ['**']
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+# Concurrency-cancel guard (repo convention for canonical check workflows).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  machine-check:
+    name: idris2 0.8.0 --build vclut-core
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # NOTE: pin to a commit SHA per repo security posture once a stable
+      # release SHA is recorded (TODO(SHA-pin); tags used here interim).
+      - name: Set up Idris2 0.8.0
+        uses: idris-community/setup-idris@v1
+        with:
+          idris-version: 0.8.0
+
+      - name: Proof-escape audit (no believe_me / postulate / assert_* / sorry)
+        run: |
+          set -euo pipefail
+          # Strip line/block comments, then scan the corpus sources.
+          files="src/core/Grammar.idr src/core/Schema.idr src/core/Levels.idr \
+                 src/core/Checker.idr src/core/Composition.idr \
+                 src/core/Epistemic.idr src/interface/abi/Types.idr"
+          if grep -nE '\b(believe_me|really_believe_me|assert_total|assert_smaller|idris_crash|postulate|sorry)\b' \
+               $files | grep -vE ':\s*(--|\|\|\|)' ; then
+            echo "::error::proof-escape symbol found in the Phase-1 corpus"
+            exit 1
+          fi
+          echo "OK: zero proof-escape symbols outside comments"
+
+      - name: Build the proof corpus
+        run: |
+          set -euo pipefail
+          idris2 --version
+          idris2 --build verification/proofs/vclut-core.ipkg
+
+      - name: Build the self-contained L4 model (Phase 0)
+        # `module SafetyL4Model` must be checked from its own directory so
+        # the module name matches the file path.
+        run: |
+          set -euo pipefail
+          cd verification/proofs && idris2 --check SafetyL4Model.idr

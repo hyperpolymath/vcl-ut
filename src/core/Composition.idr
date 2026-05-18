@@ -135,13 +135,21 @@ joinVersion v                       _                         = v
 ||| Combine linearity annotations: stricter wins.
 joinLinear : Maybe LinearAnnotation -> Maybe LinearAnnotation
           -> Maybe LinearAnnotation
-joinLinear Nothing                la                      = la
-joinLinear la                     Nothing                 = la
-joinLinear (Just LinUnlimited)    la                      = la
-joinLinear la                     (Just LinUnlimited)      = la
-joinLinear (Just LinUseOnce)      _                        = Just LinUseOnce
-joinLinear _                      (Just LinUseOnce)        = Just LinUseOnce
-joinLinear (Just (LinBounded n1)) (Just (LinBounded n2))   =
+-- Explicit, exhaustive clauses: unlike joinEffects/joinVersion this
+-- combiner has no final catch-all variable clause, so Idris's coverage
+-- checker needs every Just/Just constructor pairing spelled out.
+joinLinear Nothing                Nothing                = Nothing
+joinLinear (Just a)               Nothing                = Just a
+joinLinear Nothing                (Just b)               = Just b
+joinLinear (Just LinUnlimited)    (Just LinUnlimited)    = Just LinUnlimited
+joinLinear (Just LinUnlimited)    (Just LinUseOnce)      = Just LinUseOnce
+joinLinear (Just LinUnlimited)    (Just (LinBounded n))  = Just (LinBounded n)
+joinLinear (Just LinUseOnce)      (Just LinUnlimited)    = Just LinUseOnce
+joinLinear (Just LinUseOnce)      (Just LinUseOnce)      = Just LinUseOnce
+joinLinear (Just LinUseOnce)      (Just (LinBounded _))  = Just LinUseOnce
+joinLinear (Just (LinBounded n))  (Just LinUnlimited)    = Just (LinBounded n)
+joinLinear (Just (LinBounded _))  (Just LinUseOnce)      = Just LinUseOnce
+joinLinear (Just (LinBounded n1)) (Just (LinBounded n2)) =
   Just (LinBounded (min n1 n2))
 
 ||| Combine epistemic clauses: union of agents and requirements.
@@ -217,11 +225,12 @@ allFieldsBoundFromElem (ref :: rest) schema f =
 ||| AllFieldsBound respects list subset (every member of xs is a member of ys).
 allFieldsBoundSubset :
   {xs : List FieldRef} ->
+  {schema : OctadSchema} ->
   AllFieldsBound ys schema ->
   ((ref : FieldRef) -> Elem ref xs -> Elem ref ys) ->
   AllFieldsBound xs schema
-allFieldsBoundSubset {xs} bound f =
-  allFieldsBoundFromElem xs _ (\ref, prf => boundLookup bound (f ref prf))
+allFieldsBoundSubset {xs} {schema} bound f =
+  allFieldsBoundFromElem xs schema (\ref, prf => boundLookup bound (f ref prf))
 
 ||| The single field-ref of one statement landing in `extractFieldRefs`.
 ||| `extractFieldRefs q` definitionally unfolds to
@@ -333,35 +342,79 @@ l1Compose (MkL1 s1 sch b1) (MkL1 s2 _ b2) =
 -- ══════════════════════════════════════════════════════════════════════
 
 ||| If both disjuncts are `False`, the disjunction is `False`.
-||| (No `rewrite`: matching `prf : x = False` forces `x = False`, so
-||| `x || y` reduces to `y`.)
-orBothFalse : {x : Bool} -> x = False -> y = False -> (x || y) = False
+||| (Matching `prf : x = False` forces `x = False`, so `x || y`
+||| reduces to `y`.)
+orBothFalse : {x : Bool} -> {y : Bool} -> x = False -> y = False -> (x || y) = False
 orBothFalse Refl py = py
 
+-- `Prelude.maybe`'s `Lazy` first argument wraps the relevant terms in
+-- `Delay`, which repeatedly wedged the unifier (identical-looking terms
+-- failing to converge). The L4 core is therefore phrased with a plain,
+-- non-lazy `wsl` ("where-string-literal"); a one-line `wslEq` bridges
+-- back to `whereHasStringLit`'s `maybe`-based definition exactly once.
+
+||| Plain (non-lazy) "does this optional WHERE embed a string literal".
+wsl : Maybe Expr -> Bool
+wsl Nothing  = False
+wsl (Just e) = hasStringLit e
+
+||| Bridge: `wsl` agrees with `whereHasStringLit`'s `maybe` body.
+||| `hasStringLit` is fully qualified: a bare lowercase occurrence in a
+||| TYPE signature is auto-bound by Idris 2 as a fresh implicit (it warns
+||| "shadowing VclTotal.Core.Grammar.hasStringLit"), which silently
+||| decoupled this lemma from the real predicate. Qualification pins it.
+wslEq : (m : Maybe Expr)
+     -> wsl m = maybe False VclTotal.Core.Grammar.hasStringLit m
+wslEq Nothing  = Refl
+wslEq (Just _) = Refl
+
+||| The AND-conjoined join, in `wsl` form, is the disjunction of sides.
+||| Single isolated top-level `Refl` (joinWhere/wsl/hasStringLit on the
+||| concrete `ELogic` node all reduce — reliable at top level, as the
+||| standalone-module probe confirmed). No `maybe`, no `Delay`.
+wslJoinConjoin : (a, b : Expr) ->
+  wsl (joinWhere (Just a) (Just b)) = (wsl (Just a) || wsl (Just b))
+wslJoinConjoin _ _ = Refl
+
+||| Both-WHERE-present case. `trans` of two already-typed lemmas; the
+||| result type is syntactically `wslJoinConjoin`'s LHS, so the final
+||| check needs no reduction at all.
+wslJoinJJ : (a, b : Expr) ->
+  wsl (Just a) = False -> wsl (Just b) = False ->
+  wsl (joinWhere (Just a) (Just b)) = False
+wslJoinJJ a b p1 p2 = trans (wslJoinConjoin a b) (orBothFalse p1 p2)
+
 ||| The joined WHERE embeds a string literal only if one input did.
-||| `maybe False hasStringLit (Just e)` reduces to `hasStringLit e`, so
-||| the `Just/Just` case is exactly `hasStringLit a || hasStringLit b`.
-joinFree :
+wslJoin :
   (w1m, w2m : Maybe Expr) ->
-  maybe False hasStringLit w1m = False ->
-  maybe False hasStringLit w2m = False ->
-  maybe False hasStringLit (joinWhere w1m w2m) = False
-joinFree Nothing   Nothing   _  _  = Refl
-joinFree (Just _)  Nothing   p1 _  = p1
-joinFree Nothing   (Just _)  _  p2 = p2
-joinFree (Just _)  (Just _)  p1 p2 = orBothFalse p1 p2
+  wsl w1m = False -> wsl w2m = False ->
+  wsl (joinWhere w1m w2m) = False
+wslJoin Nothing   Nothing   _  _  = Refl
+wslJoin (Just _)  Nothing   p1 _  = p1
+wslJoin Nothing   (Just _)  _  p2 = p2
+wslJoin (Just a)  (Just b)  p1 p2 = wslJoinJJ a b p1 p2
 
 ||| **Genuine** L4 composition (matches verification/proofs/SafetyL4Model.idr,
 ||| lemma `noRawUserInputCompose`). Replaces the historical
 ||| `MkL4 _ AllParameterised`, which only typechecked because the L4
 ||| predicate was vacuous. See standards#124.
+|||
+||| `whereHasStringLit s` is `maybe False hasStringLit (whereClause s)`;
+||| `wslEq` rewrites that to `wsl (whereClause s)` so the genuine
+||| `wslJoin` argument can discharge it.
 export
 noRawUserInputCompose :
   (q1, q2 : Statement) ->
   NoRawUserInput q1 -> NoRawUserInput q2 ->
   NoRawUserInput (composeJoin q1 q2)
 noRawUserInputCompose q1 q2 (MkNoRawUserInput n1) (MkNoRawUserInput n2) =
-  MkNoRawUserInput (joinFree (whereClause q1) (whereClause q2) n1 n2)
+  let g1 : (wsl (whereClause q1) = False)
+      g1 = trans (wslEq (whereClause q1)) n1
+      g2 : (wsl (whereClause q2) = False)
+      g2 = trans (wslEq (whereClause q2)) n2
+  in MkNoRawUserInput
+       (trans (sym (wslEq (joinWhere (whereClause q1) (whereClause q2))))
+              (wslJoin (whereClause q1) (whereClause q2) g1 g2))
 
 ||| L4 certificate composition.
 l4Compose :

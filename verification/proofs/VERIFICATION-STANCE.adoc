@@ -14,33 +14,58 @@ doc-only `docs/VERIFICATION-STANCE.adoc` (PR #19).
 
 Tracked under hyperpolymath/standards#124.
 
-== Headline finding (verified, not sampled)
+== Headline finding (Phase 0 audit) — and Phase 1 status
 
-The shipped Idris2 "proof corpus" of vcl-ut *does not compile at all* on
-`origin/main`, at every layer, and has *never been machine-checked* (there is
-no `.ipkg`/Makefile/CI for `src/core/**` — only the unrelated trivial
-`src/abi/vclut.ipkg`, itself absent from CI). The previously-circulated stance
-("the dependent-type apparatus exists but is not connected") was *too
-generous*: the apparatus does not even typecheck. Concretely, reproduced with
-idris2 0.8.0:
+*Phase 0 audit (origin/main, reproduced with idris2 0.8.0):* the shipped
+Idris2 "proof corpus" *did not compile at all*, at every layer, and had
+*never been machine-checked* (no `.ipkg`/Makefile/CI for `src/core/**` —
+only the unrelated trivial `src/abi/vclut.ipkg`, itself absent from CI).
+The previously-circulated stance ("the dependent-type apparatus exists but
+is not connected") was *too generous*: the apparatus did not even
+typecheck. The concrete blockers were:
 
-* `src/interface/abi/Types.idr`
-** missing `import Decidable.Equality` (every `DecEq` use is an undefined name);
-** the `DecEq SafetyLevel/VclTotalError/QueryMode` instances are *malformed*
-   (`decEq _ _ = No absurd` with no `Uninhabited (x = y)` — un-fixable by hand
-   for 11/12-constructor enums without a derivation mechanism);
-** `CPtr p _ = Bits (ptrSize p)` is ill-typed (`Data.Bits.Bits` is an
-   interface, not a `Nat -> Type` family);
-** `createQueryHandle ptr = Just (MkQueryHandle ptr)` omits the required
-   `So (ptr /= 0)` witness;
-** `thisPlatform` uses `%runElab` without `%language ElabReflection`.
-* `src/core/Grammar.idr` — `Expr` (`ESubquery Statement`) and the epistemic
-  clause constructors forward-reference `Statement` / `EpistemicRequirement`,
-  which are defined ~100 lines later, with *no `mutual` block or forward
-  declarations*. The file does not pass the type checker.
+* `src/interface/abi/Types.idr` — missing `import Decidable.Equality`;
+  `DecEq SafetyLevel/VclTotalError/QueryMode` malformed
+  (`decEq _ _ = No absurd`, no `Uninhabited`); `CPtr p _ = Bits (ptrSize
+  p)` ill-typed; `createQueryHandle` omitted the `So (ptr /= 0)` witness;
+  `thisPlatform` used `%runElab` without `%language ElabReflection`.
+* `src/core/Grammar.idr` — `Expr`/`Statement`/`EpistemicClause`/
+  `EpistemicRequirement` mutually forward-referenced with no `mutual`
+  block.
+* Latent (never compiled): `Schema` (name-shadowing in `lookupField`),
+  `Levels` (helper predicates declared after the level data they index),
+  `Checker` (mis-scoped `where` for `agentEq`, `CheckResult` ambiguity,
+  `let`-tuple parse, and a non-structural `extractFieldRefs ⇄
+  statementFieldRefs` recursion across `ESubquery Statement`),
+  `Composition` (forward refs, deleted `AllParameterised` still
+  referenced, wrong `CertL6+` arities, non-reducing `rewrite`s).
 
-Because Grammar fails, every downstream module (`Schema`, `Levels`, `Checker`,
-`Composition`) is unverifiable in situ regardless of its own correctness.
+*Phase 1 status (this PR — RESOLVED):* every blocker above is fixed
+*honestly* and the Phase-1 corpus now compiles. `idris2 0.8.0 --build
+verification/proofs/vclut-core.ipkg` exits 0 over
+`VclTotal.ABI.Types` + `VclTotal.Core.{Grammar,Schema,Levels,Checker,
+Composition,Epistemic}` (7 modules), under `%default total`, with *zero*
+`believe_me`/`really_believe_me`/`postulate`/`assert_total`/
+`assert_smaller`/`idris_crash`/`sorry` (CI-enforced by
+`.github/workflows/proof-corpus.yml`, which also scans for proof-escape
+symbols and rebuilds `SafetyL4Model.idr`). Notable honest techniques:
+real `DecEq` via an injective C-tag round-trip + `DecEq Bits32`;
+`Checker`'s `extractFieldRefs/statementFieldRefs` made structurally total
+by pattern-matching `MkStatement` (no fuel/axiom/`assert_smaller`);
+`Composition` re-derived with a genuine list-membership L1 subset proof, a
+genuine L4 (`noRawUserInputCompose`), genuine L6–L10 equational proofs,
+and a fully-qualified `hasStringLit` (a bare lowercase occurrence in a
+*type* signature is silently auto-bound by Idris 2 as a fresh implicit,
+which had decoupled the predicate from its definition).
+
+*New finding (Phase 1):* `src/interface/abi/Layout.idr` and
+`src/interface/abi/Foreign.idr` (`VclTotal.ABI.Layout/.Foreign`) do *not*
+compile under idris2 0.8.0 and contain *unsound* scaffolding (`paddingFor`
+uses `(-)` on `Nat`; `alignUpCorrect` asserts `n = (n \`div\` a) * a` by
+`Refl`; `queryPlanHeaderNoPadding` asserts a false size equality). They
+are outside Phase 1's enumerated scope (ABI.Types + Core.*), nothing in
+`Core.*` imports them, and they are deliberately excluded from
+`vclut-core.ipkg`. See OWED below.
 
 == What IS genuinely machine-verified by this PR
 
@@ -69,16 +94,34 @@ byte-faithful model of the relevant AST fragment, proving:
   `MkL4 _ AllParameterised` uses in `Composition.compositionPreservation`,
   whose "preservation theorem" was therefore *vacuously true*.
 
-The corresponding in-repo source fix is committed on branch
-`fix/vclut-l4-devacuize-honest-stance` (`src/core/{Grammar,Levels,Checker,
-Composition}.idr`). It is logically correct and reviewable, and is
-*identical in content* to the verified model, but cannot be
-`idris2 --check`-ed in situ until the corpus is resurrected (see roadmap).
+As of Phase 1 the in-repo source fix is no longer model-only: it is
+machine-checked *in situ*. `Checker.checkLevel4Sound`
+(`checkLevel4 stmt = (True, m) -> L4_InjectionProof stmt`, proved with
+`with (whereHasStringLit stmt) proof p`, no escape) and
+`Composition.noRawUserInputCompose` typecheck inside the compiling corpus
+and are *identical in content* to the `SafetyL4Model.idr` lemmas of the
+same names (model: `MkNoRawUserInput : whereHasStringLit w = False ->
+NoRawUserInput w`; in-repo: `L4_InjectionProof = MkL4 stmt (NoRawUserInput
+stmt)` with the same `whereHasStringLit stmt = False` evidence). L4
+injection-freedom is therefore now genuine *and* wired through the
+type-checked corpus — though still not through the (stubbed) FFI.
 
 == What is NOT proven (honest, precisely-scoped gaps — OWED)
 
-. *Corpus does not compile* (above). Until fixed, NO in-repo Idris claim is
-  machine-checked. Highest priority.
+. *(Phase 1 — RESOLVED)* The Phase-1 corpus (ABI.Types + Core.*) now
+  compiles and is CI-gated; in-repo L4 is machine-checked in situ. No
+  longer outstanding.
+. *(Phase 1 — NEW OWED) `VclTotal.ABI.Layout` / `VclTotal.ABI.Foreign`
+  do not compile and are unsound.* `paddingFor` applies `(-)` to `Nat`
+  (no `Neg Nat`); `alignUpCorrect : … -> Divides align (alignUp size
+  align)` is "proved" by `DivideBy (… \`div\` align) Refl`, asserting the
+  false `alignUp size align = (alignUp size align \`div\` align) * align`;
+  `queryPlanHeaderNoPadding` asserts `24 = queryPlanHeaderLayout.totalSize`
+  which does not hold; `(align > 0)` (a `Bool`) is used as a type. These
+  are *unsound layout claims*, not mere non-compilation. Out of Phase 1's
+  enumerated scope (ABI.Types + Core.*); `Core.*` does not import them;
+  excluded from `vclut-core.ipkg`. Must be repaired or deleted before any
+  ABI memory-layout claim is relied upon (Phase 3 / FFI territory).
 . *L2/L3/L5 predicates remain vacuous.* `AllComparisonsTypeSafe` via
   `WhereTypeSafe LogicSafe` (holds for any logic expr); `L3`
   `AllNullableFieldsGuarded`'s `GuardedNull` (accepts any expr); `L5`
@@ -90,8 +133,13 @@ Composition}.idr`). It is logically correct and reviewable, and is
   record and never constructs a `SafetyCertificate`. The dependent types
   are decorative w.r.t. the decision procedure (L4 excepted, via
   `checkLevel4Sound`).
-. *`Composition.compositionPreservation`*: the L4 case is now genuine; the
-  L2/L3/L5 cases remain vacuous (and self-document as such).
+. *`Composition.compositionPreservation`* (now compiles): L0/L1/L4/L6–L10
+  are *genuine* (L1 = a real list-membership subset proof
+  `composeJoinFieldsSubset`; L4 = `noRawUserInputCompose`; L6–L10 =
+  equational proofs about the `join*` combiners). The L2/L3/L5 cases are
+  constructed at the correct *indexed* type but stay evidentially weak
+  because the L2/L3/L5 *predicates* are still vacuous (next item);
+  `Composition` self-documents this.
 . *The FFI boundary is a stub.* `ffi/zig/src/lib.zig` returns `2`
   (`L2`) for any query containing the substring `SELECT`; the Rust
   `extern "C"` counterpart does not exist. `src/abi/Foreign.idr`
@@ -104,28 +152,43 @@ Composition}.idr`). It is logically correct and reviewable, and is
 * Treat *every* vcl-ut safety-level tag as an *advisory claim*, not a proof
   carrier. Do not weaken your own checks on the strength of a vcl-ut level.
 * The *only* claim with a genuine machine-checked basis is L4
-  injection-freedom — and even that is, today, not wired through the
-  (non-compiling) corpus or the (stubbed) FFI. Do not cite vcl-ut as
-  "formally verified query safety" downstream.
+  injection-freedom. As of Phase 1 it *is* wired through the compiling,
+  CI-gated corpus (in situ `checkLevel4Sound` / `noRawUserInputCompose`) —
+  but it is still *not* transported through the FFI (stubbed), L1 schema
+  binding is genuine only as a corpus proof (not a runtime carrier), and
+  L2/L3/L5 remain vacuous. Do not cite vcl-ut as "formally verified query
+  safety" downstream; cite at most "machine-checked L4 injection-freedom
+  of the in-repo AST model, not transported across the FFI".
+* `VclTotal.ABI.Layout`/`.Foreign` carry *unsound* layout proofs — do not
+  rely on any vcl-ut struct-layout/alignment claim.
 
 == Remediation roadmap (phased, tracked standards#124)
 
-. *Phase 0 (this PR):* de-vacuize L4 + checker soundness + real
-  composition; machine-verify the content; document the true state.
-. *Phase 1:* make the corpus compile — `mutual` block in `Grammar.idr`;
-  fix/replace `ABI.Types` (`Decidable.Equality`, a real `DecEq`
-  derivation, `CPtr`, `createQueryHandle`, `thisPlatform`); add a
-  `verification/proofs/vclut-core.ipkg` + CI step so it stays compiled.
-. *Phase 2:* de-vacuize L2/L3/L5 with evidence-carrying constructors and
-  prove `checkLevelN` sound for each (as done for L4).
-. *Phase 3:* have `checkQuery` emit a real `SafetyCertificate`; transport
-  it as an opaque proof token through a non-stub Zig/Rust FFI.
+. *Phase 0 (DONE):* de-vacuize L4 + checker soundness + real
+  composition; machine-verify the content (`SafetyL4Model.idr`); document
+  the true state.
+. *Phase 1 (DONE, this PR):* corpus compiles — `mutual` in `Grammar.idr`;
+  `ABI.Types` repaired (real `DecEq`, `CPtr`, `createQueryHandle`,
+  `thisPlatform`); `Schema/Levels/Checker/Composition/Epistemic` latent
+  errors fixed honestly (incl. structural totality for
+  `extractFieldRefs`); `verification/proofs/vclut-core.ipkg` +
+  `.github/workflows/proof-corpus.yml` so it stays compiled and
+  escape-free; in-repo L4 verified in situ. *Residual:* `ABI.Layout/
+  .Foreign` unsound + non-compiling (OWED, scoped to a follow-up).
+. *Phase 2 (TODO):* de-vacuize L2/L3/L5 with evidence-carrying
+  constructors and prove `checkLevelN` sound for each (as done for L4).
+. *Phase 3 (TODO):* have `checkQuery` emit a real `SafetyCertificate`;
+  transport it as an opaque proof token through a non-stub Zig/Rust FFI;
+  repair or delete `ABI.Layout`/`.Foreign`.
 
 == Provenance
 
-Audit + remediation 2026-05-18 (hyperpolymath/standards#124). Findings
-reproduced by reading the corpus and by `idris2 0.8.0 --build` /
-`--check` (compile failures above are reproducible verbatim). The verified
-model carries no proof-escape symbols. The risk here is *absent and
-non-compiling* proof masquerading as present proof at a doubly-trusted
-interface.
+Phase 0 audit + remediation 2026-05-18 (hyperpolymath/standards#124),
+findings reproduced by `idris2 0.8.0 --build`/`--check`. Phase 1
+resurrection 2026-05-18: the Phase-1 corpus now builds clean
+(`idris2 0.8.0 --build verification/proofs/vclut-core.ipkg`, exit 0,
+7 modules, `%default total`, zero proof-escape symbols — CI-enforced).
+No proof-escape symbol was used to force any green; every obligation that
+could not be honestly discharged is scoped OWED above rather than masked.
+The residual risk is the *vacuous L2/L3/L5 predicates* and the *unsound,
+excluded* `ABI.Layout/.Foreign` — explicitly disclosed, not hidden.
