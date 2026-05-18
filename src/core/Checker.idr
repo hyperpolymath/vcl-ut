@@ -19,6 +19,7 @@ module VclTotal.Core.Checker
 import VclTotal.ABI.Types
 import VclTotal.Core.Grammar
 import VclTotal.Core.Schema
+import VclTotal.Core.Levels
 import Data.List
 import Data.Maybe
 
@@ -208,18 +209,14 @@ resolveExprType (EAnnounce _ _ _ ty) _   = ty
 
 ||| Check whether an expression contains any ELiteral (LitString _) nodes.
 ||| Used by Level 4 to detect potential injection vectors.
+|||
+||| This is now a thin alias for `Grammar.hasStringLit`, the single
+||| source of truth shared with the Level-4 proof predicate
+||| (`Levels.NoRawUserInput`). Keeping one definition is what makes
+||| `checkLevel4Sound` a genuine soundness proof rather than a check
+||| against a parallel re-implementation that could silently drift.
 containsLiteralString : Expr -> Bool
-containsLiteralString (ELiteral (LitString _) _) = True
-containsLiteralString (ECompare _ l r _)          =
-  containsLiteralString l || containsLiteralString r
-containsLiteralString (ELogic _ l Nothing _)      = containsLiteralString l
-containsLiteralString (ELogic _ l (Just r) _)     =
-  containsLiteralString l || containsLiteralString r
-containsLiteralString (EAggregate _ e _)           = containsLiteralString e
-containsLiteralString (EEpistemic _ _ e _)         = containsLiteralString e
-containsLiteralString (EAnnounce _ p b _)          =
-  containsLiteralString p || containsLiteralString b
-containsLiteralString _                            = False
+containsLiteralString = hasStringLit
 
 ||| Resolve the type of a SelectItem using the schema.
 ||| Returns TAny if the item's type cannot be determined.
@@ -357,13 +354,36 @@ checkLevel3 stmt schema =
 ||| @return (True, _) if WHERE contains no literal strings; (False, diagnostic) otherwise.
 public export
 checkLevel4 : Statement -> (Bool, String)
-checkLevel4 stmt =
-  case whereClause stmt of
-    Nothing => (True, "L4:InjectionProof — no WHERE clause, no injection risk")
-    Just wExpr =>
-      if containsLiteralString wExpr
-        then (False, "L4:InjectionProof FAILED — raw string literal in WHERE clause")
-        else (True, "L4:InjectionProof — WHERE uses only parameterised inputs")
+checkLevel4 stmt = l4Verdict (whereHasStringLit stmt)
+  where
+    l4Verdict : Bool -> (Bool, String)
+    l4Verdict True  =
+      (False, "L4:InjectionProof FAILED — raw string literal in WHERE clause")
+    l4Verdict False =
+      (True,  "L4:InjectionProof — WHERE uses only parameterised inputs")
+
+||| Disjointness of Bool constructors (local, to avoid relying on a
+||| particular Prelude `Uninhabited` instance name across idris2 0.8.0).
+falseNotTrue : (False = True) -> Void
+falseNotTrue Refl impossible
+
+||| **Soundness of the Level-4 decision procedure.**
+|||
+||| If `checkLevel4` accepts a statement, that statement genuinely
+||| carries an `L4_InjectionProof` — its WHERE clause provably embeds no
+||| string literal (`whereHasStringLit stmt = False`). This lemma is what
+||| connects the *real* (no longer vacuous) Level-4 predicate to the
+||| actual decision procedure. Before this remediation `checkLevel4`
+||| returned a bare `Bool` while `NoRawUserInput` was inhabited by the
+||| catch-all `AllParameterised`, so no soundness statement was even
+||| meaningful: a pure string-interpolation injection query type-checked
+||| at Level 4. Tracked: hyperpolymath/standards#124.
+export
+checkLevel4Sound : (stmt : Statement) -> (m : String) ->
+                   checkLevel4 stmt = (True, m) -> L4_InjectionProof stmt
+checkLevel4Sound stmt m prf with (whereHasStringLit stmt) proof p
+  checkLevel4Sound stmt m prf | False = MkL4 stmt (MkNoRawUserInput p)
+  checkLevel4Sound stmt m prf | True  = void (falseNotTrue (cong fst prf))
 
 ||| Level 5 — ResultTyped: every SELECT item resolves to a known type
 ||| (not TAny). Ensures the result set schema is fully determined.

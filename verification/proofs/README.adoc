@@ -1,1 +1,31 @@
 = Proofs Unit
+
+// SPDX-License-Identifier: PMPL-1.0-or-later
+
+This directory holds the *machine-verified* proof artefacts for vcl-ut.
+
+== Contents
+
+`SafetyL4Model.idr`::
+  Self-contained, idris2 0.8.0 `--check`-clean (exit 0, `%default total`,
+  zero proof-escape symbols) model of the Level-4 SQL-injection safety
+  remediation: the de-vacuized `NoRawUserInput` predicate, the checker
+  soundness lemma `checkLevel4Sound`, a negative injection test, and the
+  genuine compositionality proof `noRawUserInputCompose`.
+
+`VERIFICATION-STANCE.adoc`::
+  The authoritative, proof-backed statement of what is and is not
+  verified. *Read this before trusting any "verified"/"type-safe"
+  phrasing elsewhere in the repo.* It documents that the shipped
+  `src/core/**` corpus does not compile on `origin/main` and has never
+  been machine-checked, and gives the phased remediation roadmap.
+
+== Verifying
+
+[source,sh]
+----
+export IDRIS2_PREFIX=<idris2-0.8.0-prefix>
+idris2 --check verification/proofs/SafetyL4Model.idr   # expect exit 0
+----
+
+Tracked under hyperpolymath/standards#124.
