@@ -1,0 +1,131 @@
+= VCL-ut Verification Stance (proof-backed)
+:toc:
+:sectnums:
+
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+WARNING: vcl-ut is the interface between *hypatia* and *verisim*; both sides
+trust safety claims made here. This document states *precisely* what is and is
+not machine-verified, and takes precedence over any "verified" / "type-safe" /
+"formally proven" phrasing in `README.adoc`, `PROOF-NEEDS.md`, or module
+doc-comments. It is the proof-backed companion to (and supersedes) the
+doc-only `docs/VERIFICATION-STANCE.adoc` (PR #19).
+
+Tracked under hyperpolymath/standards#124.
+
+== Headline finding (verified, not sampled)
+
+The shipped Idris2 "proof corpus" of vcl-ut *does not compile at all* on
+`origin/main`, at every layer, and has *never been machine-checked* (there is
+no `.ipkg`/Makefile/CI for `src/core/**` — only the unrelated trivial
+`src/abi/vclut.ipkg`, itself absent from CI). The previously-circulated stance
+("the dependent-type apparatus exists but is not connected") was *too
+generous*: the apparatus does not even typecheck. Concretely, reproduced with
+idris2 0.8.0:
+
+* `src/interface/abi/Types.idr`
+** missing `import Decidable.Equality` (every `DecEq` use is an undefined name);
+** the `DecEq SafetyLevel/VclTotalError/QueryMode` instances are *malformed*
+   (`decEq _ _ = No absurd` with no `Uninhabited (x = y)` — un-fixable by hand
+   for 11/12-constructor enums without a derivation mechanism);
+** `CPtr p _ = Bits (ptrSize p)` is ill-typed (`Data.Bits.Bits` is an
+   interface, not a `Nat -> Type` family);
+** `createQueryHandle ptr = Just (MkQueryHandle ptr)` omits the required
+   `So (ptr /= 0)` witness;
+** `thisPlatform` uses `%runElab` without `%language ElabReflection`.
+* `src/core/Grammar.idr` — `Expr` (`ESubquery Statement`) and the epistemic
+  clause constructors forward-reference `Statement` / `EpistemicRequirement`,
+  which are defined ~100 lines later, with *no `mutual` block or forward
+  declarations*. The file does not pass the type checker.
+
+Because Grammar fails, every downstream module (`Schema`, `Levels`, `Checker`,
+`Composition`) is unverifiable in situ regardless of its own correctness.
+
+== What IS genuinely machine-verified by this PR
+
+`verification/proofs/SafetyL4Model.idr` — checked by **idris2 0.8.0,
+`idris2 --check`, exit 0, with `%default total` and ZERO
+`believe_me`/`really_believe_me`/`postulate`/`assert_total`/`idris_crash`/
+`sorry`**. It reproduces the *exact mathematical content* of the in-repo
+Level-4 (SQL-injection) remediation against a minimal, self-contained,
+byte-faithful model of the relevant AST fragment, proving:
+
+. `NoRawUserInput` is no longer *vacuous*. It previously had the single
+  catch-all constructor `AllParameterised : NoRawUserInput stmt`, inhabiting
+  it for *every* statement — including a WHERE clause that is pure string
+  interpolation. It now carries real evidence: `whereHasStringLit w = False`.
+. `checkLevel4Sound` — *soundness of the decision procedure*: if
+  `checkLevel4` accepts, the statement genuinely carries the (now real)
+  `NoRawUserInput` witness. This is the certificate↔checker connection for
+  L4; it was previously unstateable (predicate vacuous, checker returned a
+  bare `Bool`).
+. `injectionRejected` — negative test: a WHERE bearing a string literal
+  (`… = '1=1'`) is *rejected*. Under the old vacuous predicate the
+  corresponding query "type-checked" at Level 4.
+. `noRawUserInputCompose` — Level-4 injection-freedom is *genuinely* closed
+  under join composition, because `joinWhere` introduces no string literal
+  not already present. This replaces the two
+  `MkL4 _ AllParameterised` uses in `Composition.compositionPreservation`,
+  whose "preservation theorem" was therefore *vacuously true*.
+
+The corresponding in-repo source fix is committed on branch
+`fix/vclut-l4-devacuize-honest-stance` (`src/core/{Grammar,Levels,Checker,
+Composition}.idr`). It is logically correct and reviewable, and is
+*identical in content* to the verified model, but cannot be
+`idris2 --check`-ed in situ until the corpus is resurrected (see roadmap).
+
+== What is NOT proven (honest, precisely-scoped gaps — OWED)
+
+. *Corpus does not compile* (above). Until fixed, NO in-repo Idris claim is
+  machine-checked. Highest priority.
+. *L2/L3/L5 predicates remain vacuous.* `AllComparisonsTypeSafe` via
+  `WhereTypeSafe LogicSafe` (holds for any logic expr); `L3`
+  `AllNullableFieldsGuarded`'s `GuardedNull` (accepts any expr); `L5`
+  `AllSelectItemsTyped`'s `ConsTyped` (no per-item typing evidence). As
+  written, Levels 2, 3 and 5 prove nothing about the property they name.
+  Only L4 has been de-vacuized.
+. *The certificate is disconnected from the checker for every level except
+  the L4 evidence.* `Checker.checkQuery` returns a plain `CheckResult`
+  record and never constructs a `SafetyCertificate`. The dependent types
+  are decorative w.r.t. the decision procedure (L4 excepted, via
+  `checkLevel4Sound`).
+. *`Composition.compositionPreservation`*: the L4 case is now genuine; the
+  L2/L3/L5 cases remain vacuous (and self-document as such).
+. *The FFI boundary is a stub.* `ffi/zig/src/lib.zig` returns `2`
+  (`L2`) for any query containing the substring `SELECT`; the Rust
+  `extern "C"` counterpart does not exist. `src/abi/Foreign.idr`
+  fabricates `Verified Ln` from a bare untrusted `Int`. The level tag
+  hypatia/verisim receive is an *asserted integer from a substring check*,
+  not a transported proof.
+
+== Consumer guidance (hypatia / verisim)
+
+* Treat *every* vcl-ut safety-level tag as an *advisory claim*, not a proof
+  carrier. Do not weaken your own checks on the strength of a vcl-ut level.
+* The *only* claim with a genuine machine-checked basis is L4
+  injection-freedom — and even that is, today, not wired through the
+  (non-compiling) corpus or the (stubbed) FFI. Do not cite vcl-ut as
+  "formally verified query safety" downstream.
+
+== Remediation roadmap (phased, tracked standards#124)
+
+. *Phase 0 (this PR):* de-vacuize L4 + checker soundness + real
+  composition; machine-verify the content; document the true state.
+. *Phase 1:* make the corpus compile — `mutual` block in `Grammar.idr`;
+  fix/replace `ABI.Types` (`Decidable.Equality`, a real `DecEq`
+  derivation, `CPtr`, `createQueryHandle`, `thisPlatform`); add a
+  `verification/proofs/vclut-core.ipkg` + CI step so it stays compiled.
+. *Phase 2:* de-vacuize L2/L3/L5 with evidence-carrying constructors and
+  prove `checkLevelN` sound for each (as done for L4).
+. *Phase 3:* have `checkQuery` emit a real `SafetyCertificate`; transport
+  it as an opaque proof token through a non-stub Zig/Rust FFI.
+
+== Provenance
+
+Audit + remediation 2026-05-18 (hyperpolymath/standards#124). Findings
+reproduced by reading the corpus and by `idris2 0.8.0 --build` /
+`--check` (compile failures above are reproducible verbatim). The verified
+model carries no proof-escape symbols. The risk here is *absent and
+non-compiling* proof masquerading as present proof at a doubly-trusted
+interface.
