@@ -61,10 +61,14 @@
   runtime + the once-proved corpus (offline-re-checkable) — *not* a
   trusted tag, *not* a transported proof object. Plain `wasm32`
   suffices (type system not load-bearing under recompute);
-  `affinescriptiser` N/A (disclosed). **P5d — OWED (Tier-2 fallback):**
-  the C-ABI signed-attestation contract + `vclut_rs_verify` linkage,
-  for consumers that cannot run the wasm; the `ffi/zig` fail-closed
-  shim is its scaffolding. See the canonical two-tier boundary model
+  `affinescriptiser` N/A (disclosed). **P5d — RESOLVED (Tier-2
+  fallback):** `src/interface/attest` mints/verifies an Ed25519
+  attestation bound to `(sha256(stmt_wire), sha256(schema_wire),
+  level)` (fail-closed); the `vclut_rs_verify` backend is linked into
+  `ffi/zig` (`vclut_verify_wire`, `zig build test` green end-to-end).
+  Trusted-certifier (weaker than Tier-1), crypto contained. **The
+  vcl-ut#25 workstream is complete** — only precisely-scoped disclosed
+  limits remain (not gaps). See the canonical two-tier boundary model
   in `verification/proofs/VERIFICATION-STANCE.adoc` (authoritative).
 - Optional future work: prove the ReScript frontend faithfully tracks
   the Idris2 grammar (low priority; it is a convenience frontend, not a

@@ -1,0 +1,93 @@
+= VCL-total Tier-2 Attestation Format v1 (P5d, vcl-ut#25)
+:toc:
+
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+Normative format for the **Tier-2 (C-ABI trusted-certifier
+attestation) FALLBACK**. See `verification/proofs/VERIFICATION-STANCE.adoc`
+(authoritative) for the two-tier boundary model and ADR
+`docs/decisions/0002-ffi-attestation-trust-boundary.adoc` for the
+rationale. Tier-1 (recompute-PCC over `wasm32`) is the achieved tier;
+this is the explicit *weaker* fallback for consumers that cannot run
+the Tier-1 module.
+
+== Trust model (stated, not hidden)
+
+A C ABI erases types, so it cannot carry a re-checkable dependent
+proof. The honest ceiling is *trusted-certifier attestation*: the
+consumer **trusts** that (a) the Ed25519 private key is held only by a
+genuine certifier and (b) that certifier ran the conformance-pinned
+`vcltotal_parse::certified_level` (the same faithful image of the Idris
+corpus decision Tier-1 uses) before signing. The token is *unforgeable*
+and *bound*: it cannot be fabricated, transplanted onto a different
+query/schema, or have its level escalated. This is strictly weaker than
+Tier-1 (which trusts neither (a) nor (b) — it recomputes). It is **not**
+a re-checkable proof and does not claim to be.
+
+== Signed message (81 bytes, fixed)
+
+[cols="1,3"]
+|===
+| `DOMAIN`        | 16 bytes — `"VCLT-ATTEST-v1\0\0"` (protocol/version domain separation; a signature here can never be replayed as any other protocol)
+| `sha256(stmt_wire)`   | 32 bytes — SHA-256 of the v1 `Statement` wire bytes (`VCLW…`, see `WIRE-FORMAT.adoc`)
+| `sha256(schema_wire)` | 32 bytes — SHA-256 of the v1 `OctadSchema` wire bytes (`VCLS…`)
+| `level`         | 1 byte — the certified level `0..=10`
+|===
+
+`token = Ed25519_sign(certifier_sk, DOMAIN ‖ sha256(stmt_wire) ‖
+sha256(schema_wire) ‖ level)` — a detached 64-byte signature.
+
+`schema_id` is `sha256(schema_wire)` (content-addressed; no external
+registry/trust). "query" in the issue-#25 phrasing
+`(sha256(query), schema_id, level)` is the marshalled `Statement`
+(`sha256(stmt_wire)`).
+
+== Wire token layout (C-ABI `out`)
+
+65 bytes: `[ level : u8 ][ sig : 64 bytes ]`.
+
+== Mint / verify
+
+* *Mint* (certifier side): decode `(stmt_wire, schema_wire)`; run
+  `certified_level`; **iff** `0 <= level <= 10`, sign and emit the
+  token. Any decode failure or Reject ⇒ **no token** (fail-closed —
+  never a token for an unestablished level).
+* *Verify* (consumer side): recompute the 81-byte message from the
+  wire bytes the consumer holds + the attested `level`; Ed25519-verify
+  against the certifier's public key. Accept the level iff verification
+  succeeds. Verification does **not** re-run the decider — that is
+  Tier-1's role; Tier-2 trusts the certifier by construction of a C
+  ABI.
+
+A tampered `stmt_wire`, `schema_wire`, `level`, or `sig`, or a wrong
+public key, all fail verification (machine-tested:
+`src/interface/attest` — roundtrip + 5 tamper variants + fail-closed +
+C-ABI).
+
+== C-ABI
+
+`vclut_rs_verify(stmt_ptr, stmt_len, schema_ptr, schema_len, sk_ptr,
+out_ptr, out_cap) -> i64` (Rust, `src/interface/attest`), linked into
+the Zig shim `ffi/zig/src/lib.zig` and exposed as
+`vclut_verify_wire(...)`. Returns the level `0..10` (and writes the
+65-byte token) or `-1` Rejected (writes nothing; `vclut_last_error`
+set). `sk_ptr` is the certifier's 32-byte Ed25519 seed — **real key
+provisioning is deployment**, via the estate token vault
+(`hyperpolymath/reasonably-good-token-vault`); the test key
+(`[7u8;32]`) is NOT a real certifier key.
+
+== Crypto
+
+Ed25519 via `ed25519-dalek` (de-facto standard, widely audited;
+maintainer decision 2026-05-19), SHA-256 via `sha2`. Both are
+*contained* in the separate `vcltotal-attest` crate (Tier-2 only) and
+never touch the zero-dependency, `#![forbid(unsafe_code)]`
+`vcltotal-parse` core. The only `unsafe` is one audited host/guest
+C-ABI memory block.
+
+== Versioning
+
+Any change to the wire formats, message layout, or crypto bumps
+`DOMAIN` (`VCLT-ATTEST-vN`) so old signatures cannot be
+reinterpreted. Tracked: hyperpolymath/vcl-ut#25.

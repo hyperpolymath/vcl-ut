@@ -1,0 +1,54 @@
+= vcltotal-attest
+:toc:
+
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+P5d of hyperpolymath/vcl-ut#25 — **Tier-2: C-ABI trusted-certifier
+attestation (the FALLBACK tier).** Authoritative model:
+`verification/proofs/VERIFICATION-STANCE.adoc`; rationale: ADR
+`docs/decisions/0002-ffi-attestation-trust-boundary.adoc`; wire spec:
+`ATTESTATION-FORMAT.adoc`.
+
+== Role
+
+For consumers that **cannot run the Tier-1 recompute `wasm32` module**
+(`src/interface/recompute-wasm`). A C ABI cannot carry a re-checkable
+proof, so this mints an Ed25519 attestation binding
+`(sha256(stmt_wire), sha256(schema_wire), level)` — unforgeable and
+bound, but *trusted* (the consumer trusts the certifier that signed
+it). Strictly weaker than Tier-1, and labelled as such everywhere.
+
+== Fail-closed
+
+The level comes from the conformance-pinned
+`vcltotal_parse::certified_level`. A token is minted **iff** the level
+is `0..=10`; any decode failure or Reject ⇒ no token, `-1`. Never a
+signed level the certifier did not establish.
+
+== Unsafe / deps
+
+Decode + decision logic stays in the `#![forbid(unsafe_code)]`,
+zero-dependency `vcltotal-parse` core. Crypto (`ed25519-dalek`,
+`sha2`) is contained here. The only `unsafe` is one audited host/guest
+C-ABI memory block (`vclut_rs_verify`) — the declared trust boundary
+the Zig shim links.
+
+== Build / test
+
+[source,sh]
+----
+cargo test                 # 9 tests: roundtrip + 5 tamper + fail-closed + C-ABI
+cargo build --release      # → target/release/libvcltotal_attest.a
+----
+
+The Zig shim links the staticlib automatically:
+`cd ffi/zig && zig build test` (cargo-builds + links + runs the
+end-to-end fail-closed integration test).
+
+== Keys
+
+`sk` is the certifier's 32-byte Ed25519 seed. Real provisioning is
+deployment via the estate token vault
+(`hyperpolymath/reasonably-good-token-vault`). The test key is not a
+real certifier key.

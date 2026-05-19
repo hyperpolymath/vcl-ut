@@ -63,11 +63,23 @@ CI-gated and green:
   recomputation, not proof transport. Plain `wasm32` suffices (type
   system not load-bearing under recompute); `affinescriptiser` N/A
   (resource-required + wasm-backend-pending; disclosed in
-  `AFFINESCRIPTISER-NA.adoc`, not faked). **OWED — P5d (Tier-2
-  fallback):** the C-ABI signed-attestation contract +
-  `vclut_rs_verify` linkage for consumers that cannot run the wasm.
-  A re-checkable proof is impossible *only* over the C-ABI fallback
-  tier (canonical two-tier model:
+  `AFFINESCRIPTISER-NA.adoc`, not faked).
+- Phase 5 / vcl-ut#25 — **Tier-2 (P5d) RESOLVED**: `src/interface/attest`
+  (`vcltotal-attest`) mints/verifies an Ed25519 attestation over
+  `DOMAIN ‖ sha256(stmt_wire) ‖ sha256(schema_wire) ‖ level` (level =
+  the conformance-pinned `certified_level`, signed iff `0..=10`,
+  fail-closed); the previously-OWED `vclut_rs_verify` backend is this
+  crate, linked into `ffi/zig/src/lib.zig` (`vclut_verify_wire`) by
+  `build.zig` (`zig build test` 4/4, end-to-end). Unforgeable + bound
+  (roundtrip + 5 tamper variants + fail-closed + C-ABI tests).
+  `ed25519-dalek`/`sha2` contained to the Tier-2 crate; zero-dep
+  forbid-unsafe core untouched; one audited host/guest `unsafe` block.
+  Spec `src/interface/attest/ATTESTATION-FORMAT.adoc`; ADR-0002 →
+  both tiers RESOLVED. **The vcl-ut#25 boundary-reinforcement
+  workstream is complete** (only the precisely-scoped disclosed limits
+  remain — not gaps). A re-checkable proof is impossible *only* over
+  the C-ABI fallback tier; Tier-2 is honestly its weaker
+  trusted-certifier ceiling (canonical two-tier model:
   `verification/proofs/VERIFICATION-STANCE.adoc`).
 
 `verification/proofs/VERIFICATION-STANCE.adoc` is the authoritative,

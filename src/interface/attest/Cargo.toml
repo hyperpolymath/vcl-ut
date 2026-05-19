@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+
+# Standalone workspace root (same rationale as ../parse, ../recompute-wasm):
+# decoupled from the broken parent virtual workspace. This is the Tier-2
+# (C-ABI trusted-certifier attestation) FALLBACK crate — explicitly the
+# weaker boundary tier (see VERIFICATION-STANCE.adoc's two-tier model).
+# The crypto dependency is CONTAINED here and never touches the
+# zero-dep, #![forbid(unsafe_code)] `vcltotal-parse` core.
+[workspace]
+
+[package]
+name = "vcltotal-attest"
+version = "0.1.0"
+edition = "2021"
+license = "PMPL-1.0-or-later"
+authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
+repository = "https://github.com/hyperpolymath/vcl-ut"
+description = "P5d (#25): Tier-2 C-ABI trusted-certifier attestation. Mints/verifies an Ed25519 signature binding (sha256(stmt_wire), sha256(schema_wire), level); the level comes from the conformance-pinned `vcltotal_parse::certified_level`. Fail-closed."
+
+[lib]
+name = "vcltotal_attest"
+crate-type = ["staticlib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+vcltotal-parse = { path = "../parse" }
+# de-facto standard, widely audited (user decision 2026-05-19).
+# default-features off keeps the tree minimal; `std` for the host
+# staticlib; no rng feature (deterministic keys via from_bytes).
+ed25519-dalek = { version = "2", default-features = false, features = ["std"] }
+sha2 = { version = "0.10", default-features = false }
+
+[profile.release]
+panic = "abort"
+opt-level = "z"
+lto = true
+strip = true
+
+[profile.dev]
+panic = "abort"
