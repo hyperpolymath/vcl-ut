@@ -86,6 +86,20 @@ Defined here for v1 (no Idris int map existed; now normative):
 Composite: `FieldRef` = `modality` then `string` (field name).
 `EpistemicClause` = `list<agent>` then `list<EpistemicRequirement>`.
 
+`VqlType` (P5c — `Grammar.idr` `data VqlType`; recursive, so the
+decoder is fuel-bounded exactly like `Expr`). STABLE, append-only:
+
+* `TString` 0, `TInt` 1, `TFloat` 2, `TBool` 3, `TBytes` 4,
+  `TVector` 5 `u64` (dimension; Idris `Nat`), `TTimestamp` 6,
+  `THash` 7, `TList` 8 `vqltype`,
+  `TRecord` 9 `list<(string, vqltype)>`, `TOctad` 10,
+  `TNull` 11 `vqltype`, `TAny` 12, `TKnows` 13 `agent, vqltype`,
+  `TBelieves` 14 `agent, vqltype`, `TCommonKnowledge` 15 `vqltype`.
+
+Schema composites: `FieldDef` = `string` (name), `vqltype` (ty),
+`bool` (nullable), `bool` (indexed). `ModalitySchema` = `modality`
+then `list<FieldDef>`.
+
 == Statement (field order = the `Grammar.idr` record)
 
 `list<SelectItem>`, `Source`, `option<Expr>` (where),
@@ -98,6 +112,29 @@ Composite: `FieldRef` = `modality` then `string` (field name).
 
 After the final field the stream MUST be exhausted; trailing bytes =>
 `WireError::TrailingBytes`.
+
+== OctadSchema (P5c — schema marshalling)
+
+The recompute-PCC tier (see the transport note above) ships the
+`OctadSchema` alongside the `Statement` so the consumer can re-run the
+certified decider. This is a *separate* stream with its own header to
+make a schema/statement mix-up a hard `BadMagic`, not a silent
+mis-parse:
+
+Header: `56 43 4C 53` ("VCLS") then `u16` version (`01 00` for v1).
+
+Body — `OctadSchema` is the 8 modality schemas in `Grammar.idr`/
+`Schema.idr` record order (fixed arity, no count):
+
+`ModalitySchema` (graph), `ModalitySchema` (vector),
+`ModalitySchema` (tensor), `ModalitySchema` (semantic),
+`ModalitySchema` (document), `ModalitySchema` (temporal),
+`ModalitySchema` (provenance), `ModalitySchema` (spatial).
+
+After the 8th the stream MUST be exhausted (`TrailingBytes`
+otherwise). Same totality contract as the `Statement` decoder;
+`VqlType`'s recursion is fuel-bounded identically (every node ≥ 1
+discriminant byte).
 
 == Totality contract
 

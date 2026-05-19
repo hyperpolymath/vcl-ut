@@ -12,8 +12,12 @@
 //! counts, every malformed input a typed [`WireError`].
 
 use crate::ast::*;
+use crate::schema::{FieldDef, ModalitySchema, OctadSchema, VqlType};
 
 const MAGIC: [u8; 4] = *b"VCLW";
+/// Distinct magic for the P5c `OctadSchema` stream so a schema/statement
+/// mix-up is a hard `BadMagic`, never a silent mis-parse.
+const SCHEMA_MAGIC: [u8; 4] = *b"VCLS";
 const VERSION: u16 = 1;
 
 /// Total decode failure (never a panic).
@@ -841,5 +845,178 @@ fn dec_stmt(d: &mut D) -> Result<Statement, WireError> {
         linear_annot,
         epistemic_clause,
         requested_level,
+    })
+}
+
+// ── P5c: OctadSchema codec (schema marshalling for the recompute tier)
+
+fn enc_vqltype(t: &VqlType, o: &mut Vec<u8>) {
+    match t {
+        VqlType::TString => put_u8(o, 0),
+        VqlType::TInt => put_u8(o, 1),
+        VqlType::TFloat => put_u8(o, 2),
+        VqlType::TBool => put_u8(o, 3),
+        VqlType::TBytes => put_u8(o, 4),
+        VqlType::TVector(n) => {
+            put_u8(o, 5);
+            put_u64(o, *n);
+        }
+        VqlType::TTimestamp => put_u8(o, 6),
+        VqlType::THash => put_u8(o, 7),
+        VqlType::TList(inner) => {
+            put_u8(o, 8);
+            enc_vqltype(inner, o);
+        }
+        VqlType::TRecord(fields) => {
+            put_u8(o, 9);
+            put_len(o, fields.len());
+            for (name, fty) in fields {
+                put_str(o, name);
+                enc_vqltype(fty, o);
+            }
+        }
+        VqlType::TOctad => put_u8(o, 10),
+        VqlType::TNull(inner) => {
+            put_u8(o, 11);
+            enc_vqltype(inner, o);
+        }
+        VqlType::TAny => put_u8(o, 12),
+        VqlType::TKnows(a, inner) => {
+            put_u8(o, 13);
+            enc_agent(a, o);
+            enc_vqltype(inner, o);
+        }
+        VqlType::TBelieves(a, inner) => {
+            put_u8(o, 14);
+            enc_agent(a, o);
+            enc_vqltype(inner, o);
+        }
+        VqlType::TCommonKnowledge(inner) => {
+            put_u8(o, 15);
+            enc_vqltype(inner, o);
+        }
+    }
+}
+
+fn enc_fielddef(f: &FieldDef, o: &mut Vec<u8>) {
+    put_str(o, &f.name);
+    enc_vqltype(&f.ty, o);
+    put_bool(o, f.nullable);
+    put_bool(o, f.indexed);
+}
+
+fn enc_modschema(m: &ModalitySchema, o: &mut Vec<u8>) {
+    enc_modality(&m.modality, o);
+    put_len(o, m.fields.len());
+    for fd in &m.fields {
+        enc_fielddef(fd, o);
+    }
+}
+
+/// Serialise an `OctadSchema` to the v1 `VCLS` wire stream. Total.
+pub fn to_wire_schema(s: &OctadSchema) -> Vec<u8> {
+    let mut o = Vec::new();
+    o.extend_from_slice(&SCHEMA_MAGIC);
+    o.extend_from_slice(&VERSION.to_le_bytes());
+    enc_modschema(&s.graph, &mut o);
+    enc_modschema(&s.vector, &mut o);
+    enc_modschema(&s.tensor, &mut o);
+    enc_modschema(&s.semantic, &mut o);
+    enc_modschema(&s.document, &mut o);
+    enc_modschema(&s.temporal, &mut o);
+    enc_modschema(&s.provenance, &mut o);
+    enc_modschema(&s.spatial, &mut o);
+    o
+}
+
+fn dec_vqltype(d: &mut D) -> Result<VqlType, WireError> {
+    match d.u8()? {
+        0 => Ok(VqlType::TString),
+        1 => Ok(VqlType::TInt),
+        2 => Ok(VqlType::TFloat),
+        3 => Ok(VqlType::TBool),
+        4 => Ok(VqlType::TBytes),
+        5 => Ok(VqlType::TVector(d.u64()?)),
+        6 => Ok(VqlType::TTimestamp),
+        7 => Ok(VqlType::THash),
+        8 => Ok(VqlType::TList(Box::new(dec_vqltype(d)?))),
+        9 => {
+            let fields = d.vec(|dd| {
+                let name = dd.string()?;
+                let fty = dec_vqltype(dd)?;
+                Ok((name, fty))
+            })?;
+            Ok(VqlType::TRecord(fields))
+        }
+        10 => Ok(VqlType::TOctad),
+        11 => Ok(VqlType::TNull(Box::new(dec_vqltype(d)?))),
+        12 => Ok(VqlType::TAny),
+        13 => {
+            let a = dec_agent(d)?;
+            Ok(VqlType::TKnows(a, Box::new(dec_vqltype(d)?)))
+        }
+        14 => {
+            let a = dec_agent(d)?;
+            Ok(VqlType::TBelieves(a, Box::new(dec_vqltype(d)?)))
+        }
+        15 => Ok(VqlType::TCommonKnowledge(Box::new(dec_vqltype(d)?))),
+        t => Err(WireError::BadTag {
+            ty: "VqlType",
+            tag: t,
+        }),
+    }
+}
+
+fn dec_fielddef(d: &mut D) -> Result<FieldDef, WireError> {
+    let name = d.string()?;
+    let ty = dec_vqltype(d)?;
+    let nullable = d.boolean()?;
+    let indexed = d.boolean()?;
+    Ok(FieldDef {
+        name,
+        ty,
+        nullable,
+        indexed,
+    })
+}
+
+fn dec_modschema(d: &mut D) -> Result<ModalitySchema, WireError> {
+    let modality = dec_modality(d)?;
+    let fields = d.vec(dec_fielddef)?;
+    Ok(ModalitySchema { modality, fields })
+}
+
+/// Decode a v1 `VCLS` wire stream into an `OctadSchema`. Total: every
+/// input yields `Ok`/`Err`, never a panic (same contract as
+/// [`from_wire`]).
+pub fn from_wire_schema(input: &[u8]) -> Result<OctadSchema, WireError> {
+    let mut d = D { b: input, pos: 0 };
+    if d.take(4)? != SCHEMA_MAGIC {
+        return Err(WireError::BadMagic);
+    }
+    let ver = d.u16()?;
+    if ver != VERSION {
+        return Err(WireError::BadVersion(ver));
+    }
+    let graph = dec_modschema(&mut d)?;
+    let vector = dec_modschema(&mut d)?;
+    let tensor = dec_modschema(&mut d)?;
+    let semantic = dec_modschema(&mut d)?;
+    let document = dec_modschema(&mut d)?;
+    let temporal = dec_modschema(&mut d)?;
+    let provenance = dec_modschema(&mut d)?;
+    let spatial = dec_modschema(&mut d)?;
+    if d.pos != d.b.len() {
+        return Err(WireError::TrailingBytes);
+    }
+    Ok(OctadSchema {
+        graph,
+        vector,
+        tensor,
+        semantic,
+        document,
+        temporal,
+        provenance,
+        spatial,
     })
 }

@@ -57,6 +57,7 @@ module VclTotal.Interface.WireDecode
 
 import VclTotal.ABI.Types
 import VclTotal.Core.Grammar
+import VclTotal.Core.Schema
 import Data.List
 
 %default total
@@ -641,3 +642,120 @@ fromWire input = do
   if ver /= 1 then Left BadVersion else Right ()
   (stmt, r2) <- decStmt (length input) r1
   if length r2 /= 0 then Left TrailingBytes else Right stmt
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- P5c: OctadSchema decoder (schema marshalling for the recompute tier)
+--
+-- `VqlType` is recursive (TList/TNull/TRecord/TKnows/TBelieves/
+-- TCommonKnowledge nest VqlType), so its decoder is fuel-bounded
+-- exactly like `Expr`; the recursion-bearing record-field list is
+-- inlined into the same `mutual` block so the size-change analysis
+-- sees the fuel-decreasing edge directly. `VqlType` recursion is
+-- independent of `Statement`/`Expr` (it only nests `VqlType` and the
+-- non-recursive `Agent`), so this is its own block. Totality is
+-- structural, ZERO proof-escape, identical posture to the Statement
+-- decoder. The schema stream has its own magic (`VCLS`) so a
+-- schema/statement mix-up is a hard `BadMagic`.
+-- ═══════════════════════════════════════════════════════════════════════
+
+mutual
+  public export
+  decVqlType : Nat -> Parse VqlType
+  decVqlType Z     _   = Left OutOfFuel
+  decVqlType (S k) inp = do
+    (t, r0) <- byte inp
+    case t of
+      0  => Right (TString, r0)
+      1  => Right (TInt, r0)
+      2  => Right (TFloat, r0)
+      3  => Right (TBool, r0)
+      4  => Right (TBytes, r0)
+      5  => do (n, r) <- u64nat r0; Right (TVector n, r)
+      6  => Right (TTimestamp, r0)
+      7  => Right (THash, r0)
+      8  => do (v, r) <- decVqlType k r0; Right (TList v, r)
+      9  => do (fs, r) <- decVqlRecVec k r0; Right (TRecord fs, r)
+      10 => Right (TOctad, r0)
+      11 => do (v, r) <- decVqlType k r0; Right (TNull v, r)
+      12 => Right (TAny, r0)
+      13 => do (a, r1) <- decAgent r0
+               (v, r2) <- decVqlType k r1
+               Right (TKnows a v, r2)
+      14 => do (a, r1) <- decAgent r0
+               (v, r2) <- decVqlType k r1
+               Right (TBelieves a v, r2)
+      15 => do (v, r) <- decVqlType k r0; Right (TCommonKnowledge v, r)
+      x  => Left (BadTag "VqlType" x)
+
+  public export
+  decVqlRecN : Nat -> Nat -> Parse (List (String, VqlType))
+  decVqlRecN _    Z     i = Right ([], i)
+  decVqlRecN fuel (S c) i = do
+    (nm, i1)  <- vstring i
+    (vt, i2)  <- decVqlType fuel i1
+    (xs, i3)  <- decVqlRecN fuel c i2
+    Right ((nm, vt) :: xs, i3)
+
+  public export
+  decVqlRecVec : Nat -> Parse (List (String, VqlType))
+  decVqlRecVec fuel i = do
+    (n, r) <- u32count i
+    decVqlRecN fuel n r
+
+public export
+decFieldDef : Nat -> Parse FieldDef
+decFieldDef fuel inp = do
+  (nm, r1) <- vstring inp
+  (ty, r2) <- decVqlType fuel r1
+  (nl, r3) <- boolByte r2
+  (ix, r4) <- boolByte r3
+  Right (MkFieldDef nm ty nl ix, r4)
+
+public export
+decFieldDefsN : Nat -> Nat -> Parse (List FieldDef)
+decFieldDefsN _    Z     i = Right ([], i)
+decFieldDefsN fuel (S c) i = do
+  (x, i')   <- decFieldDef fuel i
+  (xs, i'') <- decFieldDefsN fuel c i'
+  Right (x :: xs, i'')
+
+public export
+decFieldDefVec : Nat -> Parse (List FieldDef)
+decFieldDefVec fuel i = do
+  (n, r) <- u32count i
+  decFieldDefsN fuel n r
+
+public export
+decModalitySchema : Nat -> Parse ModalitySchema
+decModalitySchema fuel inp = do
+  (m, r1)  <- decModality inp
+  (fs, r2) <- decFieldDefVec fuel r1
+  Right (MkModalitySchema m fs, r2)
+
+public export
+schemaMagic : List Bits8
+schemaMagic = [86, 67, 76, 83]   -- "VCLS"
+
+||| Decode a v1 `VCLS` wire stream into the certified `OctadSchema`.
+||| Total: every input yields `Right` or a typed `Left WireErr`, never
+||| a crash. Fuel is the input length (sound: every node costs >= 1
+||| discriminant byte). The 8 modality schemas are in `Schema.idr`
+||| record order; no count prefix (fixed arity).
+public export
+fromWireSchema : List Bits8 -> Either WireErr OctadSchema
+fromWireSchema input = do
+  (m, r0) <- takeN 4 input
+  if m /= schemaMagic then Left BadMagic else Right ()
+  (ver, r1) <- u16le r0
+  if ver /= 1 then Left BadVersion else Right ()
+  let f = length input
+  (gr, r2)  <- decModalitySchema f r1
+  (ve, r3)  <- decModalitySchema f r2
+  (te, r4)  <- decModalitySchema f r3
+  (se, r5)  <- decModalitySchema f r4
+  (do_, r6) <- decModalitySchema f r5
+  (tm, r7)  <- decModalitySchema f r6
+  (pr, r8)  <- decModalitySchema f r7
+  (sp, r9)  <- decModalitySchema f r8
+  if length r9 /= 0 then Left TrailingBytes
+    else Right (MkOctadSchema gr ve te se do_ tm pr sp)
