@@ -13,6 +13,19 @@
 |||
 ||| All functions are declared here with type signatures.
 ||| Implementations live in ffi/zig/src/main.zig
+|||
+||| HONEST SCOPE (standards#124, Phase 3d). `getSafetyLevel` decodes a
+||| level *tag* from an FFI integer; that integer is an *attestation*
+||| from a trusted certifier, NOT a transported dependent proof — a C
+||| ABI cannot carry a `SafetyCertificate` (inherent). The real
+||| verification authority is the Idris2 corpus certifier
+||| (`VclTotal.Core.Checker.certifyRequested` / `certifiedLevel`), which
+||| only yields a level behind a genuine machine-checked certificate.
+||| The Zig shim is *fail-closed* as of Phase 3d (no fabricated level).
+||| This module is FFI plumbing — it contains *no proofs* and is not in
+||| the proof corpus. The string→AST parser, C-ABI Statement
+||| marshalling, and Idris→C build are NAMED OWED in
+||| verification/proofs/VERIFICATION-STANCE.adoc (absent, not faked).
 
 module VclTotal.ABI.Foreign
 

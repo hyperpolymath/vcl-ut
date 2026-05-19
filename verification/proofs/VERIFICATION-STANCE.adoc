@@ -207,12 +207,34 @@ OWED section.
   (`refUnguardedWeaken{L,R}` — a larger guard set only un-flags refs)
   plus list-append, with HAVING dropped by `composeJoin` (trivially
   null-safe). No `lN Compose` relies on a vacuous constructor any more.
-. *The FFI boundary is a stub.* `ffi/zig/src/lib.zig` returns `2`
-  (`L2`) for any query containing the substring `SELECT`; the Rust
-  `extern "C"` counterpart does not exist. `src/abi/Foreign.idr`
-  fabricates `Verified Ln` from a bare untrusted `Int`. The level tag
-  hypatia/verisim receive is an *asserted integer from a substring check*,
-  not a transported proof.
+. *(Phase 3d — lie removed; FFI is now fail-closed, the boundary
+  precisely scoped).* `ffi/zig/src/lib.zig` previously returned `2`
+  (`Verified L2`) for *any* query containing the substring `SELECT` — a
+  fabricated safety level. That has been **deleted**: the shim is now
+  *fail-closed* (`vclut_verify_query` returns `-1` Rejected with an
+  explicit "no verifier backend linked" message; it never returns a
+  level it did not establish), the Zig test that enshrined the lie was
+  rewritten to assert the fail-closed contract, and `zig build test`
+  passes. A genuine *proof-gated attestation mint* now exists in the
+  CI-gated corpus: `Checker.certifiedLevel : Statement -> OctadSchema ->
+  Int` returns a level *only* on the `Just`-certificate branch of
+  `certifyRequested` (structurally — no proof-escape).
++
+  *Inherent boundary (not a defect).* A C ABI cannot transport a
+  dependent `SafetyCertificate`; the honest model is *trusted-certifier
+  attestation* (as in proof-carrying code: the consumer trusts the
+  checker that minted the integer). What a hypatia/verisim caller
+  receives is therefore at most an attestation from the Idris certifier,
+  never a re-checkable proof object — by construction of any FFI.
++
+  *NAMED OWED (absent, not faked):* (1) **no string→`Statement`
+  parser exists anywhere in the repo** — the corpus certifies an
+  already-built AST, so the `verify(query_string)` FFI shape
+  *presupposes a component nobody has written*; (2) C-ABI
+  `Statement`/`OctadSchema` marshalling; (3) the Idris→C build that
+  would let the shim actually call `certifiedLevel`; (4) the real
+  backend symbol (`vclut_rs_verify`) is declared in intent but not
+  linked. Until (1)–(4) exist the FFI is honestly fail-closed.
 
 == Consumer guidance (hypatia / verisim)
 
@@ -267,11 +289,21 @@ OWED section.
   *(3c)* `ABI.Layout` made *sound, compiling, CI-gated* (9th ipkg
   module) by deleting the unsound `alignUpCorrect`/`offsetInBounds`/
   `queryPlanHeaderNoPadding` and fixing `paddingFor`.
-  *Residual (Phase 3+, OWED, precisely):* transport the certificate as
-  an opaque proof token through a *non-stub* Zig/Rust FFI; the genuine
-  `ABI.Layout` alignment/no-padding theorems; strengthen the L6–L10
-  predicates to the full checker semantics; fix `ABI.Foreign` plumbing;
-  L3's disclosed subquery-opacity / structural-heuristic scoping.
+  *(3d)* FFI honesty: the fabricated-level lie in `ffi/zig/src/lib.zig`
+  *deleted* (shim now fail-closed, `zig build test` green, lie-test
+  rewritten); genuine proof-gated mint `Checker.certifiedLevel` added in
+  the corpus (level only behind a real certificate, no escape);
+  `Foreign.idr` (both copies) trust model documented honestly.
+  *Residual (Phase 3+, OWED, precisely — partly presupposes unwritten
+  components):* a string→`Statement` parser (does not exist anywhere in
+  the repo; the `verify(query_string)` FFI shape presupposes it); C-ABI
+  `Statement`/`OctadSchema` marshalling; the Idris→C build linking the
+  shim to `certifiedLevel`; the genuine `ABI.Layout` alignment/no-padding
+  theorems; strengthen the L6–L10 predicates to the full checker
+  semantics; `ABI.Foreign` plumbing; L3's disclosed subquery/heuristic
+  scoping. (A C ABI carrying a re-checkable dependent proof is *not*
+  on this list — it is impossible by construction; the honest target is
+  trusted-certifier attestation.)
 
 == Provenance
 
@@ -280,8 +312,10 @@ findings reproduced by `idris2 0.8.0 --build`/`--check`. Phase 1
 resurrection 2026-05-18: corpus compiles clean. Phase 2 2026-05-19:
 L2/L3/L5 de-vacuized (new `VclTotal.Core.Decide`). Phase 3 2026-05-19:
 L1/L6–L10 soundness + `certifyAt`/`certifyRequested` dependent
-certificate + `ABI.Layout` made sound & gated. The corpus now builds
-clean as *9 modules*
+certificate + `ABI.Layout` made sound & gated; Phase 3d 2026-05-19:
+FFI fabricated-level lie deleted (fail-closed, `zig build test` green) +
+proof-gated `Checker.certifiedLevel` mint. The corpus builds clean as
+*9 modules*
 (`idris2 0.8.0 --build verification/proofs/vclut-core.ipkg`, exit 0,
 `%default total`, zero proof-escape symbols — CI-enforced), the added
 modules being `VclTotal.Core.Decide` (shared deciders) and
@@ -305,13 +339,19 @@ Notes for reproduction / honesty:
   `core.symlinks` default true) is unaffected; this caveat is for local
   reproduction only.
 
-The residual risk is now purely at the *boundary*: the genuine
-in-corpus `SafetyCertificate` is *not transported through the FFI* (stub
-Zig/Rust; the level tag a caller receives is an asserted integer), the
-L6–L10 *predicates* are shallow (clause-present, not the full checker
-semantics), `ABI.Layout`'s genuine alignment/no-padding theorems are
-OWED (the unsound ones were *deleted*, not faked), `ABI.Foreign` is
-unbuilt FFI plumbing, and L3 carries its disclosed subquery/heuristic
-scoping — all explicitly disclosed, not hidden. The former headline
-residuals (*non-compiling corpus*, *vacuous L2/L3/L5 predicates*,
-*decorative certificate*, *unsound `ABI.Layout`*) are all resolved.
+The residual risk is now purely at the *boundary*, and the boundary no
+longer lies: the FFI is *fail-closed* (no fabricated level; `zig build
+test` green) and a genuine proof-gated mint (`Checker.certifiedLevel`)
+exists in the CI-gated corpus. What remains OWED is *plumbing and an
+unwritten parser*, not a soundness gap: there is **no string→`Statement`
+parser anywhere in the repo** (so the `verify(query_string)` FFI shape
+presupposes a component nobody has written), no C-ABI `Statement`
+marshalling, and no Idris→C build linking the shim to the certifier;
+plus the L6–L10 *predicate* shallowness, the genuine `ABI.Layout`
+alignment/no-padding theorems, `ABI.Foreign` plumbing, and L3's
+disclosed subquery/heuristic scoping. A C ABI carrying a *re-checkable
+dependent proof* is impossible by construction — the honest target is
+trusted-certifier attestation, and that trust boundary is stated, not
+hidden. The former headline residuals (*non-compiling corpus*, *vacuous
+L2/L3/L5 predicates*, *decorative certificate*, *unsound `ABI.Layout`*,
+*lying FFI*) are all resolved.

@@ -865,3 +865,30 @@ public export
 certifyRequested : (stmt : Statement) -> (schema : OctadSchema) ->
                    Maybe (SafetyCertificate stmt schema (requestedLevel stmt))
 certifyRequested stmt schema = certifyAt stmt schema (requestedLevel stmt)
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- Proof-gated attestation mint (Phase 3d, standards#124)
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- A C ABI cannot carry a dependent `SafetyCertificate` — that is
+-- inherent to *any* FFI boundary, not a defect. The honest model is a
+-- *trusted-certifier attestation*: this function returns the certified
+-- safety level as an `Int` IFF `certifyRequested` produced a genuine
+-- dependent certificate (the `Just` branch is *structurally* the only
+-- place a non-negative level can be returned — no proof-escape, the
+-- certificate's mere existence is the gate); otherwise `-1`.
+--
+-- An FFI/host that calls this trusts the *certifier binary*, exactly as
+-- proof-carrying-code consumers trust the checker that minted the
+-- attestation. What this is NOT: it is not a re-checkable proof token,
+-- and it does NOT parse — it certifies an already-built `Statement`.
+-- The string→`Statement` parser, the C-ABI `Statement`/`OctadSchema`
+-- marshalling, and the Idris→C build are NAMED OWED items in
+-- VERIFICATION-STANCE.adoc (absent, not faked). `certifyRequested`
+-- itself remains the single source of verification truth.
+public export
+certifiedLevel : Statement -> OctadSchema -> Int
+certifiedLevel stmt schema =
+  case certifyRequested stmt schema of
+    Just _  => cast (safetyLevelToInt (requestedLevel stmt))
+    Nothing => -1
