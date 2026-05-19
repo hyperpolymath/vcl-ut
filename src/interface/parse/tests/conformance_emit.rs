@@ -22,12 +22,60 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use vcltotal_parse::ast::*;
-use vcltotal_parse::to_wire;
+use vcltotal_parse::schema::*;
+use vcltotal_parse::{to_wire, to_wire_schema};
 
 fn line(name: &str, s: &Statement) {
     let b = to_wire(s);
     let body = b.iter().map(u8::to_string).collect::<Vec<_>>().join(",");
     println!("{name} = [{body}]");
+}
+
+fn line_schema(name: &str, s: &OctadSchema) {
+    let b = to_wire_schema(s);
+    let body = b.iter().map(u8::to_string).collect::<Vec<_>>().join(",");
+    println!("{name} = [{body}]");
+}
+
+/// Minimal P5c schema fixture: exercises empty + non-empty field
+/// lists, all 8 modality slots in record order, bools, and a recursive
+/// `VqlType` (`TList`) plus `TVector(Nat)`.
+fn sch1() -> OctadSchema {
+    let m = |modality, fields| ModalitySchema { modality, fields };
+    OctadSchema {
+        graph: m(
+            Modality::Graph,
+            vec![FieldDef {
+                name: "id".to_string(),
+                ty: VqlType::TString,
+                nullable: true,
+                indexed: false,
+            }],
+        ),
+        vector: m(
+            Modality::Vector,
+            vec![FieldDef {
+                name: "emb".to_string(),
+                ty: VqlType::TVector(4),
+                nullable: false,
+                indexed: true,
+            }],
+        ),
+        tensor: m(Modality::Tensor, vec![]),
+        semantic: m(Modality::Semantic, vec![]),
+        document: m(
+            Modality::Document,
+            vec![FieldDef {
+                name: "tags".to_string(),
+                ty: VqlType::TList(Box::new(VqlType::TString)),
+                nullable: false,
+                indexed: false,
+            }],
+        ),
+        temporal: m(Modality::Temporal, vec![]),
+        provenance: m(Modality::Provenance, vec![]),
+        spatial: m(Modality::Spatial, vec![]),
+    }
 }
 
 fn f1() -> Statement {
@@ -117,6 +165,7 @@ fn emit() {
     line("golden1", &f1());
     line("golden2", &f2());
     line("golden3", &f3());
+    line_schema("goldenS1", &sch1());
 }
 
 /// Self-check: every fixture round-trips through the Rust codec, so the
@@ -127,4 +176,8 @@ fn fixtures_roundtrip() {
     for s in [f1(), f2(), f3()] {
         assert_eq!(vcltotal_parse::from_wire(&to_wire(&s)).unwrap(), s);
     }
+    assert_eq!(
+        vcltotal_parse::from_wire_schema(&to_wire_schema(&sch1())).unwrap(),
+        sch1()
+    );
 }

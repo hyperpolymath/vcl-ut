@@ -37,11 +37,13 @@
 pub mod ast;
 pub mod lexer;
 pub mod parser;
+pub mod schema;
 pub mod wire;
 
 pub use ast::Statement;
 pub use parser::{parse, ParseError};
-pub use wire::{from_wire, to_wire, WireError};
+pub use schema::OctadSchema;
+pub use wire::{from_wire, from_wire_schema, to_wire, to_wire_schema, WireError};
 
 #[cfg(test)]
 mod tests {
