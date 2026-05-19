@@ -42,6 +42,32 @@ fn clearLastError() void {
 }
 
 // ──────────────────────────────────────────────────────────────────────
+// Tier-2 backend (P5d, vcl-ut#25) — the real `vclut_rs_verify`.
+//
+// Previously NAMED OWED ("declared in intent but not linked"). Now
+// implemented by the Rust `vcltotal-attest` crate
+// (`src/interface/attest`) and linked by build.zig. It decodes the
+// wire `(Statement, OctadSchema)`, runs the conformance-pinned
+// `vcltotal_parse::certified_level` (the same faithful image of the
+// Idris corpus decision Tier-1 uses), and on a genuine level mints an
+// Ed25519 attestation bound to `(sha256(stmt_wire), sha256(schema_wire),
+// level)`. Fail-closed: a Reject / decode failure yields -1 and NO
+// token. This is the Tier-2 *fallback* (trusted-certifier attestation)
+// — explicitly weaker than Tier-1 recompute-PCC; see
+// verification/proofs/VERIFICATION-STANCE.adoc.
+// ──────────────────────────────────────────────────────────────────────
+
+extern fn vclut_rs_verify(
+    stmt_ptr: [*]const u8,
+    stmt_len: usize,
+    schema_ptr: [*]const u8,
+    schema_len: usize,
+    sk_ptr: [*]const u8,
+    out_ptr: [*]u8,
+    out_cap: usize,
+) callconv(.c) i64;
+
+// ──────────────────────────────────────────────────────────────────────
 // C-ABI exports
 // ──────────────────────────────────────────────────────────────────────
 
@@ -91,6 +117,48 @@ pub export fn vclut_verify_query(
 /// Get the last error message. Returns an empty string when no error
 /// is pending. Caller does not own the pointer; copy before the next
 /// FFI call.
+/// Tier-2 (P5d): verify a wire-marshalled `(Statement, OctadSchema)`
+/// and, on a genuine certified level, emit a signed attestation.
+///
+/// `stmt`/`schema` are the v1 wire bytes (the C-ABI marshalling, same
+/// shape as the Tier-1 recompute module). `sk` is the certifier's
+/// 32-byte Ed25519 seed (real provisioning is deployment, via the
+/// estate token vault). On success returns the level `0..10` and
+/// writes a 65-byte token `[level:1][sig:64]` into `out` (needs
+/// `out_cap >= 65`). Returns -1 (Rejected) — writing nothing,
+/// `vclut_last_error` set — on any decode failure, a Reject level, a
+/// null pointer, or insufficient `out_cap`. **Fail-closed:** never a
+/// token for a level the certifier did not establish.
+pub export fn vclut_verify_wire(
+    stmt_ptr: [*]const u8,
+    stmt_len: usize,
+    schema_ptr: [*]const u8,
+    schema_len: usize,
+    sk_ptr: [*]const u8,
+    out_ptr: [*]u8,
+    out_cap: usize,
+) callconv(.c) c_int {
+    clearLastError();
+    const rc = vclut_rs_verify(
+        stmt_ptr,
+        stmt_len,
+        schema_ptr,
+        schema_len,
+        sk_ptr,
+        out_ptr,
+        out_cap,
+    );
+    if (rc < 0) {
+        setLastError("Rejected (fail-closed): no genuine certified " ++
+            "level — Tier-2 attestation NOT minted. The verification " ++
+            "authority is the conformance-pinned certified_level; see " ++
+            "verification/proofs/VERIFICATION-STANCE.adoc");
+        return -1;
+    }
+    // 0..10 fits c_int; rc is bounded by the Rust backend.
+    return @intCast(rc);
+}
+
 pub export fn vclut_last_error() callconv(.c) [*:0]const u8 {
     if (last_error_len == 0) return "";
     return @ptrCast(&last_error_buf[0]);
@@ -122,4 +190,22 @@ test "verify is fail-closed: no fabricated level without a backend" {
     try std.testing.expectEqual(@as(c_int, -1), rc);
     // and it never returns a "verified" (>=1) level here
     try std.testing.expect(rc < 1);
+}
+
+// P5d integration: the REAL Rust Tier-2 backend is linked
+// (libvcltotal_attest.a via build.zig). Garbage wire bytes must
+// decode-fail in the conformance-pinned decoder ⇒ no attestation ⇒
+// -1, end-to-end across the Zig↔Rust boundary. (A positive path needs
+// a valid wire (Statement,OctadSchema), exhaustively covered by the
+// Rust crate's own roundtrip/tamper suite; this asserts the
+// fail-closed contract through the actual linked symbol.)
+test "vclut_verify_wire fail-closed on garbage via the linked Rust backend" {
+    _ = vclut_init();
+    var out: [65]u8 = [_]u8{0xAA} ** 65;
+    const sk = [_]u8{7} ** 32;
+    const bad = [_]u8{0xFF} ** 8;
+    const rc = vclut_verify_wire(&bad, bad.len, &bad, bad.len, &sk, &out, out.len);
+    try std.testing.expectEqual(@as(c_int, -1), rc);
+    // out untouched on the fail-closed path
+    for (out) |byte| try std.testing.expectEqual(@as(u8, 0xAA), byte);
 }

@@ -8,8 +8,10 @@ Date: 2026-05-19
 
 ## Status
 
-Accepted (Tier-1 RESOLVED; Tier-2 / P5d OWED). Tracked:
-hyperpolymath/vcl-ut#25. Authoritative companion:
+Accepted (**both tiers RESOLVED** — Tier-1 recompute-PCC over `wasm32`;
+Tier-2 / P5d C-ABI Ed25519 attestation fallback, `src/interface/attest`
+linked into the Zig shim). Tracked: hyperpolymath/vcl-ut#25.
+Authoritative companion:
 `verification/proofs/VERIFICATION-STANCE.adoc` (canonical two-tier
 boundary model) — this ADR records *why*; the stance records *what is
 and is not proven*.
@@ -75,12 +77,22 @@ fabricated level. The only `unsafe` is one audited host/guest
 memory-ABI block — the declared trust boundary — with all
 decode/decision logic in the `#![forbid(unsafe_code)]` crate.
 
-**Tier-2 — C-ABI trusted-certifier attestation (fallback, P5d, OWED).**
-For consumers that cannot run the Tier-1 wasm: a signed token bound to
-`(sha256(query), schema_id, level)`, verified against the certifier's
-public key. Strictly weaker (pure trust in the minting certifier), and
-labelled as such. The fail-closed `ffi/zig` shim (Phase 3d) is its
-scaffolding; the signed contract + `vclut_rs_verify` linkage are OWED.
+**Tier-2 — C-ABI trusted-certifier attestation (fallback, P5d,
+RESOLVED).** For consumers that cannot run the Tier-1 wasm:
+`src/interface/attest` (`vcltotal-attest`) mints an Ed25519 signature
+over `DOMAIN ‖ sha256(stmt_wire) ‖ sha256(schema_wire) ‖ level`, where
+`level` is the conformance-pinned `vcltotal_parse::certified_level`
+(signed iff `0..=10`, fail-closed); the consumer Ed25519-verifies
+against the certifier's public key. Unforgeable and bound (tamper /
+wrong-key all reject — machine-tested). The previously-OWED
+`vclut_rs_verify` backend is this crate, linked into the `ffi/zig`
+shim (`vclut_verify_wire`) by `build.zig`; `zig build test` exercises
+the boundary end-to-end. Strictly weaker than Tier-1 (pure trust in
+the minting certifier + that it ran the pinned decider), and labelled
+as such everywhere. Spec:
+`src/interface/attest/ATTESTATION-FORMAT.adoc`; crypto
+(`ed25519-dalek`/`sha2`) contained to this Tier-2 crate, the
+zero-dep forbid-unsafe core untouched.
 
 ## Consequences
 
@@ -99,8 +111,12 @@ scaffolding; the signed contract + `vclut_rs_verify` linkage are OWED.
   Rust-side + by input-value conformance; L9/L10 predicate depth;
   additive↔ceil `alignUp` sliver). These are stated in
   VERIFICATION-STANCE.adoc, not faked.
-- P5d (Tier-2) is the remaining boundary work; until it lands,
-  non-wasm consumers receive only the fail-closed shim (no fabricated
+- P5d (Tier-2) is **delivered**: non-wasm consumers get a verifiable
+  bound attestation (fail-closed) instead of only the bare shim. The
+  vcl-ut#25 boundary-reinforcement workstream is complete; what
+  remains are the precisely-scoped disclosed limits above, not gaps.
+- (historical) Until P5d landed, non-wasm consumers received only the
+  fail-closed shim (no fabricated
   level).
 - Revisit only if a future revision genuinely introduces a tracked
   resource at this boundary (none foreseen for a pure verdict
