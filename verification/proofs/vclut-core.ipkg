@@ -30,6 +30,7 @@ sourcedir = "corpus"
 modules = VclTotal.ABI.Types
         , VclTotal.Core.Grammar
         , VclTotal.Core.Schema
+        , VclTotal.Core.Decide
         , VclTotal.Core.Levels
         , VclTotal.Core.Checker
         , VclTotal.Core.Composition

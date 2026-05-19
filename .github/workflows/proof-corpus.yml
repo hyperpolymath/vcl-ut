@@ -48,9 +48,10 @@ jobs:
         run: |
           set -euo pipefail
           # Strip line/block comments, then scan the corpus sources.
-          files="src/core/Grammar.idr src/core/Schema.idr src/core/Levels.idr \
-                 src/core/Checker.idr src/core/Composition.idr \
-                 src/core/Epistemic.idr src/interface/abi/Types.idr"
+          files="src/core/Grammar.idr src/core/Schema.idr src/core/Decide.idr \
+                 src/core/Levels.idr src/core/Checker.idr \
+                 src/core/Composition.idr src/core/Epistemic.idr \
+                 src/interface/abi/Types.idr"
           if grep -nE '\b(believe_me|really_believe_me|assert_total|assert_smaller|idris_crash|postulate|sorry)\b' \
                $files | grep -vE ':\s*(--|\|\|\|)' ; then
             echo "::error::proof-escape symbol found in the Phase-1 corpus"

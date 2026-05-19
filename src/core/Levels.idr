@@ -21,6 +21,7 @@ module VclTotal.Core.Levels
 import VclTotal.ABI.Types
 import VclTotal.Core.Grammar
 import VclTotal.Core.Schema
+import VclTotal.Core.Decide
 import Data.List
 import Data.Nat
 
@@ -106,11 +107,25 @@ data NoRawUserInput : Statement -> Type where
   MkNoRawUserInput : whereHasStringLit stmt = False -> NoRawUserInput stmt
 
 ||| Proof that all select items have known types.
+|||
+||| HISTORY (standards#124, Phase 2): this used to be
+|||
+|||   data AllSelectItemsTyped : List SelectItem -> OctadSchema -> Type where
+|||     NilTyped  : AllSelectItemsTyped [] schema
+|||     ConsTyped : AllSelectItemsTyped rest schema ->
+|||                 AllSelectItemsTyped (item :: rest) schema
+|||
+||| which is *vacuous*: `ConsTyped` demands nothing of `item`, so the
+||| predicate was inhabited for *every* list (induct down to `NilTyped`).
+||| Level 5 therefore proved nothing about result typing — a SELECT of an
+||| unresolved (`TAny`) field type-checked. It now carries real evidence:
+||| the shared decider `Decide.selectItemsTyped` (which `Checker.checkLevel5`
+||| is defined through) returns `True`, i.e. every SELECT item resolves to
+||| a known, non-`TAny` type. Soundness: `Checker.checkLevel5Sound`.
 public export
 data AllSelectItemsTyped : List SelectItem -> OctadSchema -> Type where
-  NilTyped  : AllSelectItemsTyped [] schema
-  ConsTyped : AllSelectItemsTyped rest schema ->
-              AllSelectItemsTyped (item :: rest) schema
+  MkAllSelTyped : selectItemsTyped items schema = True ->
+                  AllSelectItemsTyped items schema
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Level Predicates

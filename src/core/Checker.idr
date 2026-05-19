@@ -19,6 +19,7 @@ module VclTotal.Core.Checker
 import VclTotal.ABI.Types
 import VclTotal.Core.Grammar
 import VclTotal.Core.Schema
+import VclTotal.Core.Decide
 import VclTotal.Core.Levels
 import Data.List
 import Data.Maybe
@@ -258,20 +259,10 @@ extractComparisons (EEpistemic _ _ e _) = extractComparisons e
 extractComparisons (EAnnounce _ p b _) = extractComparisons p ++ extractComparisons b
 extractComparisons _ = []
 
-||| Resolve the VqlType of an expression using the schema.
-||| For EField nodes, looks up the field in the schema.
-||| For other nodes, returns the annotation type already on the node.
-resolveExprType : Expr -> OctadSchema -> VqlType
-resolveExprType (EField ref _) schema    = resolveType ref schema
-resolveExprType (ELiteral _ ty) _        = ty
-resolveExprType (ECompare _ _ _ ty) _    = ty
-resolveExprType (ELogic _ _ _ ty) _      = ty
-resolveExprType (EAggregate _ _ ty) _    = ty
-resolveExprType (EParam _ ty) _          = ty
-resolveExprType EStar _                  = TAny
-resolveExprType (ESubquery _) _          = TOctad
-resolveExprType (EEpistemic _ _ _ ty) _  = ty
-resolveExprType (EAnnounce _ _ _ ty) _   = ty
+-- `resolveExprType` / `resolveSelectItemType` moved to
+-- `VclTotal.Core.Decide` (Phase 2, standards#124): the Level-2 / Level-5
+-- proof predicates and these checker queries must be the SAME function,
+-- so the soundness lemmas cannot drift. Imported, used unqualified below.
 
 ||| Check whether an expression contains any ELiteral (LitString _) nodes.
 ||| Used by Level 4 to detect potential injection vectors.
@@ -284,15 +275,8 @@ resolveExprType (EAnnounce _ _ _ ty) _   = ty
 containsLiteralString : Expr -> Bool
 containsLiteralString = hasStringLit
 
-||| Resolve the type of a SelectItem using the schema.
-||| Returns TAny if the item's type cannot be determined.
-resolveSelectItemType : SelectItem -> OctadSchema -> VqlType
-resolveSelectItemType (SelField ref) schema =
-  resolveType ref schema
-resolveSelectItemType (SelModality _) _ = TOctad
-resolveSelectItemType (SelAggregate _ e) schema =
-  resolveExprType e schema
-resolveSelectItemType SelStar _ = TAny
+-- `resolveSelectItemType` now lives in `VclTotal.Core.Decide` (see note
+-- above); `checkLevel5` is defined through `Decide.selectItemsTyped`.
 
 ||| Check if a nullable field is used without a null guard in an expression.
 ||| A "null guard" is an ECompare with Eq/NotEq against LitNull.
@@ -457,21 +441,38 @@ checkLevel4Sound stmt m prf with (whereHasStringLit stmt) proof p
 ||| @stmt   The statement to check.
 ||| @schema The schema for type resolution.
 ||| @return (True, _) if no TAny in select types; (False, diagnostic) otherwise.
+||| Defined through the shared decider `Decide.selectItemsTyped` (the
+||| same function the Level-5 proof predicate `AllSelectItemsTyped`
+||| carries), so `checkLevel5Sound` is a genuine soundness statement —
+||| the L4 architecture, applied to L5 (standards#124, Phase 2).
 public export
 checkLevel5 : Statement -> OctadSchema -> (Bool, String)
-checkLevel5 stmt schema =
-  let items : List SelectItem
-      items = selectItems stmt
-      untypedItems : List SelectItem
-      untypedItems = filter (\item => isAnyType (resolveSelectItemType item schema)) items
-  in case untypedItems of
-    [] => (True, "L5:ResultTyped — all " ++ show (length items) ++ " select items have known types")
-    _  => (False, "L5:ResultTyped FAILED — " ++ show (length untypedItems) ++ " select item(s) have unresolved types")
+checkLevel5 stmt schema = l5Verdict (selectItemsTyped (selectItems stmt) schema)
   where
-    ||| Check if a VqlType is the unresolved TAny sentinel.
-    isAnyType : VqlType -> Bool
-    isAnyType TAny = True
-    isAnyType _    = False
+    l5Verdict : Bool -> (Bool, String)
+    l5Verdict True  =
+      (True,  "L5:ResultTyped — all select items have known types")
+    l5Verdict False =
+      (False, "L5:ResultTyped FAILED — a select item has an unresolved type")
+
+||| **Soundness of the Level-5 decision procedure.**
+||| If `checkLevel5` accepts, the statement genuinely carries an
+||| `L5_ResultTyped`: every SELECT item resolves to a known (non-`TAny`)
+||| type (`selectItemsTyped (selectItems stmt) schema = True`). Before
+||| Phase 2 `AllSelectItemsTyped` was inhabited by the content-free
+||| `ConsTyped`, so this statement was not even meaningful. Mirrors
+||| `checkLevel4Sound`. Tracked: hyperpolymath/standards#124.
+export
+checkLevel5Sound : (stmt : Statement) -> (schema : OctadSchema) ->
+                   (m : String) ->
+                   checkLevel5 stmt schema = (True, m) ->
+                   L5_ResultTyped stmt schema
+checkLevel5Sound stmt schema m prf
+    with (selectItemsTyped (selectItems stmt) schema) proof p
+  checkLevel5Sound stmt schema m prf | True  =
+    MkL5 stmt schema (MkAllSelTyped p)
+  checkLevel5Sound stmt schema m prf | False =
+    void (falseNotTrue (cong fst prf))
 
 ||| Level 6 — CardinalitySafe: the statement includes a LIMIT clause.
 ||| Queries that could return unbounded results must have an explicit

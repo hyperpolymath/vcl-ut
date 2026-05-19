@@ -37,6 +37,7 @@ module VclTotal.Core.Composition
 import VclTotal.ABI.Types
 import VclTotal.Core.Grammar
 import VclTotal.Core.Schema
+import VclTotal.Core.Decide
 import VclTotal.Core.Levels
 import Data.List
 import Data.List.Elem
@@ -466,13 +467,17 @@ l3Compose (MkL3 s1 sch a1) (MkL3 s2 _ a2) =
   MkL3 (composeJoin s1 s2) sch
     (joinWhereNullGuarded (whereClause s1) (whereClause s2) a1 a2)
 
-||| `AllSelectItemsTyped` is closed under list append (by structural
-||| recursion on the first witness — we *consume the input proofs*).
+||| **Genuine** L5 closure. `AllSelectItemsTyped` now carries
+||| `selectItemsTyped items sch = True`; `composeJoin` concatenates the
+||| SELECT lists and `selectItemTyped` is per-item / context-free, so the
+||| joined list is typed iff both inputs were — discharged by the real
+||| `Decide.selectItemsTypedAppend` induction. No vacuous constructor.
 selTypedAppend :
+  {xs, ys : List SelectItem} -> {sch : OctadSchema} ->
   AllSelectItemsTyped xs sch -> AllSelectItemsTyped ys sch ->
   AllSelectItemsTyped (xs ++ ys) sch
-selTypedAppend NilTyped       ys = ys
-selTypedAppend (ConsTyped r)  ys = ConsTyped (selTypedAppend r ys)
+selTypedAppend {xs} {ys} {sch} (MkAllSelTyped p1) (MkAllSelTyped p2) =
+  MkAllSelTyped (selectItemsTypedAppend xs ys sch p1 p2)
 
 l5Compose :
   L5_ResultTyped q1 schema -> L5_ResultTyped q2 schema ->
