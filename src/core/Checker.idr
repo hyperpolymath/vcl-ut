@@ -19,6 +19,7 @@ module VclTotal.Core.Checker
 import VclTotal.ABI.Types
 import VclTotal.Core.Grammar
 import VclTotal.Core.Schema
+import VclTotal.Core.Decide
 import VclTotal.Core.Levels
 import Data.List
 import Data.Maybe
@@ -77,67 +78,10 @@ safetyLevelLabel TemporalSafe    = "L8:TemporalSafe"
 safetyLevelLabel LinearSafe      = "L9:LinearSafe"
 safetyLevelLabel EpistemicSafe   = "L10:EpistemicSafe"
 
--- ═══════════════════════════════════════════════════════════════════════
--- Type Compatibility (decidable boolean check for Level 2)
--- ═══════════════════════════════════════════════════════════════════════
-
-||| Decidable structural equality for VqlType.
-||| Structural equality for Agent (ignoring payload for parameterised
-||| agents). Hoisted to the top level: a `where` block after the final
-||| clause of a multi-clause function is not in scope for the earlier
-||| clauses that referenced it.
-private
-agentEq : Agent -> Agent -> Bool
-agentEq AgEngine AgEngine               = True
-agentEq (AgProver a) (AgProver b)       = a == b
-agentEq AgValidator AgValidator         = True
-agentEq (AgUser a) (AgUser b)           = a == b
-agentEq AgFederation AgFederation       = True
-agentEq _ _                             = False
-
-||| Returns True when two types are the same constructor with matching
-||| arguments — used by Level 2 to verify comparison operand types.
-public export
-vqlTypeEq : VqlType -> VqlType -> Bool
-vqlTypeEq TString     TString     = True
-vqlTypeEq TInt        TInt        = True
-vqlTypeEq TFloat      TFloat      = True
-vqlTypeEq TBool       TBool       = True
-vqlTypeEq TBytes      TBytes      = True
-vqlTypeEq (TVector n) (TVector m) = n == m
-vqlTypeEq TTimestamp  TTimestamp  = True
-vqlTypeEq THash       THash       = True
-vqlTypeEq (TList a)   (TList b)   = vqlTypeEq a b
-vqlTypeEq TOctad      TOctad      = True
-vqlTypeEq (TNull a)   (TNull b)   = vqlTypeEq a b
-vqlTypeEq TAny        TAny        = True
-vqlTypeEq (TKnows a1 t1) (TKnows a2 t2) = agentEq a1 a2 && vqlTypeEq t1 t2
-vqlTypeEq (TBelieves a1 t1) (TBelieves a2 t2) = agentEq a1 a2 && vqlTypeEq t1 t2
-vqlTypeEq (TCommonKnowledge t1) (TCommonKnowledge t2) = vqlTypeEq t1 t2
-vqlTypeEq _           _           = False
-
-||| Check whether two VqlTypes are compatible for comparison.
-|||
-||| Compatible means:
-|||   - Same type (structural equality)
-|||   - TNull t is compatible with t (and vice versa)
-|||   - TInt is compatible with TFloat (numeric widening)
-|||
-||| This mirrors the TypeCompatible proof type in Grammar.idr but as
-||| a decidable boolean suitable for runtime checking.
-public export
-typesCompatible : VqlType -> VqlType -> Bool
-typesCompatible a b =
-  if vqlTypeEq a b
-    then True
-    else case (a, b) of
-      -- Null compatibility: TNull t ~ t and t ~ TNull t
-      (TNull inner, other) => vqlTypeEq inner other
-      (other, TNull inner) => vqlTypeEq other inner
-      -- Numeric widening: Int ~ Float
-      (TInt, TFloat)       => True
-      (TFloat, TInt)       => True
-      _                    => False
+-- `agentEq` / `vqlTypeEq` / `typesCompatible` moved to
+-- `VclTotal.Core.Decide` (Phase 2, standards#124): the Level-2 proof
+-- predicate `AllComparisonsTypeSafe` and `checkLevel2` must decide via
+-- the SAME function so `checkLevel2Sound` cannot drift. Imported above.
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Field Reference Extraction
@@ -245,33 +189,14 @@ mutual
 -- Expression Scanning Helpers
 -- ═══════════════════════════════════════════════════════════════════════
 
-||| Extract all ECompare sub-expressions from an expression tree.
-||| Returns a list of (operator, left, right, annotatedType) tuples.
-extractComparisons : Expr -> List (CompOp, Expr, Expr, VqlType)
-extractComparisons (ECompare op l r ty) =
-  (op, l, r, ty) :: extractComparisons l ++ extractComparisons r
-extractComparisons (ELogic _ l Nothing _) = extractComparisons l
-extractComparisons (ELogic _ l (Just r) _) =
-  extractComparisons l ++ extractComparisons r
-extractComparisons (EAggregate _ e _) = extractComparisons e
-extractComparisons (EEpistemic _ _ e _) = extractComparisons e
-extractComparisons (EAnnounce _ p b _) = extractComparisons p ++ extractComparisons b
-extractComparisons _ = []
+-- `extractComparisons` moved to `VclTotal.Core.Decide` (Phase 2,
+-- standards#124) — single source of truth for the L2 predicate +
+-- checkLevel2 (see note in the Type-Compatibility region above).
 
-||| Resolve the VqlType of an expression using the schema.
-||| For EField nodes, looks up the field in the schema.
-||| For other nodes, returns the annotation type already on the node.
-resolveExprType : Expr -> OctadSchema -> VqlType
-resolveExprType (EField ref _) schema    = resolveType ref schema
-resolveExprType (ELiteral _ ty) _        = ty
-resolveExprType (ECompare _ _ _ ty) _    = ty
-resolveExprType (ELogic _ _ _ ty) _      = ty
-resolveExprType (EAggregate _ _ ty) _    = ty
-resolveExprType (EParam _ ty) _          = ty
-resolveExprType EStar _                  = TAny
-resolveExprType (ESubquery _) _          = TOctad
-resolveExprType (EEpistemic _ _ _ ty) _  = ty
-resolveExprType (EAnnounce _ _ _ ty) _   = ty
+-- `resolveExprType` / `resolveSelectItemType` moved to
+-- `VclTotal.Core.Decide` (Phase 2, standards#124): the Level-2 / Level-5
+-- proof predicates and these checker queries must be the SAME function,
+-- so the soundness lemmas cannot drift. Imported, used unqualified below.
 
 ||| Check whether an expression contains any ELiteral (LitString _) nodes.
 ||| Used by Level 4 to detect potential injection vectors.
@@ -284,46 +209,14 @@ resolveExprType (EAnnounce _ _ _ ty) _   = ty
 containsLiteralString : Expr -> Bool
 containsLiteralString = hasStringLit
 
-||| Resolve the type of a SelectItem using the schema.
-||| Returns TAny if the item's type cannot be determined.
-resolveSelectItemType : SelectItem -> OctadSchema -> VqlType
-resolveSelectItemType (SelField ref) schema =
-  resolveType ref schema
-resolveSelectItemType (SelModality _) _ = TOctad
-resolveSelectItemType (SelAggregate _ e) schema =
-  resolveExprType e schema
-resolveSelectItemType SelStar _ = TAny
+-- `resolveSelectItemType` now lives in `VclTotal.Core.Decide` (see note
+-- above); `checkLevel5` is defined through `Decide.selectItemsTyped`.
 
-||| Check if a nullable field is used without a null guard in an expression.
-||| A "null guard" is an ECompare with Eq/NotEq against LitNull.
-||| Returns the list of unguarded nullable field references.
-findUnguardedNullableFields : Expr -> OctadSchema -> List FieldRef
-findUnguardedNullableFields expr schema =
-  let refs : List FieldRef
-      refs = extractFieldRefs expr
-      guarded : List FieldRef
-      guarded = findNullGuardedRefs expr
-  in filter (\ref => isNullable ref schema && not (elemBy fieldRefEq ref guarded)) refs
-  where
-    ||| Structural equality for FieldRef (same modality + field name).
-    fieldRefEq : FieldRef -> FieldRef -> Bool
-    fieldRefEq a b =
-      modalityToInt (modality a) == modalityToInt (modality b) &&
-      fieldName a == fieldName b
-
-    ||| Find all field refs that appear in a null-check pattern:
-    ||| ECompare Eq (EField ref _) (ELiteral LitNull _) or symmetric.
-    findNullGuardedRefs : Expr -> List FieldRef
-    findNullGuardedRefs (ECompare Eq (EField ref _) (ELiteral LitNull _) _) = [ref]
-    findNullGuardedRefs (ECompare Eq (ELiteral LitNull _) (EField ref _) _) = [ref]
-    findNullGuardedRefs (ECompare NotEq (EField ref _) (ELiteral LitNull _) _) = [ref]
-    findNullGuardedRefs (ECompare NotEq (ELiteral LitNull _) (EField ref _) _) = [ref]
-    findNullGuardedRefs (ECompare _ l r _) =
-      findNullGuardedRefs l ++ findNullGuardedRefs r
-    findNullGuardedRefs (ELogic _ l Nothing _) = findNullGuardedRefs l
-    findNullGuardedRefs (ELogic _ l (Just r) _) =
-      findNullGuardedRefs l ++ findNullGuardedRefs r
-    findNullGuardedRefs _ = []
+-- `findUnguardedNullableFields` (and its `fieldRefEq` /
+-- `findNullGuardedRefs` helpers) moved to `VclTotal.Core.Decide` as
+-- `nullSafeStmt` / `nullGuardedRefs` / `fieldRefEq` (Phase 2,
+-- standards#124): the L3 proof predicate and `checkLevel3` now decide
+-- via the SAME function, so `checkLevel3Sound` cannot drift.
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Individual Level Checks
@@ -368,24 +261,40 @@ checkLevel1 stmt schema =
 ||| @stmt   The statement to check.
 ||| @schema The schema for type resolution.
 ||| @return (True, _) if all comparisons type-check; (False, diagnostic) otherwise.
+|||
+||| Defined through the shared decider `Decide.whereComparisonsCompatible`
+||| (the same function the L2 proof predicate `AllComparisonsTypeSafe`
+||| carries), so `checkLevel2Sound` is a genuine soundness statement.
 public export
 checkLevel2 : Statement -> OctadSchema -> (Bool, String)
 checkLevel2 stmt schema =
-  case whereClause stmt of
-    Nothing => (True, "L2:TypeCompat — no WHERE clause, trivially compatible")
-    Just wExpr =>
-      let comps : List (CompOp, Expr, Expr, VqlType)
-          comps = extractComparisons wExpr
-          incompatible : List (CompOp, Expr, Expr, VqlType)
-          incompatible = filter (not . isCompatibleComparison) comps
-      in case incompatible of
-        [] => (True, "L2:TypeCompat — all " ++ show (length comps) ++ " comparisons type-safe")
-        _  => (False, "L2:TypeCompat FAILED — " ++ show (length incompatible) ++ " incompatible comparison(s)")
+    l2Verdict (whereComparisonsCompatible (whereClause stmt) schema)
   where
-    ||| Check that a single comparison's operands have compatible types.
-    isCompatibleComparison : (CompOp, Expr, Expr, VqlType) -> Bool
-    isCompatibleComparison (_, l, r, _) =
-      typesCompatible (resolveExprType l schema) (resolveExprType r schema)
+    l2Verdict : Bool -> (Bool, String)
+    l2Verdict True  =
+      (True,  "L2:TypeCompat — all WHERE comparisons have compatible types")
+    l2Verdict False =
+      (False, "L2:TypeCompat FAILED — incompatible comparison operand types")
+
+||| **Soundness of the Level-2 decision procedure.**
+||| If `checkLevel2` accepts, the statement genuinely carries an
+||| `L2_TypeCompat`: every `ECompare` in the WHERE clause has operands of
+||| compatible resolved types
+||| (`whereComparisonsCompatible (whereClause stmt) schema = True`).
+||| Before Phase 2 `AllComparisonsTypeSafe` was inhabited by the
+||| content-free `WhereTypeSafe …`, so this was not even meaningful.
+||| Mirrors `checkLevel4Sound`. Tracked: hyperpolymath/standards#124.
+export
+checkLevel2Sound : (stmt : Statement) -> (schema : OctadSchema) ->
+                   (m : String) ->
+                   checkLevel2 stmt schema = (True, m) ->
+                   L2_TypeCompat stmt schema
+checkLevel2Sound stmt schema m prf
+    with (whereComparisonsCompatible (whereClause stmt) schema) proof p
+  checkLevel2Sound stmt schema m prf | True  =
+    MkL2 stmt schema (MkAllCompat p)
+  checkLevel2Sound stmt schema m prf | False =
+    void (notFalseTrue (cong fst prf))
 
 ||| Level 3 — NullSafe: nullable fields must be guarded with null checks.
 ||| Any nullable field used in WHERE or HAVING without an IS NULL / IS NOT NULL
@@ -394,22 +303,38 @@ checkLevel2 stmt schema =
 ||| @stmt   The statement to check.
 ||| @schema The schema providing nullability information.
 ||| @return (True, _) if no unguarded nullable fields; (False, diagnostic) otherwise.
+|||
+||| Defined through the shared decider `Decide.nullSafeStmt` (the same
+||| function the L3 proof predicate `AllNullableFieldsGuarded` carries),
+||| so `checkLevel3Sound` is a genuine soundness statement.
 public export
 checkLevel3 : Statement -> OctadSchema -> (Bool, String)
-checkLevel3 stmt schema =
-  let whereUnguarded : List FieldRef
-      whereUnguarded = maybe [] (\e => findUnguardedNullableFields e schema) (whereClause stmt)
-      havingUnguarded : List FieldRef
-      havingUnguarded = maybe [] (\e => findUnguardedNullableFields e schema) (having stmt)
-      allUnguarded : List FieldRef
-      allUnguarded = whereUnguarded ++ havingUnguarded
-  in case allUnguarded of
-    [] => (True, "L3:NullSafe — all nullable fields are guarded")
-    (r :: _) =>
-      ( False
-      , "L3:NullSafe FAILED — unguarded nullable field: "
-          ++ modalityName (modality r) ++ "." ++ fieldName r
-      )
+checkLevel3 stmt schema = l3Verdict (nullSafeStmt stmt schema)
+  where
+    l3Verdict : Bool -> (Bool, String)
+    l3Verdict True  =
+      (True,  "L3:NullSafe — all nullable fields are guarded (WHERE + HAVING)")
+    l3Verdict False =
+      (False, "L3:NullSafe FAILED — unguarded nullable field in WHERE/HAVING")
+
+||| **Soundness of the Level-3 decision procedure.**
+||| If `checkLevel3` accepts, the statement genuinely carries an
+||| `L3_NullSafe`: neither WHERE nor HAVING uses a schema-nullable field
+||| without an explicit NULL guard (`nullSafeStmt stmt schema = True`).
+||| Before Phase 2 `AllNullableFieldsGuarded` was inhabited by the
+||| content-free `GuardedNull` and only saw WHERE. Mirrors
+||| `checkLevel4Sound`. Tracked: hyperpolymath/standards#124.
+export
+checkLevel3Sound : (stmt : Statement) -> (schema : OctadSchema) ->
+                   (m : String) ->
+                   checkLevel3 stmt schema = (True, m) ->
+                   L3_NullSafe stmt schema
+checkLevel3Sound stmt schema m prf
+    with (nullSafeStmt stmt schema) proof p
+  checkLevel3Sound stmt schema m prf | True  =
+    MkL3 stmt schema (MkNullGuarded p)
+  checkLevel3Sound stmt schema m prf | False =
+    void (notFalseTrue (cong fst prf))
 
 ||| Level 4 — InjectionProof: no raw string literals in the WHERE clause.
 ||| All user-controlled values must arrive via EParam nodes (parameterised
@@ -457,21 +382,38 @@ checkLevel4Sound stmt m prf with (whereHasStringLit stmt) proof p
 ||| @stmt   The statement to check.
 ||| @schema The schema for type resolution.
 ||| @return (True, _) if no TAny in select types; (False, diagnostic) otherwise.
+||| Defined through the shared decider `Decide.selectItemsTyped` (the
+||| same function the Level-5 proof predicate `AllSelectItemsTyped`
+||| carries), so `checkLevel5Sound` is a genuine soundness statement —
+||| the L4 architecture, applied to L5 (standards#124, Phase 2).
 public export
 checkLevel5 : Statement -> OctadSchema -> (Bool, String)
-checkLevel5 stmt schema =
-  let items : List SelectItem
-      items = selectItems stmt
-      untypedItems : List SelectItem
-      untypedItems = filter (\item => isAnyType (resolveSelectItemType item schema)) items
-  in case untypedItems of
-    [] => (True, "L5:ResultTyped — all " ++ show (length items) ++ " select items have known types")
-    _  => (False, "L5:ResultTyped FAILED — " ++ show (length untypedItems) ++ " select item(s) have unresolved types")
+checkLevel5 stmt schema = l5Verdict (selectItemsTyped (selectItems stmt) schema)
   where
-    ||| Check if a VqlType is the unresolved TAny sentinel.
-    isAnyType : VqlType -> Bool
-    isAnyType TAny = True
-    isAnyType _    = False
+    l5Verdict : Bool -> (Bool, String)
+    l5Verdict True  =
+      (True,  "L5:ResultTyped — all select items have known types")
+    l5Verdict False =
+      (False, "L5:ResultTyped FAILED — a select item has an unresolved type")
+
+||| **Soundness of the Level-5 decision procedure.**
+||| If `checkLevel5` accepts, the statement genuinely carries an
+||| `L5_ResultTyped`: every SELECT item resolves to a known (non-`TAny`)
+||| type (`selectItemsTyped (selectItems stmt) schema = True`). Before
+||| Phase 2 `AllSelectItemsTyped` was inhabited by the content-free
+||| `ConsTyped`, so this statement was not even meaningful. Mirrors
+||| `checkLevel4Sound`. Tracked: hyperpolymath/standards#124.
+export
+checkLevel5Sound : (stmt : Statement) -> (schema : OctadSchema) ->
+                   (m : String) ->
+                   checkLevel5 stmt schema = (True, m) ->
+                   L5_ResultTyped stmt schema
+checkLevel5Sound stmt schema m prf
+    with (selectItemsTyped (selectItems stmt) schema) proof p
+  checkLevel5Sound stmt schema m prf | True  =
+    MkL5 stmt schema (MkAllSelTyped p)
+  checkLevel5Sound stmt schema m prf | False =
+    void (falseNotTrue (cong fst prf))
 
 ||| Level 6 — CardinalitySafe: the statement includes a LIMIT clause.
 ||| Queries that could return unbounded results must have an explicit

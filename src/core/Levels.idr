@@ -21,6 +21,7 @@ module VclTotal.Core.Levels
 import VclTotal.ABI.Types
 import VclTotal.Core.Grammar
 import VclTotal.Core.Schema
+import VclTotal.Core.Decide
 import Data.List
 import Data.Nat
 
@@ -59,30 +60,58 @@ extractFieldRefs stmt =
   exprFieldRefs (having stmt) ++
   map fst (orderBy stmt)
 
-||| Proof that a single expression is type-safe.
-public export
-data ExprTypeSafe : Expr -> OctadSchema -> Type where
-  FieldSafe   : ExprTypeSafe (EField ref ty) schema
-  LiteralSafe : ExprTypeSafe (ELiteral lit ty) schema
-  CompareSafe : TypeCompatible lty rty ->
-                ExprTypeSafe (ECompare op l r TBool) schema
-  LogicSafe   : ExprTypeSafe (ELogic op l mr TBool) schema
-  AggregateSafe : ExprTypeSafe (EAggregate f e ty) schema
-  ParamSafe   : ExprTypeSafe (EParam name ty) schema
-
-
 ||| Proof that all comparisons in an expression use compatible types.
+|||
+||| HISTORY (standards#124, Phase 2): this used to be a pair of types
+|||
+|||   data ExprTypeSafe : Expr -> OctadSchema -> Type where
+|||     FieldSafe   : ExprTypeSafe (EField ref ty) schema
+|||     CompareSafe : TypeCompatible lty rty ->
+|||                   ExprTypeSafe (ECompare op l r TBool) schema
+|||     LogicSafe   : ExprTypeSafe (ELogic op l mr TBool) schema
+|||     ...   -- (FieldSafe/LiteralSafe/AggregateSafe/ParamSafe)
+|||   data AllComparisonsTypeSafe : Maybe Expr -> OctadSchema -> Type where
+|||     NoWhere       : AllComparisonsTypeSafe Nothing schema
+|||     WhereTypeSafe : ExprTypeSafe expr schema ->
+|||                     AllComparisonsTypeSafe (Just expr) schema
+|||
+||| which is *vacuous* three ways: `FieldSafe` demanded no relation
+||| between `ty` and the schema; `CompareSafe`'s `lty`/`rty` were free
+||| implicits unconnected to `l`/`r` (dischargeable by `SameType` for any
+||| `t`) and it never recursed into the operands; so `WhereTypeSafe …`
+||| inhabited the predicate for *every* WHERE clause. Level 2 proved
+||| nothing about type compatibility. It now carries real evidence: the
+||| shared decider `Decide.whereComparisonsCompatible` (which
+||| `Checker.checkLevel2` is defined through) returns `True`, i.e. every
+||| `ECompare` node in the WHERE clause has operands of compatible
+||| resolved types. Soundness: `Checker.checkLevel2Sound`.
 public export
 data AllComparisonsTypeSafe : Maybe Expr -> OctadSchema -> Type where
-  NoWhere : AllComparisonsTypeSafe Nothing schema
-  WhereTypeSafe : ExprTypeSafe expr schema -> AllComparisonsTypeSafe (Just expr) schema
+  MkAllCompat : whereComparisonsCompatible m schema = True ->
+                AllComparisonsTypeSafe m schema
 
 
 ||| Proof that all nullable fields are guarded (NULL checks present).
+|||
+||| HISTORY (standards#124, Phase 2): this used to be
+|||
+|||   data AllNullableFieldsGuarded : Maybe Expr -> OctadSchema -> Type
+|||     where
+|||       NoWhereNull : AllNullableFieldsGuarded Nothing schema
+|||       GuardedNull : AllNullableFieldsGuarded (Just expr) schema
+|||
+||| which is *vacuous*: `GuardedNull` inhabited the predicate for *every*
+||| `Just expr` with zero structural content, and it only saw the WHERE
+||| clause (so it could not even be `checkLevel3`'s soundness target —
+||| the checker also inspects HAVING). It is now **Statement-indexed**
+||| and carries real evidence: the shared decider `Decide.nullSafeStmt`
+||| (which `Checker.checkLevel3` is defined through) returns `True`, i.e.
+||| neither the WHERE nor the HAVING clause uses a schema-nullable field
+||| without an explicit NULL guard. Soundness: `Checker.checkLevel3Sound`.
 public export
-data AllNullableFieldsGuarded : Maybe Expr -> OctadSchema -> Type where
-  NoWhereNull : AllNullableFieldsGuarded Nothing schema
-  GuardedNull : AllNullableFieldsGuarded (Just expr) schema
+data AllNullableFieldsGuarded : Statement -> OctadSchema -> Type where
+  MkNullGuarded : nullSafeStmt stmt schema = True ->
+                  AllNullableFieldsGuarded stmt schema
 
 ||| Proof that no raw user input appears in the query's WHERE clause.
 ||| User values must arrive via `EParam` nodes, never as embedded string
@@ -106,11 +135,25 @@ data NoRawUserInput : Statement -> Type where
   MkNoRawUserInput : whereHasStringLit stmt = False -> NoRawUserInput stmt
 
 ||| Proof that all select items have known types.
+|||
+||| HISTORY (standards#124, Phase 2): this used to be
+|||
+|||   data AllSelectItemsTyped : List SelectItem -> OctadSchema -> Type where
+|||     NilTyped  : AllSelectItemsTyped [] schema
+|||     ConsTyped : AllSelectItemsTyped rest schema ->
+|||                 AllSelectItemsTyped (item :: rest) schema
+|||
+||| which is *vacuous*: `ConsTyped` demands nothing of `item`, so the
+||| predicate was inhabited for *every* list (induct down to `NilTyped`).
+||| Level 5 therefore proved nothing about result typing — a SELECT of an
+||| unresolved (`TAny`) field type-checked. It now carries real evidence:
+||| the shared decider `Decide.selectItemsTyped` (which `Checker.checkLevel5`
+||| is defined through) returns `True`, i.e. every SELECT item resolves to
+||| a known, non-`TAny` type. Soundness: `Checker.checkLevel5Sound`.
 public export
 data AllSelectItemsTyped : List SelectItem -> OctadSchema -> Type where
-  NilTyped  : AllSelectItemsTyped [] schema
-  ConsTyped : AllSelectItemsTyped rest schema ->
-              AllSelectItemsTyped (item :: rest) schema
+  MkAllSelTyped : selectItemsTyped items schema = True ->
+                  AllSelectItemsTyped items schema
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Level Predicates
@@ -143,7 +186,7 @@ public export
 data L3_NullSafe : Statement -> OctadSchema -> Type where
   MkL3 : (stmt : Statement) ->
           (schema : OctadSchema) ->
-          AllNullableFieldsGuarded (whereClause stmt) schema ->
+          AllNullableFieldsGuarded stmt schema ->
           L3_NullSafe stmt schema
 
 ||| Level 4: Injection Proof — no unparameterised user input.
