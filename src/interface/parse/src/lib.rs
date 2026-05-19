@@ -37,9 +37,11 @@
 pub mod ast;
 pub mod lexer;
 pub mod parser;
+pub mod wire;
 
 pub use ast::Statement;
 pub use parser::{parse, ParseError};
+pub use wire::{from_wire, to_wire, WireError};
 
 #[cfg(test)]
 mod tests {
