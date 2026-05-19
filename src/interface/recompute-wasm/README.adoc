@@ -1,0 +1,65 @@
+= vcltotal-recompute-wasm
+:toc:
+
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+P5c of hyperpolymath/vcl-ut#25 — the **recompute-PCC tier's `wasm32`
+entry**. See `verification/proofs/VERIFICATION-STANCE.adoc` (the
+authoritative catalogue) for the two-tier boundary model.
+
+== Role
+
+The consumer (hypatia / verisim) is shipped this wasm module + the wire
+bytes of a `(Statement, OctadSchema)` + the producer's claimed safety
+level. It **re-runs the certified decision** and compares. The trust
+argument is *not* the wasm's type system:
+
+* *Soundness* — the corpus proof `checkLevelNSound`, machine-checked
+  once in the CI-gated Idris corpus, offline-re-checkable with idris2.
+* *Faithfulness* — `vcltotal_parse::certified_level` is pinned to the
+  corpus decision by `tests/conformance_emit.rs` ⇄
+  `VclTotal.Interface.WireConformance`.
+* This crate adds only the host/guest memory ABI; no decision logic.
+
+== Fail-closed
+
+Any malformed wire input, or any required safety level not
+re-established, yields `-1` (Reject) — never a fabricated level. The
+only non-negative result is a genuinely recomputed certified level
+(`0..=10`).
+
+== Unsafe policy
+
+All decoding/decision logic lives in the `#![forbid(unsafe_code)]`
+`vcltotal-parse` crate. The **only** `unsafe` in the recompute path is
+one small, audited host/guest memory-ABI block in `src/lib.rs` — which
+*is* the declared trust boundary (the host is trusted to pass valid
+`(ptr, len)` into guest linear memory).
+
+== Build
+
+[source,sh]
+----
+cargo build --release --target wasm32-unknown-unknown
+# → target/wasm32-unknown-unknown/release/vcltotal_recompute_wasm.wasm
+----
+
+`rustup target add wasm32-unknown-unknown` if missing (non-interactive).
+
+== ABI
+
+[cols="1,3"]
+|===
+| `vcl_alloc(len) -> *mut u8`        | allocate a guest buffer for the host to fill
+| `vcl_dealloc(ptr, len)`           | free a `vcl_alloc` buffer
+| `vcl_recompute(sp,sl,cp,cl) -> i64`| decode `(Statement,OctadSchema)` wire bytes, recompute certified level; `-1` = Reject
+|===
+
+== Not affinescriptiser
+
+The estate Rust→typed-wasm wrapper is *not* used here: it structurally
+requires `[[resources]]` and this entry is a pure resource-free verdict
+function (and its wasm backend is Phase-2-pending). Faking a resource
+to satisfy it would violate the verification-honesty doctrine. Full
+rationale: `AFFINESCRIPTISER-NA.adoc`.

@@ -1,0 +1,80 @@
+= Why affinescriptiser is not used for the recompute-wasm entry
+:toc:
+
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+P5c (vcl-ut#25) ships the recompute-PCC tier as a `wasm32` module
+built by the standard Rust target, *not* via `affinescriptiser`. This
+records precisely why — disclosed, not an oversight, per the estate
+verification-honesty doctrine (`VERIFICATION-STANCE.adoc`).
+
+== The two reasons (either alone is sufficient)
+
+. *affinescriptiser is structurally resource-oriented.* Its manifest
+  `validate` rejects any manifest without `[[resources]]`:
++
+[source]
+----
+Error: At least one [[resources]] entry is required
+----
++
+The tool exists to wrap code that owns resources (file descriptors,
+sockets, GPU buffers, linear tokens) and prove *at-most-once* use via
+AffineScript affine types. The recompute entry
+(`vcl_recompute`) is a **pure total verdict function**: decode wire
+bytes → re-run the certified decision → return an `i64`. It owns no
+resources, allocates nothing that crosses the boundary, and holds no
+linear handles. There is nothing for the affine checker to track.
+Declaring a *fabricated* resource solely to satisfy the tool would be
+cargo-culting a proof obligation — precisely what the estate doctrine
+forbids ("never fake an obligation to satisfy a tool").
+
+. *affinescriptiser's wasm backend is Phase-2-pending.* `affinescriptiser
+  build` currently emits `(AffineScript compiler integration pending —
+  Phase 2)` and produces no wasm. (Verified 2026-05-19.)
+
+== Why this costs nothing
+
+Under the locked recompute design (`VERIFICATION-STANCE.adoc`
+two-tier boundary model) the security argument does **not** rest on the
+wasm's type system:
+
+* *Soundness* is the corpus proof `checkLevelNSound` — machine-checked
+  once in the CI-gated Idris corpus, offline-re-checkable with idris2.
+* *Faithfulness* of the Rust decider to that corpus is machine-pinned
+  by the cross-language conformance fixtures
+  (`tests/conformance_emit.rs` ⇄ `VclTotal.Interface.WireConformance`).
+* The wasm artefact is a *deterministic* `cargo build --release
+  --target wasm32-unknown-unknown` of that exact pinned source — pure,
+  total, deterministic integer logic with no platform-dependent
+  behaviour — so the wasm verdict is identical to the pinned native
+  verdict by construction.
+* Nothing structured crosses the module boundary that would need
+  type-preservation: opaque wire bytes in, an `i64` out; the
+  decoder+decider run *inside* the module. Plain
+  `wasm32-unknown-unknown` is therefore sufficient. AffineScript
+  dependent/affine typing was load-bearing only for the *rejected*
+  proof-term-transport tier, not for recompute.
+
+== Build
+
+[source,sh]
+----
+cd src/interface/recompute-wasm
+cargo build --release --target wasm32-unknown-unknown
+# → target/wasm32-unknown-unknown/release/vcltotal_recompute_wasm.wasm
+----
+
+The single `unsafe` in the whole recompute path is one audited
+host/guest memory-ABI block in `src/lib.rs` (the declared trust
+boundary); all decoding/decision logic stays in the
+`#![forbid(unsafe_code)]` `vcltotal-parse` crate.
+
+== If affinescriptiser later applies
+
+Should affinescriptiser's wasm backend land *and* a future revision
+genuinely introduce a tracked resource at this boundary (none is
+foreseen — a verdict function is pure by nature), this decision should
+be revisited. Until then, using it here would be a false signal.
+Tracked: hyperpolymath/vcl-ut#25.
