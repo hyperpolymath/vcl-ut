@@ -743,3 +743,125 @@ checkQuery stmt schema =
         finalState.passed
         finalState.diags
         True
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- Proof-carrying entry point (Phase 3b, standards#124)
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- `checkQuery` above stays the plain Bool/`CheckResult` path for the C
+-- ABI. This section adds the *proof-carrying* path: each `tryLN` runs
+-- the corresponding decision procedure and, on acceptance, returns the
+-- genuine `LN_*` witness via the (machine-checked) `checkLevelNSound`
+-- lemma — no proof-escape, no re-assertion. `certifyAt` assembles them
+-- into the cumulative dependent `SafetyCertificate`. This is the
+-- certificate↔checker connection that was previously entirely absent
+-- (Phase-1/2 had it for the predicates in isolation; here `checkQuery`'s
+-- *decision* is what produces the dependent certificate).
+
+tryL1 : (stmt : Statement) -> (schema : OctadSchema) ->
+        Maybe (L1_SchemaBound stmt schema)
+tryL1 stmt schema with (checkLevel1 stmt schema) proof p
+  tryL1 stmt schema | (True,  m) = Just (checkLevel1Sound stmt schema m p)
+  tryL1 stmt schema | (False, _) = Nothing
+
+tryL2 : (stmt : Statement) -> (schema : OctadSchema) ->
+        Maybe (L2_TypeCompat stmt schema)
+tryL2 stmt schema with (checkLevel2 stmt schema) proof p
+  tryL2 stmt schema | (True,  m) = Just (checkLevel2Sound stmt schema m p)
+  tryL2 stmt schema | (False, _) = Nothing
+
+tryL3 : (stmt : Statement) -> (schema : OctadSchema) ->
+        Maybe (L3_NullSafe stmt schema)
+tryL3 stmt schema with (checkLevel3 stmt schema) proof p
+  tryL3 stmt schema | (True,  m) = Just (checkLevel3Sound stmt schema m p)
+  tryL3 stmt schema | (False, _) = Nothing
+
+tryL4 : (stmt : Statement) -> Maybe (L4_InjectionProof stmt)
+tryL4 stmt with (checkLevel4 stmt) proof p
+  tryL4 stmt | (True,  m) = Just (checkLevel4Sound stmt m p)
+  tryL4 stmt | (False, _) = Nothing
+
+tryL5 : (stmt : Statement) -> (schema : OctadSchema) ->
+        Maybe (L5_ResultTyped stmt schema)
+tryL5 stmt schema with (checkLevel5 stmt schema) proof p
+  tryL5 stmt schema | (True,  m) = Just (checkLevel5Sound stmt schema m p)
+  tryL5 stmt schema | (False, _) = Nothing
+
+tryL6 : (stmt : Statement) -> Maybe (L6_CardinalitySafe stmt)
+tryL6 stmt with (checkLevel6 stmt) proof p
+  tryL6 stmt | (True,  m) = Just (checkLevel6Sound stmt m p)
+  tryL6 stmt | (False, _) = Nothing
+
+tryL7 : (stmt : Statement) -> Maybe (L7_EffectTracked stmt)
+tryL7 stmt with (checkLevel7 stmt) proof p
+  tryL7 stmt | (True,  m) = Just (checkLevel7Sound stmt m p)
+  tryL7 stmt | (False, _) = Nothing
+
+tryL8 : (stmt : Statement) -> Maybe (L8_TemporalSafe stmt)
+tryL8 stmt with (checkLevel8 stmt) proof p
+  tryL8 stmt | (True,  m) = Just (checkLevel8Sound stmt m p)
+  tryL8 stmt | (False, _) = Nothing
+
+tryL9 : (stmt : Statement) -> Maybe (L9_LinearSafe stmt)
+tryL9 stmt with (checkLevel9 stmt) proof p
+  tryL9 stmt | (True,  m) = Just (checkLevel9Sound stmt m p)
+  tryL9 stmt | (False, _) = Nothing
+
+tryL10 : (stmt : Statement) -> Maybe (L10_EpistemicSafe stmt)
+tryL10 stmt with (checkLevel10 stmt) proof p
+  tryL10 stmt | (True,  m) = Just (checkLevel10Sound stmt m p)
+  tryL10 stmt | (False, _) = Nothing
+
+||| Attempt to produce a genuine dependent `SafetyCertificate` at the
+||| requested level. `Just c` means every level 0..k was *decided*
+||| accepting and `c` carries the real cumulative evidence; `Nothing`
+||| means some required level was rejected. (L0 is unconditional —
+||| a parsed `Statement` is its own parse-safety witness.)
+public export
+certifyAt : (stmt : Statement) -> (schema : OctadSchema) ->
+            (k : SafetyLevel) ->
+            Maybe (SafetyCertificate stmt schema k)
+certifyAt stmt schema ParseSafe =
+  Just (CertL0 (MkL0 stmt))
+certifyAt stmt schema SchemaBound =
+  [| CertL1 (pure (MkL0 stmt)) (tryL1 stmt schema) |]
+certifyAt stmt schema TypeCompat =
+  [| CertL2 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema) |]
+certifyAt stmt schema NullSafe =
+  [| CertL3 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema)
+            (tryL3 stmt schema) |]
+certifyAt stmt schema InjectionProof =
+  [| CertL4 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema)
+            (tryL3 stmt schema) (tryL4 stmt) |]
+certifyAt stmt schema ResultTyped =
+  [| CertL5 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema)
+            (tryL3 stmt schema) (tryL4 stmt) (tryL5 stmt schema) |]
+certifyAt stmt schema CardinalitySafe =
+  [| CertL6 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema)
+            (tryL3 stmt schema) (tryL4 stmt) (tryL5 stmt schema)
+            (tryL6 stmt) |]
+certifyAt stmt schema EffectTracked =
+  [| CertL7 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema)
+            (tryL3 stmt schema) (tryL4 stmt) (tryL5 stmt schema)
+            (tryL6 stmt) (tryL7 stmt) |]
+certifyAt stmt schema TemporalSafe =
+  [| CertL8 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema)
+            (tryL3 stmt schema) (tryL4 stmt) (tryL5 stmt schema)
+            (tryL6 stmt) (tryL7 stmt) (tryL8 stmt) |]
+certifyAt stmt schema LinearSafe =
+  [| CertL9 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema)
+            (tryL3 stmt schema) (tryL4 stmt) (tryL5 stmt schema)
+            (tryL6 stmt) (tryL7 stmt) (tryL8 stmt) (tryL9 stmt) |]
+certifyAt stmt schema EpistemicSafe =
+  [| CertL10 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema)
+             (tryL3 stmt schema) (tryL4 stmt) (tryL5 stmt schema)
+             (tryL6 stmt) (tryL7 stmt) (tryL8 stmt) (tryL9 stmt)
+             (tryL10 stmt) |]
+
+||| Certify a query at its own declared `requestedLevel`. The result
+||| type *is* the dependent certificate for that level — a `Just` is a
+||| machine-checked proof the query meets its declared safety level.
+public export
+certifyRequested : (stmt : Statement) -> (schema : OctadSchema) ->
+                   Maybe (SafetyCertificate stmt schema (requestedLevel stmt))
+certifyRequested stmt schema = certifyAt stmt schema (requestedLevel stmt)
