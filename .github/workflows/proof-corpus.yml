@@ -64,7 +64,8 @@ jobs:
                  src/core/Levels.idr src/core/Checker.idr \
                  src/core/Composition.idr src/core/Epistemic.idr \
                  src/interface/abi/Types.idr src/interface/abi/Layout.idr \
-                 src/interface/abi/LayoutProofs.idr"
+                 src/interface/abi/LayoutProofs.idr \
+                 src/interface/WireDecode.idr src/interface/WireConformance.idr"
           if grep -nE '\b(believe_me|really_believe_me|assert_total|assert_smaller|idris_crash|postulate|sorry)\b' \
                $files | grep -vE ':\s*(--|\|\|\|)' ; then
             echo "::error::proof-escape symbol found in the Phase-1 corpus"

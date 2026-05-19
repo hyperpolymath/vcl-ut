@@ -6,8 +6,8 @@
 - **LOC**: ~8,000
 - **Languages**: Rust, ReScript, Idris2, Zig
 - **Existing ABI proofs**: `src/interface/abi/*.idr` + domain-specific Idris2: `src/core/Checker.idr`, `Grammar.idr`, `Levels.idr`, `Schema.idr`, `Composition.idr`
-- **Machine-verified**: the full `VclTotal` proof corpus — `verification/proofs/vclut-core.ipkg` builds clean under idris2 0.8.0 (`idris2 --build`, exit 0, `%default total`, **zero proof-escape symbols**, CI-gated by `.github/workflows/proof-corpus.yml`) as **10 modules** (`ABI.{Types,Layout,LayoutProofs}` + `Core.{Grammar,Schema,Decide,Levels,Checker,Composition,Epistemic}`), plus the self-contained `verification/proofs/SafetyL4Model.idr` (`--check`, exit 0). Phases 1–3 are on `origin/main` (PRs #21/#22/#23); Phase 4 (`LayoutProofs` + L6–L10 `composeJoin` closure) is **PR #24**, pending merge.
-- **Status (Phase 0 → 4 RESOLVED, honestly)**: the Phase-0 blockers are fixed, not faked — the corpus compiles and is machine-checked; `ABI.Types`/`Grammar` errors repaired; **L2/L3/L5 de-vacuized** (Phase 2, evidence-carrying predicates over `Core.Decide`); all ten levels carry `checkLevelNSound` and `Checker.certifyAt`/`certifyRequested` assemble a genuine dependent `SafetyCertificate` (Phase 3); the Zig FFI is no longer a fabricating stub — it is **fail-closed** with a proof-gated `Checker.certifiedLevel` mint (Phase 3d). Remaining honest gaps are precisely scoped (FFI proof-transport, string→`Statement` parser, L3 subquery/heuristic scoping, L9/L10 predicate depth, the additive↔ceil `alignUp` sliver). `verification/proofs/VERIFICATION-STANCE.adoc` is the authoritative, proof-backed catalogue and takes precedence over this file.
+- **Machine-verified**: the full `VclTotal` proof corpus — `verification/proofs/vclut-core.ipkg` builds clean under idris2 0.8.0 (`idris2 --build`, exit 0, `%default total`, **zero proof-escape symbols**, CI-gated by `.github/workflows/proof-corpus.yml`) as **12 modules** (`ABI.{Types,Layout,LayoutProofs}` + `Core.{Grammar,Schema,Decide,Levels,Checker,Composition,Epistemic}` + `Interface.{WireDecode,WireConformance}`), plus the self-contained `verification/proofs/SafetyL4Model.idr` (`--check`, exit 0). Phases 1–4 are on `origin/main` (PRs #21/#22/#23/#24); Phase 5 / vcl-ut#25 (trusted Rust parser P5a #26, wire codec P5b-step-1 #28, **certified Idris wire decoder + cross-language `Refl` conformance** P5b-step-2) reinforces the FFI boundary.
+- **Status (Phase 0 → 4 RESOLVED, honestly; Phase 5 boundary reinforcement in progress)**: the Phase-0 blockers are fixed, not faked — the corpus compiles and is machine-checked; `ABI.Types`/`Grammar` errors repaired; **L2/L3/L5 de-vacuized** (Phase 2, evidence-carrying predicates over `Core.Decide`); all ten levels carry `checkLevelNSound` and `Checker.certifyAt`/`certifyRequested` assemble a genuine dependent `SafetyCertificate` (Phase 3); the Zig FFI is no longer a fabricating stub — it is **fail-closed** with a proof-gated `Checker.certifiedLevel` mint (Phase 3d). **Phase 5 (vcl-ut#25)**: a trusted Rust/SPARK-grade parser + a deterministic versioned wire codec exist, and the *decode* side of the C-ABI `Statement` marshalling is now **certified** — `VclTotal.Interface.WireDecode` is a total (zero-escape) decoder proven byte-for-byte conformant with the Rust encoder by `Refl` (`WireConformance`). Remaining honest gaps are precisely scoped (FFI proof-transport / Idris→C build / Zig-shim link = P5c; signed attestation contract = P5d; L3 subquery/heuristic scoping; L9/L10 predicate depth; the additive↔ceil `alignUp` sliver; the disclosed NaN-payload limitation of the Idris `Double` boundary). `verification/proofs/VERIFICATION-STANCE.adoc` is the authoritative, proof-backed catalogue and takes precedence over this file.
 
 ## What Needs Proving
 
@@ -44,6 +44,17 @@
 - The *trusted* boundary parser is the Rust/SPARK-grade
   `src/interface/parse` crate (`vcltotal-parse`, P5a of vcl-ut#25),
   which mirrors `Grammar.idr` and feeds the certifier across the C-ABI.
+  Its `wire.rs` codec (P5b step 1) serialises the parsed `Statement`
+  to a deterministic versioned binary format
+  (`src/interface/parse/WIRE-FORMAT.adoc`).
+- The *certified* receiver of that format is
+  `VclTotal.Interface.WireDecode` (P5b step 2): a total, zero-escape
+  Idris decoder into the certified `Statement`, proven byte-for-byte
+  conformant with the Rust encoder by `Refl` in
+  `VclTotal.Interface.WireConformance`. The marshalling seam's *decode*
+  side is therefore now machine-verified; the Idris→C build that links
+  the fail-closed Zig shim to the certifier (P5c) and the signed
+  attestation contract (P5d) remain OWED.
 - Optional future work: prove the ReScript frontend faithfully tracks
   the Idris2 grammar (low priority; it is a convenience frontend, not a
   trust anchor).
