@@ -8,11 +8,19 @@
 // host, future SPARK satellites) link against libvclut_ffi.{so,a} and
 // call these symbols directly — no Rust runtime, no JSON marshalling.
 //
-// Status: scaffold. The Rust-side `extern "C"` entry points that this
-// shim is supposed to wrap don't exist yet; the functions below stub
-// out the behaviour so the build is green and the symbol table is
-// populated. When the Rust crate exposes its `vclut_verify_query`
-// FFI counterpart, swap the stub calls for `extern fn` declarations.
+// Status: scaffold, FAIL-CLOSED (standards#124, Phase 3d). The real
+// verification authority is the Idris2 certifier
+// (`VclTotal.Core.Checker.certifyRequested` / `certifiedLevel`), which
+// only yields a non-negative level when a genuine dependent
+// `SafetyCertificate` exists. No verifier backend is linked into this
+// shim yet, and there is deliberately NO fabricated result: a previous
+// version returned a fake "Verified L2" for any string containing
+// "SELECT" — that was a lie and has been deleted. Until the real
+// backend is linked AND the string→AST parser + C-ABI Statement
+// marshalling exist (NAMED OWED in
+// verification/proofs/VERIFICATION-STANCE.adoc), this shim returns
+// Rejected (-1). A fail-closed FFI is correct; a fabricated level is
+// not.
 
 const std = @import("std");
 
@@ -51,25 +59,33 @@ pub export fn vclut_verify_query(
     query_ptr: [*:0]const u8,
     schema_id: u64,
 ) callconv(.c) c_int {
-    _ = schema_id; // unused until Rust side ships
+    _ = schema_id; // unused until a real backend is linked
     const query = std.mem.span(query_ptr);
 
-    // Stub validation — until the Rust crate exposes its extern "C"
-    // counterpart, we do a minimal shape check so the FFI is testable
-    // end-to-end. Real verification will route through:
-    //   extern fn vclut_rs_verify(*const u8, usize, u64) -> i32;
     if (query.len == 0) {
         setLastError("empty query");
         return -1;
     }
-    if (std.mem.indexOf(u8, query, "SELECT") == null) {
-        setLastError("query missing SELECT keyword");
-        return -1;
-    }
 
-    // Optimistic: declare L2Typed when the query passes the shape gate.
-    // Higher levels require Rust-side type resolution.
-    return 2;
+    // FAIL-CLOSED (standards#124, Phase 3d). There is intentionally NO
+    // shape-based "optimistic" verdict here any more: returning a
+    // positive safety level this shim did not establish is a lie. The
+    // real verification authority is the Idris2 certifier
+    // (`certifyRequested`/`certifiedLevel`), which only yields a level
+    // behind a genuine dependent `SafetyCertificate`. Wiring is OWED:
+    //   1. extern fn vclut_rs_verify(query_ptr, len, schema_id) -> i32
+    //      (a real backend that marshals a `Statement`+`OctadSchema`
+    //       and calls the Idris certifier) — NOT linked.
+    //   2. a string→`Statement` parser — does not exist anywhere in the
+    //      repo (the corpus certifies an already-built AST).
+    // Until (1) and (2) exist, every query is Rejected. This keeps the
+    // symbol table populated and the build green WITHOUT asserting an
+    // unestablished safety level.
+    setLastError("no verifier backend linked: vcl-ut verification " ++
+        "authority is the Idris2 certifier (certifyRequested); FFI " ++
+        "marshalling + string->AST parser are OWED — see " ++
+        "verification/proofs/VERIFICATION-STANCE.adoc");
+    return -1;
 }
 
 /// Get the last error message. Returns an empty string when no error
@@ -96,8 +112,14 @@ test "verify rejects empty query" {
     try std.testing.expectEqual(@as(c_int, -1), rc);
 }
 
-test "verify accepts well-formed select" {
+// FAIL-CLOSED contract (standards#124, Phase 3d): with no verifier
+// backend linked, a well-formed query must NOT receive a fabricated
+// positive level. It is Rejected (-1) — the honest result. (The old
+// test asserted `== 2`, enshrining the deleted lie.)
+test "verify is fail-closed: no fabricated level without a backend" {
     _ = vclut_init();
     const rc = vclut_verify_query("SELECT * FROM t", 0);
-    try std.testing.expectEqual(@as(c_int, 2), rc);
+    try std.testing.expectEqual(@as(c_int, -1), rc);
+    // and it never returns a "verified" (>=1) level here
+    try std.testing.expect(rc < 1);
 }

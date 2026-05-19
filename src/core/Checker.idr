@@ -237,20 +237,54 @@ checkLevel0 _ = (True, "L0:ParseSafe — statement parsed successfully")
 ||| @stmt   The statement whose field references to validate.
 ||| @schema The octad schema to resolve against.
 ||| @return (True, _) if all refs resolve; (False, diagnostic) otherwise.
+|||
+||| Decided through `Decide.allFieldRefsResolve` over BOTH ref extractors:
+||| `statementFieldRefs` (the thorough, subquery-descending one — the
+||| original, behaviour-preserving check) AND `Levels.extractFieldRefs`
+||| (the extractor the L1 *predicate* `AllFieldsBound (extractFieldRefs
+||| stmt)` is stated over). The second conjunct is the drift-free
+||| soundness hook for `checkLevel1Sound`; since every ref of
+||| `Levels.extractFieldRefs stmt` is also a ref of `statementFieldRefs
+||| stmt` (the latter does strictly more — it also descends `ESubquery`),
+||| it never changes the verdict. We keep the predicate on
+||| `Levels.extractFieldRefs` so the genuine `Composition.l1Compose`
+||| proof is untouched. Tracked: hyperpolymath/standards#124.
 public export
 checkLevel1 : Statement -> OctadSchema -> (Bool, String)
 checkLevel1 stmt schema =
-  let refs : List FieldRef
-      refs = statementFieldRefs stmt
-      unresolved : List FieldRef
-      unresolved = filter (\ref => isNothing (resolveFieldRef ref schema)) refs
-  in case unresolved of
-    [] => (True, "L1:SchemaBound — all " ++ show (length refs) ++ " field refs resolve")
-    (r :: _) =>
-      ( False
-      , "L1:SchemaBound FAILED — unresolved field: "
-          ++ modalityName (modality r) ++ "." ++ fieldName r
-      )
+    l1Verdict (allFieldRefsResolve (statementFieldRefs stmt) schema
+                 && allFieldRefsResolve (Levels.extractFieldRefs stmt) schema)
+  where
+    l1Verdict : Bool -> (Bool, String)
+    l1Verdict True  =
+      (True,  "L1:SchemaBound — all field refs resolve in the schema")
+    l1Verdict False =
+      (False, "L1:SchemaBound FAILED — an unresolved field reference")
+
+||| **Soundness of the Level-1 decision procedure.**
+||| If `checkLevel1` accepts, the statement genuinely carries an
+||| `L1_SchemaBound`: every field reference of `extractFieldRefs stmt`
+||| resolves, witnessed by the *inductive* `AllFieldsBound` built by
+||| `Decide.allFieldsBoundFromResolve` (each `FieldBound` carries the
+||| real `resolveFieldRef ref schema = Just fd`). Tracked: standards#124.
+export
+checkLevel1Sound : (stmt : Statement) -> (schema : OctadSchema) ->
+                   (m : String) ->
+                   checkLevel1 stmt schema = (True, m) ->
+                   L1_SchemaBound stmt schema
+checkLevel1Sound stmt schema m prf
+    with (allFieldRefsResolve (statementFieldRefs stmt) schema
+            && allFieldRefsResolve (Levels.extractFieldRefs stmt) schema)
+         proof p
+  checkLevel1Sound stmt schema m prf | True =
+    let (_, c2) = andTrueSplit
+                    (allFieldRefsResolve (statementFieldRefs stmt) schema)
+                    (allFieldRefsResolve (Levels.extractFieldRefs stmt) schema)
+                    p
+    in MkL1 stmt schema
+         (allFieldsBoundFromResolve (Levels.extractFieldRefs stmt) schema c2)
+  checkLevel1Sound stmt schema m prf | False =
+    void (notFalseTrue (cong fst prf))
 
 ||| Level 2 — TypeCompat: every comparison expression uses operands
 ||| with compatible types (same type, null compat, or int/float widening).
@@ -550,6 +584,73 @@ checkLevel10 stmt =
       in any (\(a, b) => any (\(c, d) => a == d && b == c) pairs) pairs
 
 -- ═══════════════════════════════════════════════════════════════════════
+-- Soundness of the L6–L10 decision procedures (Phase 3a, standards#124)
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- Each `checkLevelNSound` proves: if `checkLevelN` accepts, the statement
+-- genuinely carries the corresponding `LN_*` witness. Same `with … proof
+-- p` shape as `checkLevel4Sound`; no proof-escape.
+--
+-- SCOPE (honest): the L6–L10 *predicates* assert exactly "the relevant
+-- clause/annotation is present" (`limit/effectDecl/versionConst/
+-- linearAnnot/epistemicClause stmt = Just _`). That is a real,
+-- non-vacuous property (a query lacking the clause cannot inhabit it),
+-- but it is *shallower* than what `checkLevelN` additionally enforces
+-- (L9 rejects `LinUnlimited`; L10 also requires declared agents and no
+-- direct ENTAILS cycle). These soundness lemmas are genuine for the
+-- predicates as stated; the predicate↔checker shallowness gap is
+-- disclosed in VERIFICATION-STANCE.adoc (Phase 3 residual), not masked.
+
+||| L6 soundness: acceptance ⇒ a LIMIT is present.
+export
+checkLevel6Sound : (stmt : Statement) -> (m : String) ->
+                   checkLevel6 stmt = (True, m) -> L6_CardinalitySafe stmt
+checkLevel6Sound stmt m prf with (limit stmt) proof p
+  checkLevel6Sound stmt m prf | Just n  = MkL6 stmt n p
+  checkLevel6Sound stmt m prf | Nothing = void (falseNotTrue (cong fst prf))
+
+||| L7 soundness: acceptance ⇒ an EFFECTS declaration is present.
+export
+checkLevel7Sound : (stmt : Statement) -> (m : String) ->
+                   checkLevel7 stmt = (True, m) -> L7_EffectTracked stmt
+checkLevel7Sound stmt m prf with (effectDecl stmt) proof p
+  checkLevel7Sound stmt m prf | Just e  = MkL7 stmt e p
+  checkLevel7Sound stmt m prf | Nothing = void (falseNotTrue (cong fst prf))
+
+||| L8 soundness: acceptance ⇒ a version constraint is present.
+export
+checkLevel8Sound : (stmt : Statement) -> (m : String) ->
+                   checkLevel8 stmt = (True, m) -> L8_TemporalSafe stmt
+checkLevel8Sound stmt m prf with (versionConst stmt) proof p
+  checkLevel8Sound stmt m prf | Just v  = MkL8 stmt v p
+  checkLevel8Sound stmt m prf | Nothing = void (falseNotTrue (cong fst prf))
+
+||| L9 soundness: acceptance ⇒ a linearity annotation is present.
+||| (The accepting cases are exactly `LinUseOnce` / `LinBounded`; the
+||| witness `MkL9` records `linearAnnot stmt = Just la`.)
+export
+checkLevel9Sound : (stmt : Statement) -> (m : String) ->
+                   checkLevel9 stmt = (True, m) -> L9_LinearSafe stmt
+checkLevel9Sound stmt m prf with (linearAnnot stmt) proof p
+  checkLevel9Sound stmt m prf | Nothing =
+    void (falseNotTrue (cong fst prf))
+  checkLevel9Sound stmt m prf | Just LinUnlimited =
+    void (falseNotTrue (cong fst prf))
+  checkLevel9Sound stmt m prf | Just LinUseOnce =
+    MkL9 stmt LinUseOnce p
+  checkLevel9Sound stmt m prf | Just (LinBounded n) =
+    MkL9 stmt (LinBounded n) p
+
+||| L10 soundness: acceptance ⇒ an EPISTEMIC clause is present.
+export
+checkLevel10Sound : (stmt : Statement) -> (m : String) ->
+                    checkLevel10 stmt = (True, m) -> L10_EpistemicSafe stmt
+checkLevel10Sound stmt m prf with (epistemicClause stmt) proof p
+  checkLevel10Sound stmt m prf | Just ec = MkL10 stmt ec p
+  checkLevel10Sound stmt m prf | Nothing =
+    void (falseNotTrue (cong fst prf))
+
+-- ═══════════════════════════════════════════════════════════════════════
 -- Pipeline Runner
 -- ═══════════════════════════════════════════════════════════════════════
 
@@ -642,3 +743,152 @@ checkQuery stmt schema =
         finalState.passed
         finalState.diags
         True
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- Proof-carrying entry point (Phase 3b, standards#124)
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- `checkQuery` above stays the plain Bool/`CheckResult` path for the C
+-- ABI. This section adds the *proof-carrying* path: each `tryLN` runs
+-- the corresponding decision procedure and, on acceptance, returns the
+-- genuine `LN_*` witness via the (machine-checked) `checkLevelNSound`
+-- lemma — no proof-escape, no re-assertion. `certifyAt` assembles them
+-- into the cumulative dependent `SafetyCertificate`. This is the
+-- certificate↔checker connection that was previously entirely absent
+-- (Phase-1/2 had it for the predicates in isolation; here `checkQuery`'s
+-- *decision* is what produces the dependent certificate).
+
+tryL1 : (stmt : Statement) -> (schema : OctadSchema) ->
+        Maybe (L1_SchemaBound stmt schema)
+tryL1 stmt schema with (checkLevel1 stmt schema) proof p
+  tryL1 stmt schema | (True,  m) = Just (checkLevel1Sound stmt schema m p)
+  tryL1 stmt schema | (False, _) = Nothing
+
+tryL2 : (stmt : Statement) -> (schema : OctadSchema) ->
+        Maybe (L2_TypeCompat stmt schema)
+tryL2 stmt schema with (checkLevel2 stmt schema) proof p
+  tryL2 stmt schema | (True,  m) = Just (checkLevel2Sound stmt schema m p)
+  tryL2 stmt schema | (False, _) = Nothing
+
+tryL3 : (stmt : Statement) -> (schema : OctadSchema) ->
+        Maybe (L3_NullSafe stmt schema)
+tryL3 stmt schema with (checkLevel3 stmt schema) proof p
+  tryL3 stmt schema | (True,  m) = Just (checkLevel3Sound stmt schema m p)
+  tryL3 stmt schema | (False, _) = Nothing
+
+tryL4 : (stmt : Statement) -> Maybe (L4_InjectionProof stmt)
+tryL4 stmt with (checkLevel4 stmt) proof p
+  tryL4 stmt | (True,  m) = Just (checkLevel4Sound stmt m p)
+  tryL4 stmt | (False, _) = Nothing
+
+tryL5 : (stmt : Statement) -> (schema : OctadSchema) ->
+        Maybe (L5_ResultTyped stmt schema)
+tryL5 stmt schema with (checkLevel5 stmt schema) proof p
+  tryL5 stmt schema | (True,  m) = Just (checkLevel5Sound stmt schema m p)
+  tryL5 stmt schema | (False, _) = Nothing
+
+tryL6 : (stmt : Statement) -> Maybe (L6_CardinalitySafe stmt)
+tryL6 stmt with (checkLevel6 stmt) proof p
+  tryL6 stmt | (True,  m) = Just (checkLevel6Sound stmt m p)
+  tryL6 stmt | (False, _) = Nothing
+
+tryL7 : (stmt : Statement) -> Maybe (L7_EffectTracked stmt)
+tryL7 stmt with (checkLevel7 stmt) proof p
+  tryL7 stmt | (True,  m) = Just (checkLevel7Sound stmt m p)
+  tryL7 stmt | (False, _) = Nothing
+
+tryL8 : (stmt : Statement) -> Maybe (L8_TemporalSafe stmt)
+tryL8 stmt with (checkLevel8 stmt) proof p
+  tryL8 stmt | (True,  m) = Just (checkLevel8Sound stmt m p)
+  tryL8 stmt | (False, _) = Nothing
+
+tryL9 : (stmt : Statement) -> Maybe (L9_LinearSafe stmt)
+tryL9 stmt with (checkLevel9 stmt) proof p
+  tryL9 stmt | (True,  m) = Just (checkLevel9Sound stmt m p)
+  tryL9 stmt | (False, _) = Nothing
+
+tryL10 : (stmt : Statement) -> Maybe (L10_EpistemicSafe stmt)
+tryL10 stmt with (checkLevel10 stmt) proof p
+  tryL10 stmt | (True,  m) = Just (checkLevel10Sound stmt m p)
+  tryL10 stmt | (False, _) = Nothing
+
+||| Attempt to produce a genuine dependent `SafetyCertificate` at the
+||| requested level. `Just c` means every level 0..k was *decided*
+||| accepting and `c` carries the real cumulative evidence; `Nothing`
+||| means some required level was rejected. (L0 is unconditional —
+||| a parsed `Statement` is its own parse-safety witness.)
+public export
+certifyAt : (stmt : Statement) -> (schema : OctadSchema) ->
+            (k : SafetyLevel) ->
+            Maybe (SafetyCertificate stmt schema k)
+certifyAt stmt schema ParseSafe =
+  Just (CertL0 (MkL0 stmt))
+certifyAt stmt schema SchemaBound =
+  [| CertL1 (pure (MkL0 stmt)) (tryL1 stmt schema) |]
+certifyAt stmt schema TypeCompat =
+  [| CertL2 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema) |]
+certifyAt stmt schema NullSafe =
+  [| CertL3 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema)
+            (tryL3 stmt schema) |]
+certifyAt stmt schema InjectionProof =
+  [| CertL4 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema)
+            (tryL3 stmt schema) (tryL4 stmt) |]
+certifyAt stmt schema ResultTyped =
+  [| CertL5 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema)
+            (tryL3 stmt schema) (tryL4 stmt) (tryL5 stmt schema) |]
+certifyAt stmt schema CardinalitySafe =
+  [| CertL6 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema)
+            (tryL3 stmt schema) (tryL4 stmt) (tryL5 stmt schema)
+            (tryL6 stmt) |]
+certifyAt stmt schema EffectTracked =
+  [| CertL7 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema)
+            (tryL3 stmt schema) (tryL4 stmt) (tryL5 stmt schema)
+            (tryL6 stmt) (tryL7 stmt) |]
+certifyAt stmt schema TemporalSafe =
+  [| CertL8 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema)
+            (tryL3 stmt schema) (tryL4 stmt) (tryL5 stmt schema)
+            (tryL6 stmt) (tryL7 stmt) (tryL8 stmt) |]
+certifyAt stmt schema LinearSafe =
+  [| CertL9 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema)
+            (tryL3 stmt schema) (tryL4 stmt) (tryL5 stmt schema)
+            (tryL6 stmt) (tryL7 stmt) (tryL8 stmt) (tryL9 stmt) |]
+certifyAt stmt schema EpistemicSafe =
+  [| CertL10 (pure (MkL0 stmt)) (tryL1 stmt schema) (tryL2 stmt schema)
+             (tryL3 stmt schema) (tryL4 stmt) (tryL5 stmt schema)
+             (tryL6 stmt) (tryL7 stmt) (tryL8 stmt) (tryL9 stmt)
+             (tryL10 stmt) |]
+
+||| Certify a query at its own declared `requestedLevel`. The result
+||| type *is* the dependent certificate for that level — a `Just` is a
+||| machine-checked proof the query meets its declared safety level.
+public export
+certifyRequested : (stmt : Statement) -> (schema : OctadSchema) ->
+                   Maybe (SafetyCertificate stmt schema (requestedLevel stmt))
+certifyRequested stmt schema = certifyAt stmt schema (requestedLevel stmt)
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- Proof-gated attestation mint (Phase 3d, standards#124)
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- A C ABI cannot carry a dependent `SafetyCertificate` — that is
+-- inherent to *any* FFI boundary, not a defect. The honest model is a
+-- *trusted-certifier attestation*: this function returns the certified
+-- safety level as an `Int` IFF `certifyRequested` produced a genuine
+-- dependent certificate (the `Just` branch is *structurally* the only
+-- place a non-negative level can be returned — no proof-escape, the
+-- certificate's mere existence is the gate); otherwise `-1`.
+--
+-- An FFI/host that calls this trusts the *certifier binary*, exactly as
+-- proof-carrying-code consumers trust the checker that minted the
+-- attestation. What this is NOT: it is not a re-checkable proof token,
+-- and it does NOT parse — it certifies an already-built `Statement`.
+-- The string→`Statement` parser, the C-ABI `Statement`/`OctadSchema`
+-- marshalling, and the Idris→C build are NAMED OWED items in
+-- VERIFICATION-STANCE.adoc (absent, not faked). `certifyRequested`
+-- itself remains the single source of verification truth.
+public export
+certifiedLevel : Statement -> OctadSchema -> Int
+certifiedLevel stmt schema =
+  case certifyRequested stmt schema of
+    Just _  => cast (safetyLevelToInt (requestedLevel stmt))
+    Nothing => -1

@@ -6,6 +6,23 @@
 ||| Declares the C-ABI entry points exported by the Zig FFI shim at
 ||| `ffi/zig/src/lib.zig`. Idris2's `%foreign` directive carries the
 ||| same signature both ways so the type checker catches drift.
+|||
+||| TRUST MODEL (standards#124, Phase 3d — honest scope). The `Int`
+||| returned by `prim__verify` is an *attestation*, not a transported
+||| dependent proof: a C ABI cannot carry a `SafetyCertificate` (this is
+||| inherent to any FFI boundary). The real verification authority is
+||| the Idris2 certifier `VclTotal.Core.Checker.certifyRequested` /
+||| `certifiedLevel`, which yields a non-negative level *only* behind a
+||| genuine, machine-checked dependent certificate. The mapping below
+||| (`rc` → `Verified Ln`) is faithful — it asserts nothing the C side
+||| did not return. As of Phase 3d the Zig shim is *fail-closed*: with
+||| no verifier backend linked it returns `-1` (Rejected), so
+||| `verifyQuery` honestly yields `Rejected …` rather than a fabricated
+||| level (the previous shim lied — fixed). NAMED OWED (absent, not
+||| faked): a string→`Statement` parser (none exists in the repo — the
+||| corpus certifies an already-built AST); C-ABI `Statement`/
+||| `OctadSchema` marshalling; the Idris→C build that would let the shim
+||| call the certifier. See verification/proofs/VERIFICATION-STANCE.adoc.
 
 module Foreign
 
