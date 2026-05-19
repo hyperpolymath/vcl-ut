@@ -40,8 +40,9 @@ typecheck. The concrete blockers were:
   `Composition` (forward refs, deleted `AllParameterised` still
   referenced, wrong `CertL6+` arities, non-reducing `rewrite`s).
 
-*Phase 1 + 2 + 3 status (RESOLVED):* every blocker above is fixed
-*honestly* and the corpus compiles. **Phase 2** de-vacuized L2/L3/L5
+*Phase 1–4 status (RESOLVED):* every blocker above is fixed
+*honestly* and the corpus compiles (10 modules; Phase 4 = `LayoutProofs`
++ L6–L10 `composeJoin` closure, PR #24). **Phase 2** de-vacuized L2/L3/L5
 (new shared decider module `VclTotal.Core.Decide`, evidence-carrying
 predicates, `checkLevel2/3/5Sound`, genuine `composeJoin` closure).
 **Phase 3** added soundness for L1 and L6–L10
@@ -144,10 +145,26 @@ OWED section.
   Nat`) was *fixed* to `minus`. The sound content (the
   `safetyLevel`/`queryMode`/`vqlUtError` round-trip `Refl` proofs, the
   layout data, `Divides`/`alignUp`/`paddingFor`) remains and is now
-  machine-checked. *Carried OWED (Phase 3, precisely):* the genuine
-  alignment/no-padding theorems (`alignUp` divisibility via real
-  `div`/`mod` lemmas; fold field sizes = `totalSize`) and a
-  membership-quantified `offsetInBounds`.
+  machine-checked. *(Phase 4a — RESOLVED.)* The genuine
+  alignment/no-padding/bounds theorems are discharged in the new,
+  self-contained, CI-gated module `VclTotal.ABI.LayoutProofs`
+  (10th `vclut-core.ipkg` module; byte-identical `PField`/`qphFields`
+  model of `Layout.queryPlanHeaderLayout`): `alignToDivides`
+  (alignment divisibility *by construction* for the canonical
+  round-up-to-multiple form `alignTo size a = ⌈size/a⌉ * a` — witness
+  is the quotient, no `div`/`mod` lemma, no escape);
+  `queryPlanHeaderNoPadding` (fold of field sizes 4+4+4+4+8 = declared
+  cap 24, reduces under `Refl`); `queryPlanHeaderWithin` +
+  `fieldWithin` (membership-quantified bound: any field *provably in*
+  the layout, via `Data.Vect.Elem` and `Data.So.soAnd`, satisfies
+  `foff + fsize <= cap` — the honest replacement for the deleted false
+  `offsetInBounds`/`?metavariable`). *Remaining sliver (precisely
+  scoped, NOT faked):* the additive `Layout.alignUp size a = size +
+  paddingFor size a` ↔ ceil `alignTo size a` equivalence for `a > 0`,
+  left as the documented `String` note `alignUpAdditiveEquivOWED`
+  (needs the `Data.Nat` Euclidean identity + the `Bool`↔`Prop` bridge
+  for `paddingFor`'s conditional) — a scope note, never a
+  `believe_me`.
   `VclTotal.ABI.Foreign` is *deliberately still excluded* but is *not
   unsound*: it contains **no proofs at all** — only `%foreign` C
   declarations and `Maybe`/`Either` wrappers. Its gaps are (a) it does
@@ -189,11 +206,22 @@ OWED section.
   assemble them: a `Just` result *is* a machine-checked
   `SafetyCertificate stmt schema (requestedLevel stmt)`. `checkQuery`
   (the `Bool`/`CheckResult` C-ABI path) is retained unchanged.
-  *Carried OWED (Phase 3, precisely):* the L6–L10 *predicates* assert
-  only "the relevant clause/annotation is present" — real and
-  non-vacuous, but shallower than what `checkLevelN` additionally
-  enforces (L9 ≠ `LinUnlimited`; L10 declared agents + acyclic
-  `ENTAILS`); strengthening those predicates is future work. And the
+  *(Phase 4b — RESOLVED for join-closure.)* The L6–L10 predicates now
+  carry the shared `VclTotal.Core.Decide` deciders and are *genuinely
+  closed under `composeJoin`*, machine-checked: `l6/l7/l8/l9Compose`
+  (present-LIMIT / present-EFFECTS / present-VERSION join + all four
+  ENFORCED×ENFORCED `joinLinear` cases) and `epiStructJoin` for L10's
+  *structural* part (clause present, ≥1 agent, every requirement agent
+  declared) — proved by genuine superset monotonicity
+  (`fuaSuperset`/`agentDeclaredAppL`/`agentDeclaredAppR` +
+  `fuaNilAppend`), no proof-escape. L10's no-direct-`ENTAILS`-cycle
+  sub-property is *provably NOT* join-closed and remains carried by
+  the explicit minimal `JoinSideCondition` (`epiNoCycle (composeJoin
+  q1 q2) = True` only at `EpistemicSafe`; `Unit` elsewhere) — stated
+  in the TYPE, never faked. *Still future work (precisely):*
+  deepening the L9/L10 *predicates themselves* to the full
+  `checkLevelN` semantics (L9 ≠ `LinUnlimited`; L10 acyclic `ENTAILS`
+  as a predicate rather than a side-condition). And the
   certificate is still *not transported across the FFI* (see the
   `ABI.Foreign` item) — the in-corpus certificate is not yet a runtime
   proof token handed to hypatia/verisim.
@@ -304,6 +332,31 @@ OWED section.
   scoping. (A C ABI carrying a re-checkable dependent proof is *not*
   on this list — it is impossible by construction; the honest target is
   trusted-certifier attestation.)
+. *Phase 4 (DONE in-corpus, this PR — discharges the Phase-3 "owed"
+  layout + join-closure debt):*
+  *(4a)* the genuine `ABI.Layout` alignment / no-padding / bounds
+  theorems, in the new self-contained CI-gated module
+  `VclTotal.ABI.LayoutProofs` (10th ipkg module): `alignToDivides`
+  (divisibility by construction for canonical ceil-multiple
+  alignment), `queryPlanHeaderNoPadding` (Σ field sizes = cap, reduces
+  under `Refl`), `fieldWithin` (membership-quantified bound via
+  `Vect.Elem` + `So.soAnd`). *Residual sliver:* additive↔ceil
+  `alignUp` equivalence for `a>0`, the documented `String` note
+  `alignUpAdditiveEquivOWED` — scoped, never faked.
+  *(4b)* L6–L10 genuinely closed under `composeJoin`
+  (`l6/l7/l8/l9Compose`, `epiStructJoin` via real superset
+  monotonicity); L10 acyclicity remains the explicit
+  `JoinSideCondition` (provably non-closed, in the type). No
+  `believe_me`/`postulate`/`assert_*`/`idris_crash`/`sorry`.
+  *Residual (carried):* deepen the L9/L10 *predicates* to full
+  `checkLevelN` semantics; FFI transport; the additive↔ceil sliver;
+  the unchanged Phase-3 string→`Statement`/marshalling/Idris→C items.
+  This residual is *tracked, not forgotten*: the boundary-reinforcement
+  workstream (FFI proof-attestation transport + the missing
+  `String -> Statement` parser, priority 1; the secondary items above)
+  is hyperpolymath/vcl-ut#25. A C ABI carrying a *re-checkable*
+  dependent proof is impossible by construction — the honest target
+  there is trusted-certifier attestation, stated not hidden.
 
 == Provenance
 
@@ -314,7 +367,11 @@ L2/L3/L5 de-vacuized (new `VclTotal.Core.Decide`). Phase 3 2026-05-19:
 L1/L6–L10 soundness + `certifyAt`/`certifyRequested` dependent
 certificate + `ABI.Layout` made sound & gated; Phase 3d 2026-05-19:
 FFI fabricated-level lie deleted (fail-closed, `zig build test` green) +
-proof-gated `Checker.certifiedLevel` mint. The corpus builds clean as
+proof-gated `Checker.certifiedLevel` mint. Phase 4 2026-05-19:
+`ABI.LayoutProofs` (genuine alignment/no-padding/bounds, 10th ipkg
+module) + L6–L10 `composeJoin` closure (`l6..l9Compose`,
+`epiStructJoin`); corpus rebuilt clean, 10 modules, zero proof-escape.
+The corpus builds clean as
 *9 modules*
 (`idris2 0.8.0 --build verification/proofs/vclut-core.ipkg`, exit 0,
 `%default total`, zero proof-escape symbols — CI-enforced), the added

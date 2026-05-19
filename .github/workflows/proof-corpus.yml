@@ -37,12 +37,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      # NOTE: pin to a commit SHA per repo security posture once a stable
-      # release SHA is recorded (TODO(SHA-pin); tags used here interim).
-      - name: Set up Idris2 0.8.0
-        uses: idris-community/setup-idris@v1
-        with:
-          idris-version: 0.8.0
+      # Idris2 0.8.0 is built from PINNED official source. The former
+      # `idris-community/setup-idris` action's repository no longer
+      # resolves (404), and no maintained equivalent exists; a
+      # SHA-pinned source build is deterministic, version-exact, and
+      # depends on no third-party action (matches the repo's pin
+      # posture). `idris-lang/Idris2` tag v0.8.0 == commit
+      # 15a3e4e70843f7a34100f6470c04b791330788df.
+      - name: Build & install Idris2 0.8.0 from pinned source
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends chezscheme make gcc
+          git clone --no-checkout https://github.com/idris-lang/Idris2.git /tmp/Idris2
+          git -C /tmp/Idris2 checkout 15a3e4e70843f7a34100f6470c04b791330788df
+          make -C /tmp/Idris2 bootstrap SCHEME=chezscheme
+          make -C /tmp/Idris2 install PREFIX="$HOME/.idris2"
+          echo "$HOME/.idris2/bin" >> "$GITHUB_PATH"
+          echo "IDRIS2_PREFIX=$HOME/.idris2" >> "$GITHUB_ENV"
 
       - name: Proof-escape audit (no believe_me / postulate / assert_* / sorry)
         run: |
@@ -51,7 +63,8 @@ jobs:
           files="src/core/Grammar.idr src/core/Schema.idr src/core/Decide.idr \
                  src/core/Levels.idr src/core/Checker.idr \
                  src/core/Composition.idr src/core/Epistemic.idr \
-                 src/interface/abi/Types.idr src/interface/abi/Layout.idr"
+                 src/interface/abi/Types.idr src/interface/abi/Layout.idr \
+                 src/interface/abi/LayoutProofs.idr"
           if grep -nE '\b(believe_me|really_believe_me|assert_total|assert_smaller|idris_crash|postulate|sorry)\b' \
                $files | grep -vE ':\s*(--|\|\|\|)' ; then
             echo "::error::proof-escape symbol found in the Phase-1 corpus"

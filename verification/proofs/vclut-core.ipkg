@@ -29,6 +29,7 @@ sourcedir = "corpus"
 
 modules = VclTotal.ABI.Types
         , VclTotal.ABI.Layout
+        , VclTotal.ABI.LayoutProofs
         , VclTotal.Core.Grammar
         , VclTotal.Core.Schema
         , VclTotal.Core.Decide

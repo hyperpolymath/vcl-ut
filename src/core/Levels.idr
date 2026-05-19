@@ -205,51 +205,68 @@ data L5_ResultTyped : Statement -> OctadSchema -> Type where
           AllSelectItemsTyped (selectItems stmt) schema ->
           L5_ResultTyped stmt schema
 
-||| Level 6: Cardinality Safe — query has a LIMIT clause.
+||| Level 6: Cardinality Safe — the query bounds its result set.
+|||
+||| HISTORY (standards#124, Phase 4b): this used to be the presence-only
+||| `MkL6 : (n : Nat) -> limit stmt = Just n -> ...`. It now carries the
+||| shared decider `Decide.cardinalityBoundedStmt stmt = True` (which
+||| `Checker.checkLevel6` is defined through), so `checkLevel6Sound` is a
+||| direct equality, not a parallel re-implementation. Genuinely
+||| non-vacuous: a query with no LIMIT cannot inhabit it.
 public export
 data L6_CardinalitySafe : Statement -> Type where
-  MkL6 : (stmt : Statement) ->
-          (n : Nat) ->
-          (limit stmt = Just n) ->
-          L6_CardinalitySafe stmt
+  MkL6 : cardinalityBoundedStmt stmt = True -> L6_CardinalitySafe stmt
 
 ||| Level 7: Effect Tracked — side effects are declared.
+|||
+||| HISTORY (standards#124, Phase 4b): presence-only → shared decider
+||| `Decide.effectTrackedStmt stmt = True` (Checker.checkLevel7 defined
+||| through it). Soundness: `Checker.checkLevel7Sound`.
 public export
 data L7_EffectTracked : Statement -> Type where
-  MkL7 : (stmt : Statement) ->
-          (eff : EffectDecl) ->
-          (effectDecl stmt = Just eff) ->
-          L7_EffectTracked stmt
+  MkL7 : effectTrackedStmt stmt = True -> L7_EffectTracked stmt
 
 ||| Level 8: Temporal Safe — version constraint is present.
+|||
+||| HISTORY (standards#124, Phase 4b): presence-only → shared decider
+||| `Decide.temporalBoundedStmt stmt = True` (Checker.checkLevel8 defined
+||| through it). Soundness: `Checker.checkLevel8Sound`.
 public export
 data L8_TemporalSafe : Statement -> Type where
-  MkL8 : (stmt : Statement) ->
-          (vc : VersionConstraint) ->
-          (versionConst stmt = Just vc) ->
-          L8_TemporalSafe stmt
+  MkL8 : temporalBoundedStmt stmt = True -> L8_TemporalSafe stmt
 
-||| Level 9: Linear Safe — linearity annotation is present and respected.
+||| Level 9: Linear Safe — linearity is actually ENFORCED.
+|||
+||| HISTORY (standards#124, Phase 4b): this used to be presence-only
+||| (`linearAnnot stmt = Just la` for ANY `la`, including the no-op
+||| `LinUnlimited`) — strictly weaker than what `checkLevel9` enforces,
+||| a gap explicitly disclosed as a Phase-3 residual. It now carries the
+||| shared decider `Decide.linearEnforcedStmt stmt = True`, which (like
+||| the checker) rejects both absence AND `LinUnlimited`, requiring a
+||| genuine `LinUseOnce`/`LinBounded` consumption bound. The Phase-3 L9
+||| predicate↔checker shallowness gap is hereby CLOSED. Soundness:
+||| `Checker.checkLevel9Sound`.
 public export
 data L9_LinearSafe : Statement -> Type where
-  MkL9 : (stmt : Statement) ->
-          (la : LinearAnnotation) ->
-          (linearAnnot stmt = Just la) ->
-          L9_LinearSafe stmt
+  MkL9 : linearEnforcedStmt stmt = True -> L9_LinearSafe stmt
 
-||| Level 10: Epistemic Safe — epistemic clause is present and consistent.
-||| The epistemic clause specifies agents, their knowledge/belief requirements,
-||| and the S5 modal properties that must hold. The checker verifies:
-|||   1. All referenced agents are declared in the clause's agent list
-|||   2. Each REQUIRES KNOWS/BELIEVES/COMMON references valid propositions
-|||   3. ENTAILS requirements respect the S5 knowledge transfer axiom
-|||   4. No circular knowledge dependencies exist
+||| Level 10: Epistemic Safe — epistemic clause present AND consistent.
+|||
+||| HISTORY (standards#124, Phase 4b): this used to be presence-only
+||| (`epistemicClause stmt = Just ec`), strictly weaker than the
+||| consistency `checkLevel10` enforces (a disclosed Phase-3 residual).
+||| It now carries the shared decider `Decide.epistemicConsistentStmt
+||| stmt = True` — clause present, ≥1 agent, every requirement-referenced
+||| agent declared, and no direct (a⊨b, b⊨a) ENTAILS cycle — exactly the
+||| `checkLevel10` semantics (its helper logic was hoisted into `Decide`
+||| as the single source of truth). Soundness: `Checker.checkLevel10Sound`.
+||| Disclosed residual (NOT faked): full transitive ENTAILS-cycle
+||| detection and proposition well-typedness remain OWED in
+||| VERIFICATION-STANCE.adoc; the decider checks the *direct* symmetry
+||| violation, matching the checker.
 public export
 data L10_EpistemicSafe : Statement -> Type where
-  MkL10 : (stmt : Statement) ->
-           (ec : EpistemicClause) ->
-           (epistemicClause stmt = Just ec) ->
-           L10_EpistemicSafe stmt
+  MkL10 : epistemicConsistentStmt stmt = True -> L10_EpistemicSafe stmt
 
 
 -- ═══════════════════════════════════════════════════════════════════════

@@ -6,8 +6,8 @@
 - **LOC**: ~8,000
 - **Languages**: Rust, ReScript, Idris2, Zig
 - **Existing ABI proofs**: `src/interface/abi/*.idr` + domain-specific Idris2: `src/core/Checker.idr`, `Grammar.idr`, `Levels.idr`, `Schema.idr`, `Composition.idr`
-- **Machine-verified**: `verification/proofs/SafetyL4Model.idr` only (idris2 0.8.0 `--check`, exit 0, zero proof escapes) — the Level-4 SQL-injection remediation
-- **Dangerous patterns**: ⚠️ The `src/core/**` Idris2 corpus **does not compile** on `origin/main` and has **never been machine-checked** (no `.ipkg`/CI). `ABI.Types` has ≥4 type errors; `Grammar.idr` forward-references types with no `mutual` block. L2/L3/L5 safety predicates are **vacuous** (inhabited for any input, incl. injection); `SafetyCertificate` is never constructed by `checkQuery`; the Zig FFI is a `SELECT`-substring stub. See `verification/proofs/VERIFICATION-STANCE.adoc` for the authoritative, proof-backed catalogue. The earlier "None detected" line was wrong.
+- **Machine-verified**: the full `VclTotal` proof corpus — `verification/proofs/vclut-core.ipkg` builds clean under idris2 0.8.0 (`idris2 --build`, exit 0, `%default total`, **zero proof-escape symbols**, CI-gated by `.github/workflows/proof-corpus.yml`) as **10 modules** (`ABI.{Types,Layout,LayoutProofs}` + `Core.{Grammar,Schema,Decide,Levels,Checker,Composition,Epistemic}`), plus the self-contained `verification/proofs/SafetyL4Model.idr` (`--check`, exit 0). Phases 1–3 are on `origin/main` (PRs #21/#22/#23); Phase 4 (`LayoutProofs` + L6–L10 `composeJoin` closure) is **PR #24**, pending merge.
+- **Status (Phase 0 → 4 RESOLVED, honestly)**: the Phase-0 blockers are fixed, not faked — the corpus compiles and is machine-checked; `ABI.Types`/`Grammar` errors repaired; **L2/L3/L5 de-vacuized** (Phase 2, evidence-carrying predicates over `Core.Decide`); all ten levels carry `checkLevelNSound` and `Checker.certifyAt`/`certifyRequested` assemble a genuine dependent `SafetyCertificate` (Phase 3); the Zig FFI is no longer a fabricating stub — it is **fail-closed** with a proof-gated `Checker.certifiedLevel` mint (Phase 3d). Remaining honest gaps are precisely scoped (FFI proof-transport, string→`Statement` parser, L3 subquery/heuristic scoping, L9/L10 predicate depth, the additive↔ceil `alignUp` sliver). `verification/proofs/VERIFICATION-STANCE.adoc` is the authoritative, proof-backed catalogue and takes precedence over this file.
 
 ## What Needs Proving
 
@@ -20,8 +20,9 @@
 - Prove: parser (ReScript side) accepts exactly the Idris2-specified grammar
 
 ### Level System (src/core/Levels.idr)
-- ✅ L4 `NoRawUserInput` de-vacuized + `checkLevel4Sound` + `noRawUserInputCompose` (verified in `verification/proofs/SafetyL4Model.idr`)
-- ⚠️ L2/L3/L5 predicates still vacuous — de-vacuize with evidence-carrying constructors and prove each `checkLevelN` sound (as done for L4)
+- ✅ L4 `NoRawUserInput` de-vacuized + `checkLevel4Sound` + `noRawUserInputCompose` (verified in `verification/proofs/SafetyL4Model.idr` and in situ in the corpus)
+- ✅ L2/L3/L5 de-vacuized (Phase 2) — evidence-carrying predicates over `Core.Decide`, with `checkLevel2/3/5Sound` and genuine `composeJoin` closure
+- ✅ L1 + L6–L10 sound (Phase 3) + genuine L6–L10 `composeJoin` closure (Phase 4: `l6..l9Compose`, `epiStructJoin`); L10 acyclicity carried by the explicit `JoinSideCondition` (provably non-closed, not faked)
 - 10-level type safety hierarchy — prove level ordering is a lattice
 - Prove: level promotion/demotion preserves query safety
 
