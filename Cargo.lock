@@ -1923,6 +1923,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "vcltotal-parse"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+]
+
+[[package]]
 name = "wait-timeout"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
