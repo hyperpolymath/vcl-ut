@@ -166,6 +166,13 @@ fn emit() {
     line("golden2", &f2());
     line("golden3", &f3());
     line_schema("goldenS1", &sch1());
+    // P5c recompute-tier verdicts: the Rust decider's certified level
+    // for each statement fixture against the S1 schema. The Idris
+    // `WireConformance` Refl-proves the corpus `certifiedLevel` equals
+    // these same ints on the same bytes — the runtime-TCB pin.
+    println!("cl1 = {}", vcltotal_parse::certified_level(&f1(), &sch1()));
+    println!("cl2 = {}", vcltotal_parse::certified_level(&f2(), &sch1()));
+    println!("cl3 = {}", vcltotal_parse::certified_level(&f3(), &sch1()));
 }
 
 /// Self-check: every fixture round-trips through the Rust codec, so the
@@ -180,4 +187,11 @@ fn fixtures_roundtrip() {
         vcltotal_parse::from_wire_schema(&to_wire_schema(&sch1())).unwrap(),
         sch1()
     );
+    // Recompute-tier verdicts must hold on the *decoded* bytes (the
+    // exact domain the consumer runs), not just the in-memory value.
+    let sc = vcltotal_parse::from_wire_schema(&to_wire_schema(&sch1())).unwrap();
+    for (s, want) in [(f1(), 1_i64), (f2(), -1_i64), (f3(), 0_i64)] {
+        let decoded = vcltotal_parse::from_wire(&to_wire(&s)).unwrap();
+        assert_eq!(vcltotal_parse::certified_level(&decoded, &sc), want);
+    }
 }
