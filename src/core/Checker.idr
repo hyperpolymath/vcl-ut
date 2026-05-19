@@ -550,6 +550,73 @@ checkLevel10 stmt =
       in any (\(a, b) => any (\(c, d) => a == d && b == c) pairs) pairs
 
 -- ═══════════════════════════════════════════════════════════════════════
+-- Soundness of the L6–L10 decision procedures (Phase 3a, standards#124)
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- Each `checkLevelNSound` proves: if `checkLevelN` accepts, the statement
+-- genuinely carries the corresponding `LN_*` witness. Same `with … proof
+-- p` shape as `checkLevel4Sound`; no proof-escape.
+--
+-- SCOPE (honest): the L6–L10 *predicates* assert exactly "the relevant
+-- clause/annotation is present" (`limit/effectDecl/versionConst/
+-- linearAnnot/epistemicClause stmt = Just _`). That is a real,
+-- non-vacuous property (a query lacking the clause cannot inhabit it),
+-- but it is *shallower* than what `checkLevelN` additionally enforces
+-- (L9 rejects `LinUnlimited`; L10 also requires declared agents and no
+-- direct ENTAILS cycle). These soundness lemmas are genuine for the
+-- predicates as stated; the predicate↔checker shallowness gap is
+-- disclosed in VERIFICATION-STANCE.adoc (Phase 3 residual), not masked.
+
+||| L6 soundness: acceptance ⇒ a LIMIT is present.
+export
+checkLevel6Sound : (stmt : Statement) -> (m : String) ->
+                   checkLevel6 stmt = (True, m) -> L6_CardinalitySafe stmt
+checkLevel6Sound stmt m prf with (limit stmt) proof p
+  checkLevel6Sound stmt m prf | Just n  = MkL6 stmt n p
+  checkLevel6Sound stmt m prf | Nothing = void (falseNotTrue (cong fst prf))
+
+||| L7 soundness: acceptance ⇒ an EFFECTS declaration is present.
+export
+checkLevel7Sound : (stmt : Statement) -> (m : String) ->
+                   checkLevel7 stmt = (True, m) -> L7_EffectTracked stmt
+checkLevel7Sound stmt m prf with (effectDecl stmt) proof p
+  checkLevel7Sound stmt m prf | Just e  = MkL7 stmt e p
+  checkLevel7Sound stmt m prf | Nothing = void (falseNotTrue (cong fst prf))
+
+||| L8 soundness: acceptance ⇒ a version constraint is present.
+export
+checkLevel8Sound : (stmt : Statement) -> (m : String) ->
+                   checkLevel8 stmt = (True, m) -> L8_TemporalSafe stmt
+checkLevel8Sound stmt m prf with (versionConst stmt) proof p
+  checkLevel8Sound stmt m prf | Just v  = MkL8 stmt v p
+  checkLevel8Sound stmt m prf | Nothing = void (falseNotTrue (cong fst prf))
+
+||| L9 soundness: acceptance ⇒ a linearity annotation is present.
+||| (The accepting cases are exactly `LinUseOnce` / `LinBounded`; the
+||| witness `MkL9` records `linearAnnot stmt = Just la`.)
+export
+checkLevel9Sound : (stmt : Statement) -> (m : String) ->
+                   checkLevel9 stmt = (True, m) -> L9_LinearSafe stmt
+checkLevel9Sound stmt m prf with (linearAnnot stmt) proof p
+  checkLevel9Sound stmt m prf | Nothing =
+    void (falseNotTrue (cong fst prf))
+  checkLevel9Sound stmt m prf | Just LinUnlimited =
+    void (falseNotTrue (cong fst prf))
+  checkLevel9Sound stmt m prf | Just LinUseOnce =
+    MkL9 stmt LinUseOnce p
+  checkLevel9Sound stmt m prf | Just (LinBounded n) =
+    MkL9 stmt (LinBounded n) p
+
+||| L10 soundness: acceptance ⇒ an EPISTEMIC clause is present.
+export
+checkLevel10Sound : (stmt : Statement) -> (m : String) ->
+                    checkLevel10 stmt = (True, m) -> L10_EpistemicSafe stmt
+checkLevel10Sound stmt m prf with (epistemicClause stmt) proof p
+  checkLevel10Sound stmt m prf | Just ec = MkL10 stmt ec p
+  checkLevel10Sound stmt m prf | Nothing =
+    void (falseNotTrue (cong fst prf))
+
+-- ═══════════════════════════════════════════════════════════════════════
 -- Pipeline Runner
 -- ═══════════════════════════════════════════════════════════════════════
 
