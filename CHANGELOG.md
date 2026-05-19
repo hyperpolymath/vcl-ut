@@ -10,6 +10,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Verified
+
+**VclTotal proof corpus — Phase 0→4 remediation** (2026-05-18/19,
+hyperpolymath/standards#124). The `src/core/**` Idris2 corpus, which at
+Phase 0 did not compile and had never been machine-checked, is now
+CI-gated and green:
+
+- `verification/proofs/vclut-core.ipkg` builds clean under idris2 0.8.0
+  (`idris2 --build`, exit 0, `%default total`) as **10 modules**, with
+  **zero proof-escape symbols** (no `believe_me`/`postulate`/`assert_*`/
+  `idris_crash`/`sorry`), enforced by `.github/workflows/proof-corpus.yml`.
+- Phase 1 (#21): corpus resurrection — `ABI.Types`/`Grammar` repaired,
+  `.ipkg`/CI added, L4 verified in situ.
+- Phase 2 (#22): L2/L3/L5 de-vacuized over the shared `Core.Decide`
+  deciders + `checkLevel2/3/5Sound` + genuine `composeJoin` closure.
+- Phase 3 (#23): L1 + L6–L10 soundness; `Checker.certifyAt`/
+  `certifyRequested` assemble a genuine dependent `SafetyCertificate`;
+  `ABI.Layout` made sound; Phase 3d removed the fabricating Zig FFI
+  (now fail-closed) and added the proof-gated `Checker.certifiedLevel`.
+- Phase 4 (PR #24): `ABI.LayoutProofs` (genuine alignment/no-padding/
+  bounds) + L6–L10 `composeJoin` closure (`l6..l9Compose`,
+  `epiStructJoin`); L10 acyclicity carried by the explicit
+  `JoinSideCondition` (provably non-closed, not faked).
+
+`verification/proofs/VERIFICATION-STANCE.adoc` is the authoritative,
+precisely-scoped catalogue (residual OWED items disclosed, not masked).
+
 ### Renamed
 
 **V{Q→C}L-{UT→total}** (2026-04-05). Full repo-wide migration of the project

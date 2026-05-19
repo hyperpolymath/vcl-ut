@@ -40,8 +40,9 @@ typecheck. The concrete blockers were:
   `Composition` (forward refs, deleted `AllParameterised` still
   referenced, wrong `CertL6+` arities, non-reducing `rewrite`s).
 
-*Phase 1 + 2 + 3 status (RESOLVED):* every blocker above is fixed
-*honestly* and the corpus compiles. **Phase 2** de-vacuized L2/L3/L5
+*Phase 1–4 status (RESOLVED):* every blocker above is fixed
+*honestly* and the corpus compiles (10 modules; Phase 4 = `LayoutProofs`
++ L6–L10 `composeJoin` closure, PR #24). **Phase 2** de-vacuized L2/L3/L5
 (new shared decider module `VclTotal.Core.Decide`, evidence-carrying
 predicates, `checkLevel2/3/5Sound`, genuine `composeJoin` closure).
 **Phase 3** added soundness for L1 and L6–L10
