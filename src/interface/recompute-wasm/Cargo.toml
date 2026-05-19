@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+
+# Standalone workspace root (same rationale as ../parse/Cargo.toml): the
+# parent virtual workspace has a pre-existing unresolvable external
+# path-dep, so this boundary crate builds/gates in isolation. Its ONLY
+# dependency is the in-repo, forbid-unsafe `vcltotal-parse` (internal
+# path-dep — resolves in a standalone checkout, unlike the broken
+# `../../../echidna/...` member).
+[workspace]
+
+[package]
+name = "vcltotal-recompute-wasm"
+version = "0.1.0"
+edition = "2021"
+license = "PMPL-1.0-or-later"
+authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
+repository = "https://github.com/hyperpolymath/vcl-ut"
+description = "P5c (#25): the recompute-PCC tier's wasm32 entry. Wraps the forbid-unsafe `vcltotal-parse` decoder+decider; the ONLY unsafe is one audited host/guest memory-ABI block (the declared trust boundary)."
+
+[lib]
+name = "vcltotal_recompute_wasm"
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+vcltotal-parse = { path = "../parse" }
+
+# Total/panic-free is inherited from `vcltotal-parse`'s static SPARK
+# lint set (the decoder/decider carry no panics). `panic = "abort"`
+# removes the unwinding runtime from the cdylib so a (by-construction
+# unreachable) panic is a trap, never UB.
+[profile.release]
+panic = "abort"
+opt-level = "z"
+lto = true
+strip = true
+
+[profile.dev]
+panic = "abort"
