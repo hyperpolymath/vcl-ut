@@ -129,3 +129,113 @@ selectItemsTypedAppend (i :: is) ys sch pxs py =
   let (qi, qis) = andTrueSplit (selectItemTyped i sch)
                                (selectItemsTyped is sch) pxs
   in andTrueIntro qi (selectItemsTypedAppend is ys sch qis py)
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- Level 2 decider — TypeCompat
+-- (was private in Checker; hoisted so the L2 predicate + checkLevel2
+--  share ONE definition — single source of truth, no drift)
+-- ═══════════════════════════════════════════════════════════════════════
+
+||| Structural equality for Agent (payload-sensitive for the parameterised
+||| constructors). Used only to compare epistemic type wrappers.
+public export
+agentEq : Agent -> Agent -> Bool
+agentEq AgEngine        AgEngine        = True
+agentEq (AgProver a)    (AgProver b)    = a == b
+agentEq AgValidator     AgValidator     = True
+agentEq (AgUser a)      (AgUser b)      = a == b
+agentEq AgFederation    AgFederation    = True
+agentEq _               _              = False
+
+||| Structural equality for VqlType (same constructor + matching args).
+public export
+vqlTypeEq : VqlType -> VqlType -> Bool
+vqlTypeEq TString     TString     = True
+vqlTypeEq TInt        TInt        = True
+vqlTypeEq TFloat      TFloat      = True
+vqlTypeEq TBool       TBool       = True
+vqlTypeEq TBytes      TBytes      = True
+vqlTypeEq (TVector n) (TVector m) = n == m
+vqlTypeEq TTimestamp  TTimestamp  = True
+vqlTypeEq THash       THash       = True
+vqlTypeEq (TList a)   (TList b)   = vqlTypeEq a b
+vqlTypeEq TOctad      TOctad      = True
+vqlTypeEq (TNull a)   (TNull b)   = vqlTypeEq a b
+vqlTypeEq TAny        TAny        = True
+vqlTypeEq (TKnows a1 t1)     (TKnows a2 t2)     = agentEq a1 a2 && vqlTypeEq t1 t2
+vqlTypeEq (TBelieves a1 t1)  (TBelieves a2 t2)  = agentEq a1 a2 && vqlTypeEq t1 t2
+vqlTypeEq (TCommonKnowledge t1) (TCommonKnowledge t2) = vqlTypeEq t1 t2
+vqlTypeEq _           _           = False
+
+||| Two VqlTypes are compatible for comparison: structurally equal, or
+||| `TNull t ~ t`, or numeric widening `TInt ~ TFloat`. Decidable mirror
+||| of `Grammar.TypeCompatible`.
+public export
+typesCompatible : VqlType -> VqlType -> Bool
+typesCompatible a b =
+  if vqlTypeEq a b
+    then True
+    else case (a, b) of
+      (TNull inner, other) => vqlTypeEq inner other
+      (other, TNull inner) => vqlTypeEq other inner
+      (TInt, TFloat)       => True
+      (TFloat, TInt)       => True
+      _                    => False
+
+||| All `ECompare` nodes in an expression tree, as
+||| (operator, left, right, annotated-type) tuples. Structural recursion
+||| on `Expr`; `ESubquery` is opaque here (its own checker pass covers
+||| it), so this is total with no fuel/axiom.
+public export
+extractComparisons : Expr -> List (CompOp, Expr, Expr, VqlType)
+extractComparisons (ECompare op l r ty) =
+  (op, l, r, ty) :: extractComparisons l ++ extractComparisons r
+extractComparisons (ELogic _ l Nothing _)  = extractComparisons l
+extractComparisons (ELogic _ l (Just r) _) =
+  extractComparisons l ++ extractComparisons r
+extractComparisons (EAggregate _ e _)   = extractComparisons e
+extractComparisons (EEpistemic _ _ e _) = extractComparisons e
+extractComparisons (EAnnounce _ p b _)  =
+  extractComparisons p ++ extractComparisons b
+extractComparisons _ = []
+
+||| One comparison's operands have compatible resolved types.
+public export
+comparisonCompatible :
+  OctadSchema -> (CompOp, Expr, Expr, VqlType) -> Bool
+comparisonCompatible schema (_, l, r, _) =
+  typesCompatible (resolveExprType l schema) (resolveExprType r schema)
+
+||| Every comparison in a list is operand-compatible. Explicit spine
+||| recursion (not `all`) so the append lemma is one structural step.
+public export
+allComparisonsCompatible :
+  List (CompOp, Expr, Expr, VqlType) -> OctadSchema -> Bool
+allComparisonsCompatible []        _      = True
+allComparisonsCompatible (c :: cs) schema =
+  comparisonCompatible schema c && allComparisonsCompatible cs schema
+
+||| Level-2 decider: every comparison in the (optional) WHERE clause has
+||| operands of compatible resolved types. `Nothing` is trivially safe.
+public export
+whereComparisonsCompatible : Maybe Expr -> OctadSchema -> Bool
+whereComparisonsCompatible Nothing  _      = True
+whereComparisonsCompatible (Just e) schema =
+  allComparisonsCompatible (extractComparisons e) schema
+
+||| `allComparisonsCompatible` over an append follows from each side
+||| (engine of genuine L2 composition: `composeJoin` conjoins the two
+||| WHEREs under one `ELogic And` node, whose comparison multiset is
+||| exactly the union — `extractComparisons` distributes over it — and
+||| `comparisonCompatible` is per-node / context-free).
+public export
+allComparisonsCompatibleAppend :
+  (xs, ys : List (CompOp, Expr, Expr, VqlType)) -> (sch : OctadSchema) ->
+  allComparisonsCompatible xs sch = True ->
+  allComparisonsCompatible ys sch = True ->
+  allComparisonsCompatible (xs ++ ys) sch = True
+allComparisonsCompatibleAppend []        ys sch _   py = py
+allComparisonsCompatibleAppend (c :: cs) ys sch pxs py =
+  let (qc, qcs) = andTrueSplit (comparisonCompatible sch c)
+                               (allComparisonsCompatible cs sch) pxs
+  in andTrueIntro qc (allComparisonsCompatibleAppend cs ys sch qcs py)

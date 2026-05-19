@@ -60,23 +60,35 @@ extractFieldRefs stmt =
   exprFieldRefs (having stmt) ++
   map fst (orderBy stmt)
 
-||| Proof that a single expression is type-safe.
-public export
-data ExprTypeSafe : Expr -> OctadSchema -> Type where
-  FieldSafe   : ExprTypeSafe (EField ref ty) schema
-  LiteralSafe : ExprTypeSafe (ELiteral lit ty) schema
-  CompareSafe : TypeCompatible lty rty ->
-                ExprTypeSafe (ECompare op l r TBool) schema
-  LogicSafe   : ExprTypeSafe (ELogic op l mr TBool) schema
-  AggregateSafe : ExprTypeSafe (EAggregate f e ty) schema
-  ParamSafe   : ExprTypeSafe (EParam name ty) schema
-
-
 ||| Proof that all comparisons in an expression use compatible types.
+|||
+||| HISTORY (standards#124, Phase 2): this used to be a pair of types
+|||
+|||   data ExprTypeSafe : Expr -> OctadSchema -> Type where
+|||     FieldSafe   : ExprTypeSafe (EField ref ty) schema
+|||     CompareSafe : TypeCompatible lty rty ->
+|||                   ExprTypeSafe (ECompare op l r TBool) schema
+|||     LogicSafe   : ExprTypeSafe (ELogic op l mr TBool) schema
+|||     ...   -- (FieldSafe/LiteralSafe/AggregateSafe/ParamSafe)
+|||   data AllComparisonsTypeSafe : Maybe Expr -> OctadSchema -> Type where
+|||     NoWhere       : AllComparisonsTypeSafe Nothing schema
+|||     WhereTypeSafe : ExprTypeSafe expr schema ->
+|||                     AllComparisonsTypeSafe (Just expr) schema
+|||
+||| which is *vacuous* three ways: `FieldSafe` demanded no relation
+||| between `ty` and the schema; `CompareSafe`'s `lty`/`rty` were free
+||| implicits unconnected to `l`/`r` (dischargeable by `SameType` for any
+||| `t`) and it never recursed into the operands; so `WhereTypeSafe …`
+||| inhabited the predicate for *every* WHERE clause. Level 2 proved
+||| nothing about type compatibility. It now carries real evidence: the
+||| shared decider `Decide.whereComparisonsCompatible` (which
+||| `Checker.checkLevel2` is defined through) returns `True`, i.e. every
+||| `ECompare` node in the WHERE clause has operands of compatible
+||| resolved types. Soundness: `Checker.checkLevel2Sound`.
 public export
 data AllComparisonsTypeSafe : Maybe Expr -> OctadSchema -> Type where
-  NoWhere : AllComparisonsTypeSafe Nothing schema
-  WhereTypeSafe : ExprTypeSafe expr schema -> AllComparisonsTypeSafe (Just expr) schema
+  MkAllCompat : whereComparisonsCompatible m schema = True ->
+                AllComparisonsTypeSafe m schema
 
 
 ||| Proof that all nullable fields are guarded (NULL checks present).

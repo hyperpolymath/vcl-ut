@@ -78,67 +78,10 @@ safetyLevelLabel TemporalSafe    = "L8:TemporalSafe"
 safetyLevelLabel LinearSafe      = "L9:LinearSafe"
 safetyLevelLabel EpistemicSafe   = "L10:EpistemicSafe"
 
--- ═══════════════════════════════════════════════════════════════════════
--- Type Compatibility (decidable boolean check for Level 2)
--- ═══════════════════════════════════════════════════════════════════════
-
-||| Decidable structural equality for VqlType.
-||| Structural equality for Agent (ignoring payload for parameterised
-||| agents). Hoisted to the top level: a `where` block after the final
-||| clause of a multi-clause function is not in scope for the earlier
-||| clauses that referenced it.
-private
-agentEq : Agent -> Agent -> Bool
-agentEq AgEngine AgEngine               = True
-agentEq (AgProver a) (AgProver b)       = a == b
-agentEq AgValidator AgValidator         = True
-agentEq (AgUser a) (AgUser b)           = a == b
-agentEq AgFederation AgFederation       = True
-agentEq _ _                             = False
-
-||| Returns True when two types are the same constructor with matching
-||| arguments — used by Level 2 to verify comparison operand types.
-public export
-vqlTypeEq : VqlType -> VqlType -> Bool
-vqlTypeEq TString     TString     = True
-vqlTypeEq TInt        TInt        = True
-vqlTypeEq TFloat      TFloat      = True
-vqlTypeEq TBool       TBool       = True
-vqlTypeEq TBytes      TBytes      = True
-vqlTypeEq (TVector n) (TVector m) = n == m
-vqlTypeEq TTimestamp  TTimestamp  = True
-vqlTypeEq THash       THash       = True
-vqlTypeEq (TList a)   (TList b)   = vqlTypeEq a b
-vqlTypeEq TOctad      TOctad      = True
-vqlTypeEq (TNull a)   (TNull b)   = vqlTypeEq a b
-vqlTypeEq TAny        TAny        = True
-vqlTypeEq (TKnows a1 t1) (TKnows a2 t2) = agentEq a1 a2 && vqlTypeEq t1 t2
-vqlTypeEq (TBelieves a1 t1) (TBelieves a2 t2) = agentEq a1 a2 && vqlTypeEq t1 t2
-vqlTypeEq (TCommonKnowledge t1) (TCommonKnowledge t2) = vqlTypeEq t1 t2
-vqlTypeEq _           _           = False
-
-||| Check whether two VqlTypes are compatible for comparison.
-|||
-||| Compatible means:
-|||   - Same type (structural equality)
-|||   - TNull t is compatible with t (and vice versa)
-|||   - TInt is compatible with TFloat (numeric widening)
-|||
-||| This mirrors the TypeCompatible proof type in Grammar.idr but as
-||| a decidable boolean suitable for runtime checking.
-public export
-typesCompatible : VqlType -> VqlType -> Bool
-typesCompatible a b =
-  if vqlTypeEq a b
-    then True
-    else case (a, b) of
-      -- Null compatibility: TNull t ~ t and t ~ TNull t
-      (TNull inner, other) => vqlTypeEq inner other
-      (other, TNull inner) => vqlTypeEq other inner
-      -- Numeric widening: Int ~ Float
-      (TInt, TFloat)       => True
-      (TFloat, TInt)       => True
-      _                    => False
+-- `agentEq` / `vqlTypeEq` / `typesCompatible` moved to
+-- `VclTotal.Core.Decide` (Phase 2, standards#124): the Level-2 proof
+-- predicate `AllComparisonsTypeSafe` and `checkLevel2` must decide via
+-- the SAME function so `checkLevel2Sound` cannot drift. Imported above.
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Field Reference Extraction
@@ -246,18 +189,9 @@ mutual
 -- Expression Scanning Helpers
 -- ═══════════════════════════════════════════════════════════════════════
 
-||| Extract all ECompare sub-expressions from an expression tree.
-||| Returns a list of (operator, left, right, annotatedType) tuples.
-extractComparisons : Expr -> List (CompOp, Expr, Expr, VqlType)
-extractComparisons (ECompare op l r ty) =
-  (op, l, r, ty) :: extractComparisons l ++ extractComparisons r
-extractComparisons (ELogic _ l Nothing _) = extractComparisons l
-extractComparisons (ELogic _ l (Just r) _) =
-  extractComparisons l ++ extractComparisons r
-extractComparisons (EAggregate _ e _) = extractComparisons e
-extractComparisons (EEpistemic _ _ e _) = extractComparisons e
-extractComparisons (EAnnounce _ p b _) = extractComparisons p ++ extractComparisons b
-extractComparisons _ = []
+-- `extractComparisons` moved to `VclTotal.Core.Decide` (Phase 2,
+-- standards#124) — single source of truth for the L2 predicate +
+-- checkLevel2 (see note in the Type-Compatibility region above).
 
 -- `resolveExprType` / `resolveSelectItemType` moved to
 -- `VclTotal.Core.Decide` (Phase 2, standards#124): the Level-2 / Level-5
@@ -352,24 +286,40 @@ checkLevel1 stmt schema =
 ||| @stmt   The statement to check.
 ||| @schema The schema for type resolution.
 ||| @return (True, _) if all comparisons type-check; (False, diagnostic) otherwise.
+|||
+||| Defined through the shared decider `Decide.whereComparisonsCompatible`
+||| (the same function the L2 proof predicate `AllComparisonsTypeSafe`
+||| carries), so `checkLevel2Sound` is a genuine soundness statement.
 public export
 checkLevel2 : Statement -> OctadSchema -> (Bool, String)
 checkLevel2 stmt schema =
-  case whereClause stmt of
-    Nothing => (True, "L2:TypeCompat — no WHERE clause, trivially compatible")
-    Just wExpr =>
-      let comps : List (CompOp, Expr, Expr, VqlType)
-          comps = extractComparisons wExpr
-          incompatible : List (CompOp, Expr, Expr, VqlType)
-          incompatible = filter (not . isCompatibleComparison) comps
-      in case incompatible of
-        [] => (True, "L2:TypeCompat — all " ++ show (length comps) ++ " comparisons type-safe")
-        _  => (False, "L2:TypeCompat FAILED — " ++ show (length incompatible) ++ " incompatible comparison(s)")
+    l2Verdict (whereComparisonsCompatible (whereClause stmt) schema)
   where
-    ||| Check that a single comparison's operands have compatible types.
-    isCompatibleComparison : (CompOp, Expr, Expr, VqlType) -> Bool
-    isCompatibleComparison (_, l, r, _) =
-      typesCompatible (resolveExprType l schema) (resolveExprType r schema)
+    l2Verdict : Bool -> (Bool, String)
+    l2Verdict True  =
+      (True,  "L2:TypeCompat — all WHERE comparisons have compatible types")
+    l2Verdict False =
+      (False, "L2:TypeCompat FAILED — incompatible comparison operand types")
+
+||| **Soundness of the Level-2 decision procedure.**
+||| If `checkLevel2` accepts, the statement genuinely carries an
+||| `L2_TypeCompat`: every `ECompare` in the WHERE clause has operands of
+||| compatible resolved types
+||| (`whereComparisonsCompatible (whereClause stmt) schema = True`).
+||| Before Phase 2 `AllComparisonsTypeSafe` was inhabited by the
+||| content-free `WhereTypeSafe …`, so this was not even meaningful.
+||| Mirrors `checkLevel4Sound`. Tracked: hyperpolymath/standards#124.
+export
+checkLevel2Sound : (stmt : Statement) -> (schema : OctadSchema) ->
+                   (m : String) ->
+                   checkLevel2 stmt schema = (True, m) ->
+                   L2_TypeCompat stmt schema
+checkLevel2Sound stmt schema m prf
+    with (whereComparisonsCompatible (whereClause stmt) schema) proof p
+  checkLevel2Sound stmt schema m prf | True  =
+    MkL2 stmt schema (MkAllCompat p)
+  checkLevel2Sound stmt schema m prf | False =
+    void (notFalseTrue (cong fst prf))
 
 ||| Level 3 — NullSafe: nullable fields must be guarded with null checks.
 ||| Any nullable field used in WHERE or HAVING without an IS NULL / IS NOT NULL

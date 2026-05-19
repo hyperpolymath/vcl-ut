@@ -425,29 +425,39 @@ l4Compose (MkL4 s1 n1) (MkL4 s2 n2) =
   MkL4 (composeJoin s1 s2) (noRawUserInputCompose s1 s2 n1 n2)
 
 -- ══════════════════════════════════════════════════════════════════════
--- SECTION 5: L2 / L3 / L5 — correct indexed construction
---            (predicates remain vacuous; OWED, see VERIFICATION-STANCE)
+-- SECTION 5: L2 / L3 / L5 composition
+--   L2 + L5 are now GENUINE (Phase 2, standards#124); L3 below.
 -- ══════════════════════════════════════════════════════════════════════
 
-||| L2: the joined WHERE is Nothing, one verbatim side, or an `ELogic And`.
-||| For the verbatim sides we *reuse the input witness* (not a fresh
-||| catch-all); the conjoined node uses `LogicSafe`, the (still vacuous)
-||| L2 constructor.
-joinWhereTypeSafe :
-  (w1m, w2m : Maybe Expr) ->
-  AllComparisonsTypeSafe w1m sch -> AllComparisonsTypeSafe w2m sch ->
-  AllComparisonsTypeSafe (joinWhere w1m w2m) sch
-joinWhereTypeSafe Nothing   Nothing   NoWhere            NoWhere            = NoWhere
-joinWhereTypeSafe (Just _)  Nothing   (WhereTypeSafe e1) NoWhere            = WhereTypeSafe e1
-joinWhereTypeSafe Nothing   (Just _)  NoWhere            (WhereTypeSafe e2) = WhereTypeSafe e2
-joinWhereTypeSafe (Just _)  (Just _)  (WhereTypeSafe _)  (WhereTypeSafe _)  = WhereTypeSafe LogicSafe
+||| **Genuine** L2 closure. `AllComparisonsTypeSafe` now carries
+||| `whereComparisonsCompatible m sch = True`. `composeJoin` builds the
+||| joined WHERE as `Nothing`, a verbatim side, or
+||| `Just (ELogic And a (Just b) TBool)`; `Decide.extractComparisons`
+||| distributes over that `ELogic` node (the node itself is not an
+||| `ECompare`), so the joined comparison list is exactly
+||| `extractComparisons a ++ extractComparisons b` and
+||| `comparisonCompatible` is per-node / context-free. The verbatim
+||| sides reuse the input witness; the conjoined case is discharged by
+||| the real `Decide.allComparisonsCompatibleAppend`. No vacuous
+||| constructor; mirrors the L4 `wslJoin` shape.
+whereCompatJoin :
+  (w1m, w2m : Maybe Expr) -> (sch : OctadSchema) ->
+  whereComparisonsCompatible w1m sch = True ->
+  whereComparisonsCompatible w2m sch = True ->
+  whereComparisonsCompatible (joinWhere w1m w2m) sch = True
+whereCompatJoin Nothing   Nothing   _   _  _  = Refl
+whereCompatJoin (Just _)  Nothing   _   p1 _  = p1
+whereCompatJoin Nothing   (Just _)  _   _  p2 = p2
+whereCompatJoin (Just a)  (Just b)  sch p1 p2 =
+  allComparisonsCompatibleAppend
+    (extractComparisons a) (extractComparisons b) sch p1 p2
 
 l2Compose :
   L2_TypeCompat q1 schema -> L2_TypeCompat q2 schema ->
   L2_TypeCompat (composeJoin q1 q2) schema
-l2Compose (MkL2 s1 sch a1) (MkL2 s2 _ a2) =
+l2Compose (MkL2 s1 sch (MkAllCompat a1)) (MkL2 s2 _ (MkAllCompat a2)) =
   MkL2 (composeJoin s1 s2) sch
-    (joinWhereTypeSafe (whereClause s1) (whereClause s2) a1 a2)
+    (MkAllCompat (whereCompatJoin (whereClause s1) (whereClause s2) sch a1 a2))
 
 ||| L3: `AllNullableFieldsGuarded` only distinguishes `Nothing` from
 ||| `Just _`; the join is `Just _` whenever either input was.
