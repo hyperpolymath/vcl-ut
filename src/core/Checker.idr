@@ -25,6 +25,11 @@ import Data.Maybe
 
 %default total
 
+-- `Levels.CheckResult` (the proof-carrying Passed/Failed datatype) and this
+-- module's own `CheckResult` record share a name; this module only uses its
+-- own. Hide the imported one so `checkQuery`'s signature is unambiguous.
+%hide VclTotal.Core.Levels.CheckResult
+
 -- ═══════════════════════════════════════════════════════════════════════
 -- Check Result
 -- ═══════════════════════════════════════════════════════════════════════
@@ -77,6 +82,19 @@ safetyLevelLabel EpistemicSafe   = "L10:EpistemicSafe"
 -- ═══════════════════════════════════════════════════════════════════════
 
 ||| Decidable structural equality for VqlType.
+||| Structural equality for Agent (ignoring payload for parameterised
+||| agents). Hoisted to the top level: a `where` block after the final
+||| clause of a multi-clause function is not in scope for the earlier
+||| clauses that referenced it.
+private
+agentEq : Agent -> Agent -> Bool
+agentEq AgEngine AgEngine               = True
+agentEq (AgProver a) (AgProver b)       = a == b
+agentEq AgValidator AgValidator         = True
+agentEq (AgUser a) (AgUser b)           = a == b
+agentEq AgFederation AgFederation       = True
+agentEq _ _                             = False
+
 ||| Returns True when two types are the same constructor with matching
 ||| arguments — used by Level 2 to verify comparison operand types.
 public export
@@ -97,15 +115,6 @@ vqlTypeEq (TKnows a1 t1) (TKnows a2 t2) = agentEq a1 a2 && vqlTypeEq t1 t2
 vqlTypeEq (TBelieves a1 t1) (TBelieves a2 t2) = agentEq a1 a2 && vqlTypeEq t1 t2
 vqlTypeEq (TCommonKnowledge t1) (TCommonKnowledge t2) = vqlTypeEq t1 t2
 vqlTypeEq _           _           = False
-  where
-    ||| Structural equality for Agent (ignoring payload for parameterised agents).
-    agentEq : Agent -> Agent -> Bool
-    agentEq AgEngine AgEngine               = True
-    agentEq (AgProver a) (AgProver b)       = a == b
-    agentEq AgValidator AgValidator         = True
-    agentEq (AgUser a) (AgUser b)           = a == b
-    agentEq AgFederation AgFederation       = True
-    agentEq _ _                             = False
 
 ||| Check whether two VqlTypes are compatible for comparison.
 |||
@@ -134,46 +143,103 @@ typesCompatible a b =
 -- Field Reference Extraction
 -- ═══════════════════════════════════════════════════════════════════════
 
-||| Recursively extract all FieldRef nodes from an expression tree.
-||| Traverses EField, ECompare, ELogic, EAggregate, and ESubquery nodes.
-public export
-extractFieldRefs : Expr -> List FieldRef
-extractFieldRefs (EField ref _)         = [ref]
-extractFieldRefs (ELiteral _ _)         = []
-extractFieldRefs (ECompare _ l r _)     = extractFieldRefs l ++ extractFieldRefs r
-extractFieldRefs (ELogic _ l Nothing _) = extractFieldRefs l
-extractFieldRefs (ELogic _ l (Just r) _) = extractFieldRefs l ++ extractFieldRefs r
-extractFieldRefs (EAggregate _ e _)     = extractFieldRefs e
-extractFieldRefs (EParam _ _)           = []
-extractFieldRefs EStar                  = []
-extractFieldRefs (ESubquery sub)        = statementFieldRefs sub
-extractFieldRefs (EEpistemic _ _ e _)   = extractFieldRefs e
-extractFieldRefs (EAnnounce _ prop body _) =
-  extractFieldRefs prop ++ extractFieldRefs body
+-- Totality note (hyperpolymath/standards#124, Phase 1)
+-- ----------------------------------------------------
+-- `extractFieldRefs` and `statementFieldRefs` are mutually recursive
+-- across the `Expr`/`Statement` boundary: `Expr` has the constructor
+-- `ESubquery Statement`, and a `Statement` carries `Maybe Expr` /
+-- `List SelectItem` clauses that contain further `Expr`s.
+--
+-- Idris 2's structural-termination checker only credits a recursive call
+-- as decreasing when its argument is a *constructor-pattern subterm* of
+-- a matched argument. A record *projection* (`whereClause stmt`,
+-- `having stmt`, `selectItems stmt`) is an opaque function application,
+-- NOT recognised as smaller — that is exactly why the previous
+-- projection-based body was rejected as "possibly not terminating".
+--
+-- The honest fix below introduces no fuel, no axiom and no
+-- `assert_smaller`: it just pattern-matches the `MkStatement`
+-- constructor so every clause becomes a bound subpattern variable, and
+-- inlines the `Maybe`/`List`/`SelectItem` traversals into the `mutual`
+-- block so each `extractFieldRefs` call sits *directly* on a
+-- constructor-pattern subterm. The descent the checker now sees is the
+-- genuine one:
+--
+--     extractFieldRefs (ESubquery sub)            -- sub ⊏ the Expr
+--       └─ statementFieldRefs (MkStatement … w h) -- w,h,sel ⊏ sub
+--            └─ extractFieldRefs w / h / aggregate-e   -- ⊏ that Statement
+--
+-- so every trip round the cycle strips at least one `ESubquery`
+-- constructor: it is ordinary structural recursion on the finite AST,
+-- and the computed list of `FieldRef`s is byte-for-byte the same set as
+-- before (same clauses, same order: SELECT ++ WHERE ++ GROUP BY ++
+-- HAVING ++ ORDER BY).
+mutual
+  ||| Recursively extract all FieldRef nodes from an expression tree.
+  ||| Traverses EField, ECompare, ELogic, EAggregate, and ESubquery nodes.
+  public export
+  extractFieldRefs : Expr -> List FieldRef
+  extractFieldRefs (EField ref _)         = [ref]
+  extractFieldRefs (ELiteral _ _)         = []
+  extractFieldRefs (ECompare _ l r _)     = extractFieldRefs l ++ extractFieldRefs r
+  extractFieldRefs (ELogic _ l Nothing _) = extractFieldRefs l
+  extractFieldRefs (ELogic _ l (Just r) _) = extractFieldRefs l ++ extractFieldRefs r
+  extractFieldRefs (EAggregate _ e _)     = extractFieldRefs e
+  extractFieldRefs (EParam _ _)           = []
+  extractFieldRefs EStar                  = []
+  extractFieldRefs (ESubquery sub)        = statementFieldRefs sub
+  extractFieldRefs (EEpistemic _ _ e _)   = extractFieldRefs e
+  extractFieldRefs (EAnnounce _ prop body _) =
+    extractFieldRefs prop ++ extractFieldRefs body
 
-||| Collect all field references from every clause of a statement.
-||| Delegates to extractFieldRefs for each expression-bearing clause.
-public export
-statementFieldRefs : Statement -> List FieldRef
-statementFieldRefs stmt =
-  let selRefs : List FieldRef
-      selRefs = concatMap selItemFieldRefs (selectItems stmt)
-      whereRefs : List FieldRef
-      whereRefs = maybe [] extractFieldRefs (whereClause stmt)
-      groupRefs : List FieldRef
-      groupRefs = groupBy stmt
-      havingRefs : List FieldRef
-      havingRefs = maybe [] extractFieldRefs (having stmt)
-      orderRefs : List FieldRef
-      orderRefs = map fst (orderBy stmt)
-  in selRefs ++ whereRefs ++ groupRefs ++ havingRefs ++ orderRefs
-  where
-    ||| Extract field references from a single SELECT item.
-    selItemFieldRefs : SelectItem -> List FieldRef
-    selItemFieldRefs (SelField ref)       = [ref]
-    selItemFieldRefs (SelModality _)      = []
-    selItemFieldRefs (SelAggregate _ e)   = extractFieldRefs e
-    selItemFieldRefs SelStar              = []
+  ||| Field references collected from an optional expression-bearing
+  ||| clause (WHERE / HAVING). Written by pattern match (not `maybe`)
+  ||| so the `Just` payload is a constructor-pattern subterm the
+  ||| totality checker tracks as smaller.
+  export
+  maybeExprFieldRefs : Maybe Expr -> List FieldRef
+  maybeExprFieldRefs Nothing  = []
+  maybeExprFieldRefs (Just e) = extractFieldRefs e
+
+  ||| Extract field references from a single SELECT item. In the
+  ||| `mutual` block (not a `where` helper) so the `extractFieldRefs e`
+  ||| call on `SelAggregate _ e` lands on a tracked subterm.
+  export
+  selItemFieldRefs : SelectItem -> List FieldRef
+  selItemFieldRefs (SelField ref)     = [ref]
+  selItemFieldRefs (SelModality _)    = []
+  selItemFieldRefs (SelAggregate _ e) = extractFieldRefs e
+  selItemFieldRefs SelStar            = []
+
+  ||| Map `selItemFieldRefs` over the SELECT list by explicit structural
+  ||| recursion on the list spine (replaces `concatMap`, whose argument
+  ||| would again be an untracked projection).
+  export
+  selItemsFieldRefs : List SelectItem -> List FieldRef
+  selItemsFieldRefs []        = []
+  selItemsFieldRefs (i :: is) = selItemFieldRefs i ++ selItemsFieldRefs is
+
+  ||| Collect all field references from every clause of a statement.
+  ||| Delegates to extractFieldRefs for each expression-bearing clause.
+  ||| The statement is destructured via its `MkStatement` constructor so
+  ||| each clause (`sel`, `whr`, `grp`, `hav`, `ord`) is a subpattern
+  ||| variable the structural checker recognises as smaller than the
+  ||| `Statement` (which, in the recursive case, is the `ESubquery`
+  ||| payload — itself smaller than the enclosing `Expr`).
+  public export
+  statementFieldRefs : Statement -> List FieldRef
+  statementFieldRefs (MkStatement sel _ whr grp hav ord _ _ _ _ _ _ _ _) =
+    let selRefs    : List FieldRef
+        selRefs    = selItemsFieldRefs sel
+        whereRefs  : List FieldRef
+        whereRefs  = maybeExprFieldRefs whr
+        groupRefs  : List FieldRef
+        groupRefs  = grp
+        havingRefs : List FieldRef
+        havingRefs = maybeExprFieldRefs hav
+        orderRefs  : List FieldRef
+        orderRefs  = map fst ord
+    in selRefs ++ whereRefs ++ groupRefs ++ havingRefs ++ orderRefs
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Expression Scanning Helpers
@@ -621,7 +687,8 @@ checkQuery : Statement -> OctadSchema -> CheckResult
 checkQuery stmt schema =
   let initState : PipelineState
       initState = MkPipelineState ParseSafe [] []
-      (finalState, mFailure) = runPipeline allLevels stmt schema initState
+      finalState : PipelineState
+      finalState = fst (runPipeline allLevels stmt schema initState)
   in case finalState.passed of
     [] =>
       -- Level 0 itself failed — should not happen (ParseSafe always passes)

@@ -27,6 +27,92 @@ import Data.Nat
 %default total
 
 -- ═══════════════════════════════════════════════════════════════════════
+-- Helper Predicates
+-- ═══════════════════════════════════════════════════════════════════════
+
+||| Extract field references from a SELECT item list.
+||| Exported so that Composition.idr can prove distributivity over (++).
+public export
+selectFieldRefs : List SelectItem -> List FieldRef
+selectFieldRefs [] = []
+selectFieldRefs (SelField ref :: rest) = ref :: selectFieldRefs rest
+selectFieldRefs (_ :: rest) = selectFieldRefs rest
+
+||| Extract field references from an optional expression.
+||| Exported so that Composition.idr can prove properties of joinWhere.
+public export
+exprFieldRefs : Maybe Expr -> List FieldRef
+exprFieldRefs Nothing = []
+exprFieldRefs (Just (EField ref _)) = [ref]
+exprFieldRefs (Just (ECompare _ l r _)) = exprFieldRefs (Just l) ++ exprFieldRefs (Just r)
+exprFieldRefs (Just (ELogic _ l mr _)) = exprFieldRefs (Just l) ++ exprFieldRefs mr
+exprFieldRefs (Just (EAggregate _ e _)) = exprFieldRefs (Just e)
+exprFieldRefs _ = []
+
+||| Extract all field references from a statement.
+public export
+extractFieldRefs : Statement -> List FieldRef
+extractFieldRefs stmt =
+  selectFieldRefs (selectItems stmt) ++
+  exprFieldRefs (whereClause stmt) ++
+  (groupBy stmt) ++
+  exprFieldRefs (having stmt) ++
+  map fst (orderBy stmt)
+
+||| Proof that a single expression is type-safe.
+public export
+data ExprTypeSafe : Expr -> OctadSchema -> Type where
+  FieldSafe   : ExprTypeSafe (EField ref ty) schema
+  LiteralSafe : ExprTypeSafe (ELiteral lit ty) schema
+  CompareSafe : TypeCompatible lty rty ->
+                ExprTypeSafe (ECompare op l r TBool) schema
+  LogicSafe   : ExprTypeSafe (ELogic op l mr TBool) schema
+  AggregateSafe : ExprTypeSafe (EAggregate f e ty) schema
+  ParamSafe   : ExprTypeSafe (EParam name ty) schema
+
+
+||| Proof that all comparisons in an expression use compatible types.
+public export
+data AllComparisonsTypeSafe : Maybe Expr -> OctadSchema -> Type where
+  NoWhere : AllComparisonsTypeSafe Nothing schema
+  WhereTypeSafe : ExprTypeSafe expr schema -> AllComparisonsTypeSafe (Just expr) schema
+
+
+||| Proof that all nullable fields are guarded (NULL checks present).
+public export
+data AllNullableFieldsGuarded : Maybe Expr -> OctadSchema -> Type where
+  NoWhereNull : AllNullableFieldsGuarded Nothing schema
+  GuardedNull : AllNullableFieldsGuarded (Just expr) schema
+
+||| Proof that no raw user input appears in the query's WHERE clause.
+||| User values must arrive via `EParam` nodes, never as embedded string
+||| literals (the canonical SQL-injection vector).
+|||
+||| HISTORY (standards#124, vcl-ut HOLE remediation): this used to be
+|||
+|||   data NoRawUserInput : Statement -> Type where
+|||     AllParameterised : NoRawUserInput stmt
+|||
+||| which is *vacuous* — `AllParameterised` inhabits `NoRawUserInput stmt`
+||| for *every* statement, including one whose WHERE is pure string
+||| interpolation. Level 4 therefore proved nothing about the property it
+||| names. It now carries real structural evidence: the WHERE clause
+||| embeds no string literal (`Grammar.whereHasStringLit stmt = False`).
+||| `Checker.checkLevel4` decides exactly this predicate
+||| (see `checkLevel4Sound`), and it is genuinely closed under join
+||| composition (see `Composition.noRawUserInputCompose`).
+public export
+data NoRawUserInput : Statement -> Type where
+  MkNoRawUserInput : whereHasStringLit stmt = False -> NoRawUserInput stmt
+
+||| Proof that all select items have known types.
+public export
+data AllSelectItemsTyped : List SelectItem -> OctadSchema -> Type where
+  NilTyped  : AllSelectItemsTyped [] schema
+  ConsTyped : AllSelectItemsTyped rest schema ->
+              AllSelectItemsTyped (item :: rest) schema
+
+-- ═══════════════════════════════════════════════════════════════════════
 -- Level Predicates
 -- ═══════════════════════════════════════════════════════════════════════
 
@@ -122,89 +208,6 @@ data L10_EpistemicSafe : Statement -> Type where
            (epistemicClause stmt = Just ec) ->
            L10_EpistemicSafe stmt
 
--- ═══════════════════════════════════════════════════════════════════════
--- Helper Predicates
--- ═══════════════════════════════════════════════════════════════════════
-
-||| Extract field references from a SELECT item list.
-||| Exported so that Composition.idr can prove distributivity over (++).
-public export
-selectFieldRefs : List SelectItem -> List FieldRef
-selectFieldRefs [] = []
-selectFieldRefs (SelField ref :: rest) = ref :: selectFieldRefs rest
-selectFieldRefs (_ :: rest) = selectFieldRefs rest
-
-||| Extract field references from an optional expression.
-||| Exported so that Composition.idr can prove properties of joinWhere.
-public export
-exprFieldRefs : Maybe Expr -> List FieldRef
-exprFieldRefs Nothing = []
-exprFieldRefs (Just (EField ref _)) = [ref]
-exprFieldRefs (Just (ECompare _ l r _)) = exprFieldRefs (Just l) ++ exprFieldRefs (Just r)
-exprFieldRefs (Just (ELogic _ l mr _)) = exprFieldRefs (Just l) ++ exprFieldRefs mr
-exprFieldRefs (Just (EAggregate _ e _)) = exprFieldRefs (Just e)
-exprFieldRefs _ = []
-
-||| Extract all field references from a statement.
-public export
-extractFieldRefs : Statement -> List FieldRef
-extractFieldRefs stmt =
-  selectFieldRefs (selectItems stmt) ++
-  exprFieldRefs (whereClause stmt) ++
-  (groupBy stmt) ++
-  exprFieldRefs (having stmt) ++
-  map fst (orderBy stmt)
-
-||| Proof that all comparisons in an expression use compatible types.
-public export
-data AllComparisonsTypeSafe : Maybe Expr -> OctadSchema -> Type where
-  NoWhere : AllComparisonsTypeSafe Nothing schema
-  WhereTypeSafe : ExprTypeSafe expr schema -> AllComparisonsTypeSafe (Just expr) schema
-
-||| Proof that a single expression is type-safe.
-public export
-data ExprTypeSafe : Expr -> OctadSchema -> Type where
-  FieldSafe   : ExprTypeSafe (EField ref ty) schema
-  LiteralSafe : ExprTypeSafe (ELiteral lit ty) schema
-  CompareSafe : TypeCompatible lty rty ->
-                ExprTypeSafe (ECompare op l r TBool) schema
-  LogicSafe   : ExprTypeSafe (ELogic op l mr TBool) schema
-  AggregateSafe : ExprTypeSafe (EAggregate f e ty) schema
-  ParamSafe   : ExprTypeSafe (EParam name ty) schema
-
-||| Proof that all nullable fields are guarded (NULL checks present).
-public export
-data AllNullableFieldsGuarded : Maybe Expr -> OctadSchema -> Type where
-  NoWhereNull : AllNullableFieldsGuarded Nothing schema
-  GuardedNull : AllNullableFieldsGuarded (Just expr) schema
-
-||| Proof that no raw user input appears in the query's WHERE clause.
-||| User values must arrive via `EParam` nodes, never as embedded string
-||| literals (the canonical SQL-injection vector).
-|||
-||| HISTORY (standards#124, vcl-ut HOLE remediation): this used to be
-|||
-|||   data NoRawUserInput : Statement -> Type where
-|||     AllParameterised : NoRawUserInput stmt
-|||
-||| which is *vacuous* — `AllParameterised` inhabits `NoRawUserInput stmt`
-||| for *every* statement, including one whose WHERE is pure string
-||| interpolation. Level 4 therefore proved nothing about the property it
-||| names. It now carries real structural evidence: the WHERE clause
-||| embeds no string literal (`Grammar.whereHasStringLit stmt = False`).
-||| `Checker.checkLevel4` decides exactly this predicate
-||| (see `checkLevel4Sound`), and it is genuinely closed under join
-||| composition (see `Composition.noRawUserInputCompose`).
-public export
-data NoRawUserInput : Statement -> Type where
-  MkNoRawUserInput : whereHasStringLit stmt = False -> NoRawUserInput stmt
-
-||| Proof that all select items have known types.
-public export
-data AllSelectItemsTyped : List SelectItem -> OctadSchema -> Type where
-  NilTyped  : AllSelectItemsTyped [] schema
-  ConsTyped : AllSelectItemsTyped rest schema ->
-              AllSelectItemsTyped (item :: rest) schema
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Subsumption Proofs

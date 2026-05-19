@@ -30,6 +30,7 @@ module VclTotal.Core.Epistemic
 import VclTotal.ABI.Types
 import VclTotal.Core.Grammar
 import Data.List
+import Data.So
 
 %default total
 
@@ -296,6 +297,11 @@ data AllRequirementsSatisfied : EpistemicContext -> List EpistemicRequirement ->
              AllRequirementsSatisfied ctx reqs ->
              AllRequirementsSatisfied ctx (req :: reqs)
 
+||| Extract requirements from an epistemic clause.
+public export
+requirements : EpistemicClause -> List EpistemicRequirement
+requirements (EpClause _ reqs) = reqs
+
 ||| The Level 10 soundness certificate: given a well-formed epistemic
 ||| clause and a satisfying model, the epistemic properties hold.
 public export
@@ -306,10 +312,6 @@ data EpistemicCertificate : Statement -> Type where
              (ctx : EpistemicContext) ->
              AllRequirementsSatisfied ctx (requirements ec) ->
              EpistemicCertificate stmt
-  where
-    ||| Extract requirements from an epistemic clause.
-    requirements : EpistemicClause -> List EpistemicRequirement
-    requirements (EpClause _ reqs) = reqs
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Belief vs Knowledge: Axiom Differences

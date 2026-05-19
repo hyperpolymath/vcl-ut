@@ -14,11 +14,16 @@
 
 module VclTotal.ABI.Types
 
-import Data.Bits
 import Data.So
 import Data.Vect
+import Decidable.Equality
 
 %default total
+
+||| Local injectivity of the `Just` constructor (base does not export one).
+private
+justInj : {0 a, b : t} -> Just a = Just b -> a = b
+justInj Refl = Refl
 
 --------------------------------------------------------------------------------
 -- Platform Detection
@@ -30,12 +35,12 @@ data Platform = Linux | Windows | MacOS | BSD | WASM
 
 ||| Compile-time platform detection
 ||| Set during compilation based on target triple
+||| The compile target is fixed to Linux for the verified corpus. A genuine
+||| target-triple-driven selection belongs in the build system, not in a
+||| `%runElab` block that never typechecked (no `%language ElabReflection`).
 public export
 thisPlatform : Platform
-thisPlatform =
-  %runElab do
-    -- Platform detection logic — overridden by compiler flags
-    pure Linux
+thisPlatform = Linux
 
 --------------------------------------------------------------------------------
 -- Query Safety Levels (the 10 levels of VCL-total)
@@ -101,21 +106,40 @@ intToSafetyLevel 9  = Just LinearSafe
 intToSafetyLevel 10 = Just EpistemicSafe
 intToSafetyLevel _  = Nothing
 
-||| SafetyLevel decidable equality
+||| Round-trip: the C-tag encoding has a total left inverse. Each clause is
+||| `Refl` (definitional), giving an injectivity certificate without any
+||| proof-escape and without an O(n^2) case split.
+public export
+safetyLevelRoundTrip : (s : SafetyLevel)
+                    -> intToSafetyLevel (safetyLevelToInt s) = Just s
+safetyLevelRoundTrip ParseSafe       = Refl
+safetyLevelRoundTrip SchemaBound     = Refl
+safetyLevelRoundTrip TypeCompat      = Refl
+safetyLevelRoundTrip NullSafe        = Refl
+safetyLevelRoundTrip InjectionProof  = Refl
+safetyLevelRoundTrip ResultTyped     = Refl
+safetyLevelRoundTrip CardinalitySafe = Refl
+safetyLevelRoundTrip EffectTracked   = Refl
+safetyLevelRoundTrip TemporalSafe    = Refl
+safetyLevelRoundTrip LinearSafe      = Refl
+safetyLevelRoundTrip EpistemicSafe   = Refl
+
+||| `safetyLevelToInt` is injective, derived from the round-trip above.
+public export
+safetyLevelToIntInj : (x, y : SafetyLevel)
+                   -> safetyLevelToInt x = safetyLevelToInt y -> x = y
+safetyLevelToIntInj x y prf =
+  justInj $
+    trans (sym (safetyLevelRoundTrip x))
+          (trans (cong intToSafetyLevel prf) (safetyLevelRoundTrip y))
+
+||| SafetyLevel decidable equality — a real derivation via the injective
+||| integer tag and `DecEq Bits32`, not `No absurd`.
 public export
 DecEq SafetyLevel where
-  decEq ParseSafe       ParseSafe       = Yes Refl
-  decEq SchemaBound     SchemaBound     = Yes Refl
-  decEq TypeCompat      TypeCompat      = Yes Refl
-  decEq NullSafe        NullSafe        = Yes Refl
-  decEq InjectionProof  InjectionProof  = Yes Refl
-  decEq ResultTyped     ResultTyped     = Yes Refl
-  decEq CardinalitySafe CardinalitySafe = Yes Refl
-  decEq EffectTracked   EffectTracked   = Yes Refl
-  decEq TemporalSafe    TemporalSafe    = Yes Refl
-  decEq LinearSafe      LinearSafe      = Yes Refl
-  decEq EpistemicSafe   EpistemicSafe   = Yes Refl
-  decEq _ _ = No absurd
+  decEq x y = case decEq (safetyLevelToInt x) (safetyLevelToInt y) of
+    Yes prf  => Yes (safetyLevelToIntInj x y prf)
+    No contra => No (\xy => contra (cong safetyLevelToInt xy))
 
 --------------------------------------------------------------------------------
 -- VCL-total Error Codes
@@ -183,22 +207,38 @@ intToVclTotalError 10 = Just EpistemicViolation
 intToVclTotalError 11 = Just InternalError
 intToVclTotalError _  = Nothing
 
-||| VclTotalError decidable equality
+||| Round-trip left inverse for the error C-tag encoding.
+public export
+vclTotalErrorRoundTrip : (e : VclTotalError)
+                      -> intToVclTotalError (vqlUtErrorToInt e) = Just e
+vclTotalErrorRoundTrip Ok                     = Refl
+vclTotalErrorRoundTrip ParseError             = Refl
+vclTotalErrorRoundTrip SchemaError            = Refl
+vclTotalErrorRoundTrip TypeError              = Refl
+vclTotalErrorRoundTrip NullError              = Refl
+vclTotalErrorRoundTrip InjectionAttempt       = Refl
+vclTotalErrorRoundTrip CardinalityViolation   = Refl
+vclTotalErrorRoundTrip EffectViolation        = Refl
+vclTotalErrorRoundTrip TemporalBoundsExceeded = Refl
+vclTotalErrorRoundTrip LinearityViolation     = Refl
+vclTotalErrorRoundTrip EpistemicViolation     = Refl
+vclTotalErrorRoundTrip InternalError          = Refl
+
+||| `vqlUtErrorToInt` is injective, derived from the round-trip above.
+public export
+vclTotalErrorToIntInj : (x, y : VclTotalError)
+                     -> vqlUtErrorToInt x = vqlUtErrorToInt y -> x = y
+vclTotalErrorToIntInj x y prf =
+  justInj $
+    trans (sym (vclTotalErrorRoundTrip x))
+          (trans (cong intToVclTotalError prf) (vclTotalErrorRoundTrip y))
+
+||| VclTotalError decidable equality — real derivation, not `No absurd`.
 public export
 DecEq VclTotalError where
-  decEq Ok                     Ok                     = Yes Refl
-  decEq ParseError             ParseError             = Yes Refl
-  decEq SchemaError            SchemaError            = Yes Refl
-  decEq TypeError              TypeError              = Yes Refl
-  decEq NullError              NullError              = Yes Refl
-  decEq InjectionAttempt       InjectionAttempt       = Yes Refl
-  decEq CardinalityViolation   CardinalityViolation   = Yes Refl
-  decEq EffectViolation        EffectViolation        = Yes Refl
-  decEq TemporalBoundsExceeded TemporalBoundsExceeded = Yes Refl
-  decEq LinearityViolation     LinearityViolation     = Yes Refl
-  decEq EpistemicViolation     EpistemicViolation     = Yes Refl
-  decEq InternalError          InternalError          = Yes Refl
-  decEq _ _ = No absurd
+  decEq x y = case decEq (vqlUtErrorToInt x) (vqlUtErrorToInt y) of
+    Yes prf  => Yes (vclTotalErrorToIntInj x y prf)
+    No contra => No (\xy => contra (cong vqlUtErrorToInt xy))
 
 --------------------------------------------------------------------------------
 -- Query Mode
@@ -230,13 +270,29 @@ intToQueryMode 1 = Just DependentTypes
 intToQueryMode 2 = Just UltimateTypeSafe
 intToQueryMode _ = Nothing
 
-||| QueryMode decidable equality
+||| Round-trip left inverse for the query-mode C-tag encoding.
+public export
+queryModeRoundTrip : (m : QueryMode)
+                  -> intToQueryMode (queryModeToInt m) = Just m
+queryModeRoundTrip Slipstream       = Refl
+queryModeRoundTrip DependentTypes   = Refl
+queryModeRoundTrip UltimateTypeSafe = Refl
+
+||| `queryModeToInt` is injective, derived from the round-trip above.
+public export
+queryModeToIntInj : (x, y : QueryMode)
+                 -> queryModeToInt x = queryModeToInt y -> x = y
+queryModeToIntInj x y prf =
+  justInj $
+    trans (sym (queryModeRoundTrip x))
+          (trans (cong intToQueryMode prf) (queryModeRoundTrip y))
+
+||| QueryMode decidable equality — real derivation, not `No absurd`.
 public export
 DecEq QueryMode where
-  decEq Slipstream       Slipstream       = Yes Refl
-  decEq DependentTypes   DependentTypes   = Yes Refl
-  decEq UltimateTypeSafe UltimateTypeSafe = Yes Refl
-  decEq _ _ = No absurd
+  decEq x y = case decEq (queryModeToInt x) (queryModeToInt y) of
+    Yes prf  => Yes (queryModeToIntInj x y prf)
+    No contra => No (\xy => contra (cong queryModeToInt xy))
 
 --------------------------------------------------------------------------------
 -- Opaque Handles
@@ -253,8 +309,9 @@ data QueryHandle : Type where
 ||| Returns Nothing if pointer is null (allocation failure).
 public export
 createQueryHandle : Bits64 -> Maybe QueryHandle
-createQueryHandle 0 = Nothing
-createQueryHandle ptr = Just (MkQueryHandle ptr)
+createQueryHandle ptr = case choose (ptr /= 0) of
+  Left nonNull => Just (MkQueryHandle ptr {nonNull})
+  Right _      => Nothing
 
 ||| Extract pointer value from query handle
 public export
@@ -297,10 +354,16 @@ ptrSize MacOS   = 64
 ptrSize BSD     = 64
 ptrSize WASM    = 32
 
-||| Pointer type for platform
+||| Pointer type for platform — a concrete machine word per platform
+||| (mirrors `ptrSize`), not the `Data.Bits.Bits` interface (which is not a
+||| `Nat -> Type` family and made the original definition ill-typed).
 public export
 CPtr : Platform -> Type -> Type
-CPtr p _ = Bits (ptrSize p)
+CPtr Linux   _ = Bits64
+CPtr Windows _ = Bits64
+CPtr MacOS   _ = Bits64
+CPtr BSD     _ = Bits64
+CPtr WASM    _ = Bits32
 
 --------------------------------------------------------------------------------
 -- Memory Layout Proofs for Query Plan Buffers
