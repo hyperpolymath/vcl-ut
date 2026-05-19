@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: PMPL-1.0-or-later
+
+# Standalone workspace root: decouples this trusted boundary crate from
+# the parent virtual workspace, whose pre-existing `src/interface`
+# member has an external path-dep (`../../../echidna/...`) that does not
+# resolve in a standalone checkout (CI). This crate has NO external
+# path-deps and must build/gate in isolation.
+[workspace]
+
+[package]
+name = "vcltotal-parse"
+version = "0.1.0"
+edition = "2021"
+license = "PMPL-1.0-or-later"
+authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
+repository = "https://github.com/hyperpolymath/vcl-ut"
+description = "P5a (#25): trusted, panic-free String -> Statement parser for VCL-total; faithful Rust mirror of src/core/Grammar.idr, feeding the Idris2 certifier across the C-ABI."
+
+[lib]
+name = "vcltotal_parse"
+path = "src/lib.rs"
+
+[dependencies]
+
+[dev-dependencies]
+proptest = "1"
+
+# SPARK-grade posture is enforced STATICALLY in lib.rs:
+# `#![forbid(unsafe_code)]` + `#![deny(clippy::arithmetic_side_effects,
+# unwrap_used, expect_used, panic, indexing_slicing, unreachable, todo,
+# unimplemented, exit)]`. `arithmetic_side_effects` rejects every
+# unchecked +/-/* on integers at compile time; the only arithmetic in
+# the crate is cursor `saturating_add`. The `proptest` panic-free
+# invariant (tests/parse.rs, 4096 cases x 3 strategies) is the runtime
+# witness. No `[profile]` here: workspace members' profiles are ignored
+# by Cargo, so the guarantee is the static lint set, not a build flag.

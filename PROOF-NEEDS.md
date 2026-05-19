@@ -34,8 +34,19 @@
 - Debug adapter and formatter — lower priority but should preserve query semantics
 
 ### ReScript Bridge (src/bridges/)
-- `VclTotalParser.res`, `VclTotalBridge.res` — bridge between ReScript frontend and Idris2/Rust core
-- Prove: bridge faithfully translates between ReScript and core representations
+- `VclTotalParser.res`, `VclTotalBridge.res` — a **standalone ReScript
+  frontend** (a working recursive-descent parser producing a *ReScript*
+  AST). It is **not** on the verified path: it does not connect to, or
+  marshal into, the Idris2 `Statement` the proof corpus certifies, nor
+  the Rust core. (`VERIFICATION-STANCE.adoc` "no string→`Statement`
+  parser exists" is precise — it means no parser whose output is the
+  *certified* Idris2 `Statement`.)
+- The *trusted* boundary parser is the Rust/SPARK-grade
+  `src/interface/parse` crate (`vcltotal-parse`, P5a of vcl-ut#25),
+  which mirrors `Grammar.idr` and feeds the certifier across the C-ABI.
+- Optional future work: prove the ReScript frontend faithfully tracks
+  the Idris2 grammar (low priority; it is a convenience frontend, not a
+  trust anchor).
 
 ## Recommended Prover
 
