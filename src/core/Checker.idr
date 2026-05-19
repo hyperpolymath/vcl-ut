@@ -237,20 +237,54 @@ checkLevel0 _ = (True, "L0:ParseSafe — statement parsed successfully")
 ||| @stmt   The statement whose field references to validate.
 ||| @schema The octad schema to resolve against.
 ||| @return (True, _) if all refs resolve; (False, diagnostic) otherwise.
+|||
+||| Decided through `Decide.allFieldRefsResolve` over BOTH ref extractors:
+||| `statementFieldRefs` (the thorough, subquery-descending one — the
+||| original, behaviour-preserving check) AND `Levels.extractFieldRefs`
+||| (the extractor the L1 *predicate* `AllFieldsBound (extractFieldRefs
+||| stmt)` is stated over). The second conjunct is the drift-free
+||| soundness hook for `checkLevel1Sound`; since every ref of
+||| `Levels.extractFieldRefs stmt` is also a ref of `statementFieldRefs
+||| stmt` (the latter does strictly more — it also descends `ESubquery`),
+||| it never changes the verdict. We keep the predicate on
+||| `Levels.extractFieldRefs` so the genuine `Composition.l1Compose`
+||| proof is untouched. Tracked: hyperpolymath/standards#124.
 public export
 checkLevel1 : Statement -> OctadSchema -> (Bool, String)
 checkLevel1 stmt schema =
-  let refs : List FieldRef
-      refs = statementFieldRefs stmt
-      unresolved : List FieldRef
-      unresolved = filter (\ref => isNothing (resolveFieldRef ref schema)) refs
-  in case unresolved of
-    [] => (True, "L1:SchemaBound — all " ++ show (length refs) ++ " field refs resolve")
-    (r :: _) =>
-      ( False
-      , "L1:SchemaBound FAILED — unresolved field: "
-          ++ modalityName (modality r) ++ "." ++ fieldName r
-      )
+    l1Verdict (allFieldRefsResolve (statementFieldRefs stmt) schema
+                 && allFieldRefsResolve (Levels.extractFieldRefs stmt) schema)
+  where
+    l1Verdict : Bool -> (Bool, String)
+    l1Verdict True  =
+      (True,  "L1:SchemaBound — all field refs resolve in the schema")
+    l1Verdict False =
+      (False, "L1:SchemaBound FAILED — an unresolved field reference")
+
+||| **Soundness of the Level-1 decision procedure.**
+||| If `checkLevel1` accepts, the statement genuinely carries an
+||| `L1_SchemaBound`: every field reference of `extractFieldRefs stmt`
+||| resolves, witnessed by the *inductive* `AllFieldsBound` built by
+||| `Decide.allFieldsBoundFromResolve` (each `FieldBound` carries the
+||| real `resolveFieldRef ref schema = Just fd`). Tracked: standards#124.
+export
+checkLevel1Sound : (stmt : Statement) -> (schema : OctadSchema) ->
+                   (m : String) ->
+                   checkLevel1 stmt schema = (True, m) ->
+                   L1_SchemaBound stmt schema
+checkLevel1Sound stmt schema m prf
+    with (allFieldRefsResolve (statementFieldRefs stmt) schema
+            && allFieldRefsResolve (Levels.extractFieldRefs stmt) schema)
+         proof p
+  checkLevel1Sound stmt schema m prf | True =
+    let (_, c2) = andTrueSplit
+                    (allFieldRefsResolve (statementFieldRefs stmt) schema)
+                    (allFieldRefsResolve (Levels.extractFieldRefs stmt) schema)
+                    p
+    in MkL1 stmt schema
+         (allFieldsBoundFromResolve (Levels.extractFieldRefs stmt) schema c2)
+  checkLevel1Sound stmt schema m prf | False =
+    void (notFalseTrue (cong fst prf))
 
 ||| Level 2 — TypeCompat: every comparison expression uses operands
 ||| with compatible types (same type, null compat, or int/float widening).

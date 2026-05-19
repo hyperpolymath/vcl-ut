@@ -506,3 +506,52 @@ nullSafeStmt : Statement -> OctadSchema -> Bool
 nullSafeStmt stmt schema =
   maybeExprNullSafe (whereClause stmt) schema
     && maybeExprNullSafe (having stmt) schema
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- Level 1 decider bridge — SchemaBound (Phase 3a)
+-- A `= True` resolution check that *builds* the genuine inductive
+-- `AllFieldsBound` evidence (each ref carries its `resolveFieldRef … =
+-- Just fd` witness). Lets `checkLevel1Sound` connect the checker to the
+-- existing (non-vacuous) L1 predicate without disturbing the genuine
+-- `Composition.l1Compose` proof, which stays on `Levels.extractFieldRefs`.
+-- ═══════════════════════════════════════════════════════════════════════
+
+||| One field reference resolves in the schema.
+public export
+fieldRefResolves : FieldRef -> OctadSchema -> Bool
+fieldRefResolves ref schema =
+  case resolveFieldRef ref schema of
+    Just _  => True
+    Nothing => False
+
+||| Every field reference in the list resolves. Explicit spine recursion
+||| (cf. `selectItemsTyped`) so the builder below is one structural step.
+public export
+allFieldRefsResolve : List FieldRef -> OctadSchema -> Bool
+allFieldRefsResolve []        _      = True
+allFieldRefsResolve (r :: rs) schema =
+  fieldRefResolves r schema && allFieldRefsResolve rs schema
+
+||| `fieldRefResolves = True` yields the genuine `FieldBound` witness
+||| (with the actual `resolveFieldRef ref schema = Just fd` equality).
+public export
+fieldBoundFromResolve :
+  (ref : FieldRef) -> (schema : OctadSchema) ->
+  fieldRefResolves ref schema = True -> FieldBound ref schema
+fieldBoundFromResolve ref schema prf with (resolveFieldRef ref schema) proof q
+  fieldBoundFromResolve ref schema prf | Just fd = MkFieldBound ref schema fd q
+  fieldBoundFromResolve ref schema prf | Nothing = void (notFalseTrue prf)
+
+||| `allFieldRefsResolve = True` builds the genuine inductive
+||| `AllFieldsBound` (this is what makes L1 soundness real, not a
+||| re-assertion).
+public export
+allFieldsBoundFromResolve :
+  (refs : List FieldRef) -> (schema : OctadSchema) ->
+  allFieldRefsResolve refs schema = True -> AllFieldsBound refs schema
+allFieldsBoundFromResolve []        schema _   = NilBound
+allFieldsBoundFromResolve (r :: rs) schema prf =
+  let (h, t) = andTrueSplit (fieldRefResolves r schema)
+                            (allFieldRefsResolve rs schema) prf
+  in ConsBound (fieldBoundFromResolve r schema h)
+               (allFieldsBoundFromResolve rs schema t)
