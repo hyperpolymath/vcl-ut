@@ -4,16 +4,27 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
-The C-ABI marshalling format for a parsed `Statement`. The Rust
-encoder/decoder (`wire.rs`) is normative for v1; the P5b-step-2 Idris2
-decoder MUST decode this identical byte stream into `Grammar.idr`'s
-`Statement` (the certified type), proven total. Cross-language
-conformance is by shared golden vectors.
+The `Statement` marshalling format. The Rust encoder/decoder
+(`wire.rs`) is normative for v1; the P5b-step-2 Idris2 decoder MUST
+decode this identical byte stream into `Grammar.idr`'s `Statement`
+(the certified type), proven total. Cross-language conformance is by
+shared golden vectors.
 
 Design: a deterministic, versioned, length-prefixed binary TLV.
 *Rationale:* no parser dependency / no extra trust surface (vs CBOR),
-fully auditable, byte-exact, total decode. This is the boundary the
-hypatia<->verisim seam crosses; it is specified, not improvised.
+fully auditable, byte-exact, total decode. This is the byte
+representation of the `Statement` that crosses the hypatia<->verisim
+seam; it is specified, not improvised.
+
+NOTE: This format is *transport-agnostic*. It is the marshalling
+payload over the C-ABI **fallback** tier (trusted-certifier
+attestation, P5d) *and* the proof-term payload over the estate's
+**typed-wasm** target, where it rides with a checker kernel the
+consumer re-runs (proof-carrying code — re-checkable, TCB = checker
+kernel; the P5c objective). Re-checkable transport is impossible only
+over a C ABI, not over typed-wasm; see the two-tier boundary model in
+`verification/proofs/VERIFICATION-STANCE.adoc` ("What is NOT
+proven"), the authoritative catalogue.
 
 == Conventions
 

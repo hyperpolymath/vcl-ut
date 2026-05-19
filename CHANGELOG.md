@@ -46,8 +46,14 @@ CI-gated and green:
   `Statement` marshalling *decode* side is now certified. Disclosed:
   the NaN *payload* is not preserved across the Idris `Double` boundary
   (finite + infinite values bit-exact; Rust proptest remains the
-  exhaustive float witness). OWED: Idris→C build + Zig-shim link
-  (P5c), signed attestation contract (P5d).
+  exhaustive float witness). OWED: **P5c — typed-wasm PCC transport**
+  (proof term + checker kernel the consumer re-runs; *re-checkable*,
+  TCB = checker kernel; the estate-aligned objective — the `ffi/zig`
+  fail-closed shim is retained only as the C-ABI attestation
+  *fallback*, not the endpoint); **P5d** — the signed-attestation
+  fallback contract for C-only consumers. Re-checkable transport is
+  impossible only over a C ABI, not over typed-wasm (two-tier boundary
+  model: `verification/proofs/VERIFICATION-STANCE.adoc`).
 
 `verification/proofs/VERIFICATION-STANCE.adoc` is the authoritative,
 precisely-scoped catalogue (residual OWED items disclosed, not masked).
