@@ -1,0 +1,109 @@
+= Architecture Decision Record: 0002-ffi-attestation-trust-boundary
+<!-- SPDX-License-Identifier: PMPL-1.0-or-later -->
+<!-- Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk> -->
+
+# 2. FFI trust boundary: recompute-PCC over wasm32 (Tier-1), C-ABI attestation (Tier-2)
+
+Date: 2026-05-19
+
+## Status
+
+Accepted (Tier-1 RESOLVED; Tier-2 / P5d OWED). Tracked:
+hyperpolymath/vcl-ut#25. Authoritative companion:
+`verification/proofs/VERIFICATION-STANCE.adoc` (canonical two-tier
+boundary model) — this ADR records *why*; the stance records *what is
+and is not proven*.
+
+## Context
+
+vcl-ut is the doubly-trusted hypatia↔verisim interface. The Idris2
+corpus proves, machine-checked and CI-gated, that the 10-level VCL-total
+decision procedure is sound (`checkLevelNSound`,
+`Checker.certifyAt`/`certifyRequested` assembling a dependent
+`SafetyCertificate`). The open question was how a *consumer* obtains
+that guarantee across a process/language boundary.
+
+Constraints established during Phase 5:
+
+- A **C ABI erases types to machine words**: a dependent
+  `SafetyCertificate` cannot cross it as a re-checkable object. Over a
+  C ABI the honest ceiling is *trusted-certifier attestation* (trust
+  the minting checker; the token is unforgeable, bound to
+  `(sha256(query), schema_id, level)`).
+- A **proof-term-PCC** design (ship a core proof term + a small
+  dependent kernel the consumer runs) was considered and **rejected**:
+  Idris2 0.8.0 ships no embeddable verified core kernel, and building
+  one is its own subproject of unbounded scope.
+- The estate's `affinescriptiser` (Rust→typed-wasm wrapper) **does not
+  apply**: it structurally requires ≥1 `[[resources]]` and the
+  verdict entry is a pure resource-free function (fabricating a
+  resource to satisfy the tool would violate the verification-honesty
+  doctrine), and its wasm backend is Phase-2-pending. (Disclosed:
+  `src/interface/recompute-wasm/AFFINESCRIPTISER-NA.adoc`.)
+
+## Decision
+
+Adopt a **two-tier boundary**:
+
+**Tier-1 — recompute-PCC over plain `wasm32` (the achieved tier).**
+The consumer is shipped the `wasm32` module
+`src/interface/recompute-wasm` (`vcl_recompute`) + the wire bytes of a
+`(Statement, OctadSchema)` + the producer's claimed level, and
+**re-runs the certified decision itself**, comparing its verdict to
+the claim. This is proof-carrying code by *recomputation*, not by
+transporting a proof object. The consumer's TCB is:
+
+1. the once-proved corpus soundness (`checkLevelNSound`),
+   machine-checked in the CI-gated Idris corpus and *offline*
+   re-checkable with idris2 — never in the runtime path;
+2. the cross-language conformance pin that
+   `vcltotal_parse::certified_level` is a faithful image of that
+   corpus decision (`tests/conformance_emit.rs` ⇄
+   `VclTotal.Interface.WireConformance`, `Refl` on shared golden
+   bytes); and
+3. the wasm runtime — *not* the whole certifier, *not* a level tag
+   taken on faith.
+
+Plain `wasm32-unknown-unknown` is **sufficient and not a compromise**:
+nothing structured crosses the boundary that needs type-preservation
+(opaque wire bytes in, an `i64` out; the decoder+decider run *inside*
+the module), so the wasm *type system* is not load-bearing. The wasm
+verdict equals the conformance-pinned native verdict by construction
+(deterministic build of pinned, pure, total source). The path is
+fail-closed: any malformed input or unmet level → Reject, never a
+fabricated level. The only `unsafe` is one audited host/guest
+memory-ABI block — the declared trust boundary — with all
+decode/decision logic in the `#![forbid(unsafe_code)]` crate.
+
+**Tier-2 — C-ABI trusted-certifier attestation (fallback, P5d, OWED).**
+For consumers that cannot run the Tier-1 wasm: a signed token bound to
+`(sha256(query), schema_id, level)`, verified against the certifier's
+public key. Strictly weaker (pure trust in the minting certifier), and
+labelled as such. The fail-closed `ffi/zig` shim (Phase 3d) is its
+scaffolding; the signed contract + `vclut_rs_verify` linkage are OWED.
+
+## Consequences
+
+- The headline "no re-checkable proof across an FFI" objection is
+  **dissolved for Tier-1**: it was only ever true of an *untyped C
+  ABI*, and Tier-1 sidesteps it by recomputation rather than proof
+  transport. Recompute is, in one respect, *stronger* than proof-object
+  PCC — the consumer need not trust a transported term's provenance;
+  its cost is recomputation, negligible for a static AST decision.
+- The certifier (the Idris corpus) stays the single source of
+  verification truth, machine-checked once; the runtime never carries
+  a proof object.
+- Disclosed, precisely-scoped limits remain (NaN-payload
+  reconstruction; cross-module `Refl` non-reduction of
+  `find`/`elemBy`, so schema-resolution-dependent verdicts are pinned
+  Rust-side + by input-value conformance; L9/L10 predicate depth;
+  additive↔ceil `alignUp` sliver). These are stated in
+  VERIFICATION-STANCE.adoc, not faked.
+- P5d (Tier-2) is the remaining boundary work; until it lands,
+  non-wasm consumers receive only the fail-closed shim (no fabricated
+  level).
+- Revisit only if a future revision genuinely introduces a tracked
+  resource at this boundary (none foreseen for a pure verdict
+  function) or if a verified embeddable dependent kernel becomes
+  available (which would enable, but is not required for, an
+  additional proof-object tier).

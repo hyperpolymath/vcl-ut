@@ -43,17 +43,32 @@ CI-gated and green:
   it byte-for-byte conformant with the Rust `to_wire` encoder by `Refl`
   on golden fixtures (regeneration oracle:
   `src/interface/parse/tests/conformance_emit.rs`). The C-ABI
-  `Statement` marshalling *decode* side is now certified. Disclosed:
+  `Statement` marshalling *decode* side is certified. Disclosed:
   the NaN *payload* is not preserved across the Idris `Double` boundary
   (finite + infinite values bit-exact; Rust proptest remains the
-  exhaustive float witness). OWED: **P5c — typed-wasm PCC transport**
-  (proof term + checker kernel the consumer re-runs; *re-checkable*,
-  TCB = checker kernel; the estate-aligned objective — the `ffi/zig`
-  fail-closed shim is retained only as the C-ABI attestation
-  *fallback*, not the endpoint); **P5d** — the signed-attestation
-  fallback contract for C-only consumers. Re-checkable transport is
-  impossible only over a C ABI, not over typed-wasm (two-tier boundary
-  model: `verification/proofs/VERIFICATION-STANCE.adoc`).
+  exhaustive float witness).
+- Phase 5 / vcl-ut#25 — **Tier-1 recompute-PCC RESOLVED**: P5c-1 (#30)
+  certified `OctadSchema` codec (closes schema-marshalling OWED);
+  P5c-2/3/4 (#31) `vcltotal_parse::decider` — a faithful Rust port of
+  the corpus decision core (`Schema`/`Decide`/`Checker`
+  `checkLevel0..10`/`certifiedLevel`), machine-pinned to the corpus's
+  public deciders via `WireConformance` on shared golden bytes
+  (find-dependent verdicts pinned Rust-side + input-value conformance,
+  disclosed); P5c-5 (#32) the recompute **`wasm32`** artefact
+  `src/interface/recompute-wasm` (`vcl_recompute`, fail-closed, one
+  audited host/guest `unsafe` block; all logic in the forbid-unsafe
+  crate); P5c-6 (this change) the `OWED→RESOLVED` stance flip + ADR
+  `docs/decisions/0002-ffi-attestation-trust-boundary.adoc`. The
+  consumer **re-runs** the certified decision and compares — PCC by
+  recomputation, not proof transport. Plain `wasm32` suffices (type
+  system not load-bearing under recompute); `affinescriptiser` N/A
+  (resource-required + wasm-backend-pending; disclosed in
+  `AFFINESCRIPTISER-NA.adoc`, not faked). **OWED — P5d (Tier-2
+  fallback):** the C-ABI signed-attestation contract +
+  `vclut_rs_verify` linkage for consumers that cannot run the wasm.
+  A re-checkable proof is impossible *only* over the C-ABI fallback
+  tier (canonical two-tier model:
+  `verification/proofs/VERIFICATION-STANCE.adoc`).
 
 `verification/proofs/VERIFICATION-STANCE.adoc` is the authoritative,
 precisely-scoped catalogue (residual OWED items disclosed, not masked).

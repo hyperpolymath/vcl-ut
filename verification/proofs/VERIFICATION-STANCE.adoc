@@ -40,13 +40,16 @@ typecheck. The concrete blockers were:
   `Composition` (forward refs, deleted `AllParameterised` still
   referenced, wrong `CertL6+` arities, non-reducing `rewrite`s).
 
-*Phase 1–4 status (RESOLVED); Phase 5 boundary reinforcement (in
-progress):* every blocker above is fixed *honestly* and the corpus
-compiles (now **12 modules**: Phase 4 = `LayoutProofs` + L6–L10
-`composeJoin` closure, PR #24; Phase 5 / vcl-ut#25 adds
-`Interface.{WireDecode,WireConformance}` — the certified wire decoder
-+ cross-language `Refl` conformance, P5b step 2). **Phase 2** de-vacuized
-L2/L3/L5
+*Phase 1–4 status (RESOLVED); Phase 5 boundary reinforcement — Tier-1
+RESOLVED, Tier-2/P5d OWED:* every blocker above is fixed *honestly*
+and the corpus compiles (**12 modules**: Phase 4 = `LayoutProofs` +
+L6–L10 `composeJoin` closure, PR #24; Phase 5 / vcl-ut#25 added
+`Interface.{WireDecode,WireConformance}` — the certified wire/schema
+decoder + cross-language `Refl` conformance, plus the faithful Rust
+decision port and the recompute-`wasm32` artefact: **Tier-1
+recompute-PCC, RESOLVED**, PRs #26/#28/#29/#30/#31/#32; see the
+canonical two-tier boundary model under "What is NOT proven").
+**Phase 2** de-vacuized L2/L3/L5
 (new shared decider module `VclTotal.Core.Decide`, evidence-carrying
 predicates, `checkLevel2/3/5Sound`, genuine `composeJoin` closure).
 **Phase 3** added soundness for L1 and L6–L10
@@ -253,68 +256,93 @@ OWED section.
   `certifyRequested` (structurally — no proof-escape).
 +
   *Boundary model — two tiers, not one (canonical; other mentions
-  refer here).* The achievable guarantee depends on the *transport*,
-  and the impossibility result is specific to an untyped one:
+  refer here). Tier-1 is RESOLVED (Phase 5 / vcl-ut#25, PRs
+  #29/#30/#31/#32); Tier-2 remains OWED (P5d).*
 +
-  ** *C-ABI tier (fallback).* A C ABI erases types to machine words,
-     so it cannot transport a re-checkable dependent
-     `SafetyCertificate`. Over a C ABI the honest ceiling is
-     *trusted-certifier attestation*: the consumer trusts the checker
-     that minted the token; the token is unforgeable and bound to
-     `(sha256(query), schema_id, level)` (P5d). This tier exists only
-     for consumers reachable solely over C.
-  ** *typed-wasm tier (estate target, the real objective).* The
-     estate's transport/compilation target is **typed-wasm**, whose
-     module boundary is *typed, not erased*. The proof term crosses
-     faithfully (no flattening to an `int`) and a value of the proof
-     type cannot be forged without the linear capability. Riding a
-     small **proof-checker kernel** along with it — which the consumer
-     runs — yields *proof-carrying code*: the consumer **re-validates**
-     the certificate. The TCB shrinks from "trust the whole certifier"
-     to "trust the checker kernel + the typed-wasm verifier". (typed-
-     wasm's own type system is linear/structural, *not* dependent, so
-     it does not re-check the safety predicate itself — the shipped
-     kernel does. That is standard PCC and is strictly stronger than
-     attestation.)
+  ** *Tier-1 — recompute-PCC over `wasm32` (RESOLVED, the achieved
+     tier).* The consumer is shipped the `wasm32` module
+     (`src/interface/recompute-wasm`, `vcl_recompute`) + the wire
+     bytes of a `(Statement, OctadSchema)` + the producer's claimed
+     level, and **re-runs the certified decision itself**, comparing
+     its verdict to the claim. This is proof-carrying code by
+     *recomputation*, not by transporting a proof object: the consumer
+     does not trust a proof term's provenance — it independently
+     re-establishes the verdict. The TCB is (a) the once-proved corpus
+     soundness `checkLevelNSound` (machine-checked in the CI-gated
+     Idris corpus, *offline*-re-checkable with idris2, never in the
+     runtime path), (b) the conformance pin that
+     `vcltotal_parse::certified_level` is a faithful image of that
+     corpus decision (`tests/conformance_emit.rs` ⇄
+     `VclTotal.Interface.WireConformance`, `Refl`), and (c) the wasm
+     runtime — *not* the whole certifier. Fail-closed: any malformed
+     input or unmet level → Reject, never a fabricated level.
 +
-  So "a re-checkable dependent proof is impossible by construction" is
-  true *of a C ABI*, **not of any FFI**: the estate-aligned objective
-  (P5c) is the typed-wasm PCC tier; C-ABI attestation (P5d) is the
-  explicit, weaker fallback — not the ceiling. (The current Zig shim is
-  the C tier; the earlier `ffi/zig` line is fail-closed scaffolding,
-  not the architectural endpoint.)
+     *Why plain `wasm32` is sufficient (not a weaker choice).* Nothing
+     structured crosses this boundary that would need
+     type-preservation: opaque wire bytes in, an `i64` out, and the
+     decoder+decider run *inside* the module. The wasm *type system*
+     is therefore **not load-bearing** here — the guarantee is
+     (a)+(b)+(c) above. AffineScript dependent/affine typing was
+     load-bearing only for a *proof-term-transport* design, which was
+     **rejected** (Idris2 ships no embeddable verified core kernel;
+     building one is its own subproject). `affinescriptiser` is *not*
+     used (disclosed, not an oversight — `src/interface/recompute-wasm/
+     AFFINESCRIPTISER-NA.adoc`): it structurally requires ≥1
+     `[[resources]]` and the entry is a pure resource-free verdict
+     function (fabricating a resource to satisfy the tool would be the
+     cargo-culting this doctrine forbids), and its own wasm backend is
+     Phase-2-pending. The wasm verdict equals the conformance-pinned
+     native verdict *by construction* (deterministic `cargo build` of
+     the same pinned, pure, total source).
+  ** *Tier-2 — C-ABI trusted-certifier attestation (FALLBACK, P5d —
+     still OWED).* A C ABI erases types to machine words, so it cannot
+     transport a re-checkable dependent `SafetyCertificate`; over a C
+     ABI the honest ceiling is *trusted-certifier attestation* (the
+     consumer trusts the checker that minted an unforgeable token
+     bound to `(sha256(query), schema_id, level)`). This tier exists
+     only for consumers that cannot run the Tier-1 wasm. The
+     fail-closed `ffi/zig` shim (Phase 3d) is its scaffolding; the
+     signed-attestation contract + `vclut_rs_verify` linkage are P5d,
+     OWED.
 +
-  *NAMED OWED (absent, not faked) — Phase-5 progress folded in:*
-  (1) a string→`Statement` *frontend* now exists as the **trusted**
-  Rust/SPARK-grade `src/interface/parse` crate (P5a, #26): it parses to
-  a faithful Rust mirror of `Grammar.idr`, panic-free/total by
-  statically-enforced lints. It is *trusted*, not *certified* — it is
-  not itself the dependently-typed checker. (2) C-ABI `Statement`
-  marshalling: the *decode* direction is now **certified** —
-  `VclTotal.Interface.WireDecode` totally decodes the deterministic
-  versioned wire format (`src/interface/parse/WIRE-FORMAT.adoc`;
-  encoder `wire.rs::to_wire`, P5b step 1, #28) into the certified
-  `Statement` (`%default total`, zero proof-escape, fuel-bounded
-  recursion), and `VclTotal.Interface.WireConformance` proves it
-  byte-for-byte conformant with the Rust encoder by `Refl` (P5b
-  step 2). The *encode* direction (Idris `Statement`→wire) and
-  `OctadSchema` marshalling remain OWED. (3) the **typed-wasm PCC
-  transport** — the proof term + a checker kernel the consumer
-  re-runs, per the two-tier boundary model above — is the P5c
-  objective (the C-ABI/Zig shim is retained only as the fail-closed
-  attestation fallback, *not* the endpoint) and remains OWED; (4) the
-  real backend symbol (`vclut_rs_verify`) linkage remains OWED, as
-  does the P5d signed-attestation *fallback* contract. Until these
-  exist the FFI is honestly fail-closed. *Disclosed limitation:* the
-  certified decoder cannot reconstruct a NaN *payload* (Idris2 0.8.0
-  has no pure bit-exact `Bits64 -> Double`); it decodes any NaN
-  bit-pattern to a NaN — finite and infinite values are bit-exact.
-  The exhaustive bit-exact float witness (incl. NaN bits) remains the
-  Rust proptest `wire.rs::golden_bit_exact_floats`. This is a
-  disclosed limitation, not a hidden gap. Per the two-tier model
-  above, a re-checkable proof is impossible only over the *C-ABI*
-  fallback tier; the estate-target *typed-wasm* tier (P5c) **is**
-  re-checkable (PCC).
+  So "a re-checkable proof is impossible by construction" is true
+  *only of the C-ABI fallback tier*, **not of any FFI**: Tier-1
+  (recompute over `wasm32`) achieves consumer-side re-validation
+  without transporting a proof at all. Recompute is, in one respect,
+  *stronger* than proof-object PCC (no need to trust a transported
+  term's provenance); its cost is recomputation, which for a static
+  AST decision is negligible.
++
+  *NAMED OWED — Phase-5 status folded in (RESOLVED items marked):*
+  (1) *RESOLVED-as-trusted:* a string→`Statement` frontend exists as
+  the **trusted** Rust/SPARK-grade `src/interface/parse` crate (P5a,
+  #26) — *trusted*, not *certified* (it is not the dependently-typed
+  checker; that is by design — the certifier is the corpus, re-run in
+  Tier-1). (2) *RESOLVED (decode):* `Statement` *and* `OctadSchema`
+  marshalling decode is **certified** — `VclTotal.Interface.WireDecode`
+  (`%default total`, zero proof-escape, fuel-bounded;
+  `WireConformance` `Refl`-pins it byte-for-byte to the Rust
+  `to_wire*` encoder, P5b-2 #29 / P5c-1 #30). The *encode* direction
+  (Idris `Statement`/`OctadSchema`→wire) remains OWED (not needed by
+  the recompute tier — the producer encodes from Rust). (3) *RESOLVED:*
+  the decision-transport tier is delivered as Tier-1 recompute-`wasm32`
+  (P5c-5 #32) with the faithful Rust decision port machine-pinned to
+  the corpus (P5c-2/3/4 #31). (4) *OWED:* the P5d C-ABI
+  signed-attestation *fallback* contract + `vclut_rs_verify` linkage
+  (Tier-2). Until P5d, non-wasm consumers get the fail-closed shim.
+  *Disclosed limitations, not hidden gaps:* (i) the certified decoder
+  decodes any NaN bit-pattern to *a* NaN (Idris2 0.8.0 has no pure
+  bit-exact `Bits64 -> Double`); finite + infinite values are
+  bit-exact; the exhaustive float witness incl. NaN bits is the Rust
+  proptest `wire.rs::golden_bit_exact_floats`. (ii) cross-module
+  `Refl` pins cannot force `Data.List.find`/`elemBy` (idris2 0.8.0
+  non-reduction — the corpus documents the same for its own
+  `refElem`), so a schema-resolution-dependent verdict (e.g. golden2
+  `vector.x` unresolved → Reject) is pinned Rust-side (decoded
+  self-check) + by input-value conformance (`conform2`), not by Idris
+  `Refl`; the find-free decision structure *is* `Refl`-pinned. (iii)
+  the L9/L10 predicate depth and the additive↔ceil `alignUp` sliver
+  remain as previously scoped.
 
 == Consumer guidance (hypatia / verisim)
 
@@ -338,17 +366,22 @@ OWED section.
   deleted, not faked); its genuine alignment/no-padding theorems are
   OWED. `VclTotal.ABI.Foreign` contains *no proofs* (FFI plumbing) — do
   not treat its returned level tag as a verified claim.
-* *Transport target (forward guidance).* The end goal is **not**
-  "trust our attestation". Over the estate's typed-wasm boundary the
-  certificate will be transported as a proof term re-validated by a
-  small checker kernel you run (proof-carrying code): you will be able
-  to *re-check*, with a TCB of the checker kernel + the typed-wasm
-  verifier, not the whole certifier (P5c). Trusted-certifier
-  attestation (P5d) is the explicit *fallback* for consumers reachable
-  only over a C ABI — weaker, and labelled as such. Until P5c lands,
-  today's guidance stands (advisory tag only); it is a *plumbing*
-  gap, and the ceiling is PCC, not attestation. See the two-tier
-  boundary model in "What is NOT proven".
+* *Transport (DELIVERED — Tier-1 recompute-PCC, P5c, vcl-ut#25).* The
+  guarantee is **not** "trust our attestation". You are shipped the
+  `wasm32` module `src/interface/recompute-wasm` (`vcl_recompute`) +
+  the `(Statement, OctadSchema)` wire bytes + the claimed level. **Run
+  it and compare**: a match means *you* have independently
+  re-established the corpus-proved verdict — your TCB is the
+  conformance-pinned decider image + the wasm runtime + the
+  *offline*-re-checkable corpus soundness proof, **not** the whole
+  certifier, and **not** a level tag you must take on faith. It is
+  fail-closed (malformed/unmet → Reject, never a fabricated level).
+  Recommended consumer posture: treat a Tier-1 recomputed level as a
+  genuine machine basis (you verified it); still apply defence in
+  depth. The C-ABI level tag (Tier-2, P5d, *still OWED*) remains
+  advisory-only — a weaker fallback for consumers that cannot run the
+  wasm. See the canonical two-tier boundary model in "What is NOT
+  proven".
 
 == Remediation roadmap (phased, tracked standards#124)
 
@@ -423,45 +456,49 @@ OWED section.
   over a *C ABI*; over the estate's typed-wasm target it is the
   objective (PCC, TCB = checker kernel), with C-ABI attestation as the
   fallback tier — see the two-tier boundary model above.
-. *Phase 5 (boundary reinforcement, hyperpolymath/vcl-ut#25 — in
-  progress):* the residual tracked above is being discharged in
-  precisely-scoped steps. *P5a (#26):* the **trusted** Rust/SPARK-grade
-  `src/interface/parse` parser (string → faithful Rust mirror of
-  `Grammar.idr`; panic-free/total by static lints) — the previously
-  *absent* string→AST frontend now exists (trusted, not certified).
-  *P5b step 1 (#28):* a deterministic, versioned, length-prefixed wire
-  codec (`wire.rs`, normative `WIRE-FORMAT.adoc`) — the C-ABI
-  marshalling format, no extra trust surface. *P5b step 2 (this PR):*
-  the **certified** decode side — `VclTotal.Interface.WireDecode`
-  totally decodes that exact format into the certified `Statement`
-  (`%default total`, ZERO proof-escape; recursion bounded by an
-  input-length fuel `Nat`, sound because every node costs ≥1
-  discriminant byte; omitted `VqlType` slots filled `TAny` per the
-  grammar's documented pre-typecheck convention), and
-  `VclTotal.Interface.WireConformance` proves byte-for-byte agreement
-  with the Rust `to_wire` encoder by `Refl` on shared golden fixtures
-  (regeneration oracle `tests/conformance_emit.rs`) — cross-language
-  conformance as a build-time proof, not a test. The marshalling
-  *decode* side is therefore now machine-verified.
-  *Disclosed limitation (not a hidden gap):* the certified decoder
-  decodes any NaN bit-pattern to *a* NaN (Idris2 0.8.0 has no pure
-  bit-exact `Bits64 -> Double`); finite values (incl. subnormals,
-  `f64::MIN`/`MAX`) and both infinities are bit-exact. The exhaustive
-  bit-exact float witness, NaN payload included, stays the Rust
-  proptest `wire.rs::golden_bit_exact_floats`. *Still OWED (precisely):*
-  the *encode* direction (Idris→wire) + `OctadSchema` marshalling;
-  **P5c — typed-wasm PCC transport**: carry the proof term across the
-  *typed* (non-erasing) typed-wasm boundary plus a small proof-checker
-  kernel the consumer re-runs, so the certificate is **re-validated**,
-  not merely attested (TCB = checker kernel + typed-wasm verifier; see
-  the two-tier boundary model above). The pre-existing `ffi/zig`
-  fail-closed shim is retained *only* as the C-ABI attestation
-  fallback for non-typed-wasm consumers — it is not the architectural
-  endpoint. *P5d (fallback tier):* the signed-attestation contract
-  over `(sha256(query), schema_id, level)` + ADR + the OWED→RESOLVED
-  stance flip, for consumers reachable only over C. Re-checkable
-  transport is impossible *only* over a C ABI; over the estate target
-  (typed-wasm) it is the explicit P5c objective.
+. *Phase 5 (boundary reinforcement, hyperpolymath/vcl-ut#25 — Tier-1
+  DONE; Tier-2/P5d OWED):* the Phase-4 residual is discharged in
+  precisely-scoped, merged steps. *P5a (#26):* the **trusted**
+  Rust/SPARK-grade `src/interface/parse` parser (string → faithful
+  Rust mirror of `Grammar.idr`; panic-free/total by static lints) —
+  the previously *absent* string→AST frontend (trusted, not
+  certified). *P5b-1 (#28):* a deterministic versioned wire codec
+  (`wire.rs`, normative `WIRE-FORMAT.adoc`). *P5b-2 (#29):* the
+  **certified** `Statement` decoder `VclTotal.Interface.WireDecode`
+  (`%default total`, ZERO proof-escape, input-length fuel `Nat`;
+  `VclTotal.Interface.WireConformance` `Refl`-pins it byte-for-byte to
+  the Rust `to_wire` encoder). *P5c-1 (#30):* the certified
+  `OctadSchema` codec (closes the schema-marshalling OWED item;
+  `conformS1` `Refl`). *P5c-2/3/4 (#31):* `vcltotal_parse::decider`
+  — a faithful Rust port of the corpus decision core
+  (`Schema`/`Decide`/`Checker` `checkLevel0..10`/`certifiedLevel`),
+  machine-pinned to the corpus's public deciders via `WireConformance`
+  on shared golden bytes (find-dependent verdicts pinned Rust-side +
+  by input-value conformance, disclosed). *P5c-5 (#32):* the
+  recompute **`wasm32` artefact** `src/interface/recompute-wasm`
+  (`vcl_recompute`, fail-closed, one audited host/guest unsafe block;
+  all logic stays in the `#![forbid(unsafe_code)]` crate). Together
+  these are **Tier-1 (recompute-PCC over `wasm32`), now RESOLVED** —
+  see the canonical two-tier boundary model above for the precise
+  guarantee and TCB.
+  *Disclosed limitations (not hidden gaps):* the NaN-payload
+  reconstruction limit (finite/infinite bit-exact; Rust proptest is
+  the exhaustive witness); the cross-module `Refl` non-reduction of
+  `Data.List.find`/`elemBy` (schema-resolution-dependent verdicts
+  pinned Rust-side + input-value conformance); the L9/L10 predicate
+  depth and additive↔ceil `alignUp` sliver. `affinescriptiser` is
+  *not* used for Tier-1 (resource-required + wasm-backend-pending;
+  disclosed in `AFFINESCRIPTISER-NA.adoc`, not faked) and plain
+  `wasm32` is sufficient because the wasm type system is not
+  load-bearing under recompute.
+  *Still OWED — P5d (Tier-2 fallback):* the C-ABI signed-attestation
+  contract over `(sha256(query), schema_id, level)` + the
+  `vclut_rs_verify` linkage, for consumers that cannot run the Tier-1
+  wasm. The pre-existing `ffi/zig` fail-closed shim is its
+  scaffolding. Also still OWED: the *encode* direction (Idris→wire),
+  not required by recompute (the producer encodes from Rust). A
+  re-checkable proof remains impossible *only* over the C-ABI fallback
+  tier; Tier-1 sidesteps that by recomputation, not proof transport.
 
 == Provenance
 
@@ -476,11 +513,17 @@ proof-gated `Checker.certifiedLevel` mint. Phase 4 2026-05-19:
 `ABI.LayoutProofs` (genuine alignment/no-padding/bounds, 10th ipkg
 module) + L6–L10 `composeJoin` closure (`l6..l9Compose`,
 `epiStructJoin`); corpus rebuilt clean, zero proof-escape.
-Phase 5 / vcl-ut#25 2026-05-19: P5a trusted Rust parser (#26) + P5b
-step 1 wire codec (#28); **P5b step 2 (this PR):**
-`VclTotal.Interface.WireDecode` (certified total wire decoder) +
-`VclTotal.Interface.WireConformance` (`Refl` cross-language conformance
-vs the Rust encoder), corpus rebuilt clean.
+Phase 5 / vcl-ut#25 2026-05-19 (Tier-1 recompute-PCC, RESOLVED):
+P5a trusted Rust parser (#26); P5b-1 wire codec (#28); P5b-2
+`VclTotal.Interface.WireDecode` + `WireConformance` certified
+decoder + `Refl` conformance (#29); P5c-1 certified `OctadSchema`
+codec (#30); P5c-2/3/4 `vcltotal_parse::decider` faithful Rust port
+of the corpus decision core, machine-pinned via `WireConformance`
+(#31); P5c-5 recompute `wasm32` artefact `src/interface/recompute-wasm`
+(fail-closed, one audited host/guest unsafe block) (#32); P5c-6 this
+PR — the `OWED→RESOLVED` stance flip + ADR
+`docs/decisions/0002-ffi-attestation-trust-boundary.adoc`. Tier-2
+(P5d C-ABI signed-attestation fallback) remains OWED.
 The corpus now builds clean as
 *12 modules*
 (`idris2 0.8.0 --build verification/proofs/vclut-core.ipkg`, exit 0,
@@ -507,30 +550,32 @@ Notes for reproduction / honesty:
   `core.symlinks` default true) is unaffected; this caveat is for local
   reproduction only.
 
-The residual risk is now purely at the *boundary*, and the boundary no
-longer lies: the FFI is *fail-closed* (no fabricated level; `zig build
-test` green) and a genuine proof-gated mint (`Checker.certifiedLevel`)
-exists in the CI-gated corpus. What remains OWED is *plumbing*, not a
-soundness gap. Phase 5 / vcl-ut#25 has closed the previously-headline
-"no parser" item: a string→AST frontend now exists as the **trusted**
-Rust/SPARK-grade `src/interface/parse` parser (P5a, #26 — trusted, not
-certified), and the `Statement` *decode* side is now **certified**
-(`VclTotal.Interface.WireDecode`, total/zero-escape, proven byte-for-byte
-conformant with the Rust encoder by `Refl` in
-`VclTotal.Interface.WireConformance`, P5b #28 + this PR). Still OWED:
-the *encode* direction + `OctadSchema` marshalling; **P5c — typed-wasm
-PCC transport** (proof term + checker kernel the consumer re-runs, so
-the certificate is re-validated, not merely attested; the `ffi/zig`
-fail-closed shim retained only as the C-ABI attestation fallback);
-the P5d signed-attestation *fallback* contract; plus the L6–L10
-*predicate* shallowness, the genuine `ABI.Layout` alignment/no-padding
-theorems, `ABI.Foreign` plumbing, L3's disclosed subquery/heuristic
-scoping, and the disclosed NaN-payload limitation of the Idris
-`Double` boundary (finite/infinite values bit-exact; Rust proptest is
-the exhaustive float witness). Re-checkable transport is impossible
-*only* over a C ABI; over the estate's typed-wasm target it is the
-explicit objective (PCC, TCB = checker kernel) — see the canonical
-two-tier boundary model above. That trust boundary is stated, not
-hidden. The former headline residuals (*non-compiling corpus*, *vacuous
-L2/L3/L5 predicates*, *decorative certificate*, *unsound `ABI.Layout`*,
-*lying FFI*) are all resolved.
+The residual risk is now at the *boundary*, and the boundary no longer
+lies. **Tier-1 (recompute-PCC over `wasm32`) is RESOLVED** (Phase 5 /
+vcl-ut#25, PRs #26/#28/#29/#30/#31/#32): the previously-headline "no
+parser" item is closed (trusted Rust `src/interface/parse`, P5a); the
+`Statement` *and* `OctadSchema` *decode* side is **certified**
+(`WireDecode`, total/zero-escape, `WireConformance` `Refl`-pinned to
+the Rust encoder); the decision core is a faithful Rust port
+machine-pinned to the corpus; and the consumer re-runs it from a
+fail-closed `wasm32` module (`src/interface/recompute-wasm`) — *you
+re-validate, you do not trust a tag*. The guarantee, TCB and
+sufficiency of plain `wasm32` are stated in the canonical two-tier
+model above. **Still OWED — Tier-2 / P5d:** the C-ABI
+signed-attestation *fallback* contract + `vclut_rs_verify` linkage,
+for consumers that cannot run the Tier-1 wasm (the `ffi/zig`
+fail-closed shim is its scaffolding). Also still OWED / disclosed: the
+*encode* direction (Idris→wire; not needed by recompute), the L6–L10
+*predicate* shallowness, the genuine `ABI.Layout`
+alignment/no-padding theorems, `ABI.Foreign` plumbing, L3's disclosed
+subquery/heuristic scoping, the NaN-payload reconstruction limit
+(finite/infinite bit-exact; Rust proptest is the exhaustive witness),
+and the cross-module `Refl` non-reduction of `find`/`elemBy`
+(schema-resolution-dependent verdicts pinned Rust-side + input-value
+conformance). A re-checkable proof remains impossible *only* over the
+C-ABI fallback tier; Tier-1 sidesteps that by recomputation, not proof
+transport — stated, not hidden. The former headline residuals
+(*non-compiling corpus*, *vacuous L2/L3/L5 predicates*, *decorative
+certificate*, *unsound `ABI.Layout`*, *lying FFI*, *no parser /
+untransported certificate*) are all resolved; what remains is the P5d
+fallback contract and the precisely-scoped disclosed limits above.
