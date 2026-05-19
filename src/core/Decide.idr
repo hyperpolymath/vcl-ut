@@ -555,3 +555,163 @@ allFieldsBoundFromResolve (r :: rs) schema prf =
                             (allFieldRefsResolve rs schema) prf
   in ConsBound (fieldBoundFromResolve r schema h)
                (allFieldsBoundFromResolve rs schema t)
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- Levels 6–10 deciders — Phase 4b (standards#124)
+--
+-- Phase 3 left L6–L10 as *presence-only* predicates ("the clause is
+-- present"), and disclosed in VERIFICATION-STANCE.adoc that this is
+-- shallower than what `Checker.checkLevelN` actually enforces (L9 also
+-- rejects `LinUnlimited`; L10 also requires declared agents and no direct
+-- ENTAILS cycle). Phase 4b closes that gap: the L6–L10 predicates now
+-- carry `<decider> stmt = True` exactly as L2/L3/L5 do, and
+-- `Checker.checkLevelN` is defined THROUGH the same decider, so
+-- `checkLevelNSound` is a genuine equality, not a parallel
+-- re-implementation that could silently drift.
+--
+-- Nothing here uses believe_me / postulate / assert_* / idris_crash /
+-- sorry: the deciders are ordinary case analysis over the AST.
+-- ═══════════════════════════════════════════════════════════════════════
+
+-- The L6–L8 deciders factor through a tiny `Maybe`-level presence test
+-- and L9 through a `Maybe LinearAnnotation` enforcement test. Naming the
+-- helpers (rather than inlining `case`) keeps the Composition closure
+-- lemmas a single structural step, matching the `notAnyTy`/`selectItemTyped`
+-- house style.
+
+||| A `Maybe` clause is present.
+public export
+isPresentM : Maybe a -> Bool
+isPresentM (Just _) = True
+isPresentM Nothing  = False
+
+||| L6 — CardinalitySafe: the query bounds its result cardinality with a
+||| LIMIT. The AST carries no finer cardinality information, and a query
+||| with no LIMIT genuinely fails this (not vacuous).
+public export
+cardinalityBoundedStmt : Statement -> Bool
+cardinalityBoundedStmt stmt = isPresentM (limit stmt)
+
+||| L7 — EffectTracked: the query declares its effects.
+public export
+effectTrackedStmt : Statement -> Bool
+effectTrackedStmt stmt = isPresentM (effectDecl stmt)
+
+||| L8 — TemporalSafe: the query pins a version constraint.
+public export
+temporalBoundedStmt : Statement -> Bool
+temporalBoundedStmt stmt = isPresentM (versionConst stmt)
+
+||| A linearity annotation that actually ENFORCES a consumption bound:
+||| `LinUseOnce` or `LinBounded`. Absence and the no-op `LinUnlimited`
+||| are NOT enforced.
+public export
+linEnforcedM : Maybe LinearAnnotation -> Bool
+linEnforcedM (Just LinUseOnce)     = True
+linEnforcedM (Just (LinBounded _)) = True
+linEnforcedM (Just LinUnlimited)   = False
+linEnforcedM Nothing               = False
+
+||| L9 — LinearSafe: the query carries a linearity annotation that
+||| actually enforces a consumption bound. This is the genuine Phase-4b
+||| strengthening that closes the Phase-3 disclosed L9 predicate↔checker
+||| gap (`LinUnlimited`/absence are now rejected by the predicate too).
+public export
+linearEnforcedStmt : Statement -> Bool
+linearEnforcedStmt stmt = linEnforcedM (linearAnnot stmt)
+
+-- L10 epistemic-consistency helpers, hoisted verbatim from the
+-- `Checker.checkLevel10` where-block so the predicate and the checker
+-- share ONE definition (single source of truth, no drift).
+
+||| String identity of an agent (declaration / cycle comparison key).
+public export
+agentId : Agent -> String
+agentId AgEngine        = "ENGINE"
+agentId (AgProver name) = "PROVER:" ++ name
+agentId AgValidator     = "VALIDATOR"
+agentId (AgUser name)   = "USER:" ++ name
+agentId AgFederation    = "FEDERATION"
+
+||| Whether an agent is in the declared-agents list (by `agentId`).
+||| Defined by explicit `||` spine recursion rather than Prelude `any`
+||| (which is `foldr`/`Delay`-based and does NOT reduce structurally on
+||| `_::_`, so monotonicity inductions stall — the same reason `Decide`
+||| uses `refElem` instead of `elemBy`). Extensionally identical to
+||| `any (\d => agentId a == agentId d)`.
+public export
+agentDeclared : Agent -> List Agent -> Bool
+agentDeclared _ []        = False
+agentDeclared a (d :: ds) = (agentId a == agentId d) || agentDeclared a ds
+
+||| Agents referenced in requirements but not declared (as `agentId`s).
+public export
+findUndeclaredAgents :
+  List Agent -> List EpistemicRequirement -> List String
+findUndeclaredAgents declared [] = []
+findUndeclaredAgents declared (EpReqKnows a _ :: rest) =
+  if agentDeclared a declared
+    then findUndeclaredAgents declared rest
+    else agentId a :: findUndeclaredAgents declared rest
+findUndeclaredAgents declared (EpReqBelieves a _ :: rest) =
+  if agentDeclared a declared
+    then findUndeclaredAgents declared rest
+    else agentId a :: findUndeclaredAgents declared rest
+findUndeclaredAgents declared (EpReqCommon _ :: rest) =
+  findUndeclaredAgents declared rest
+findUndeclaredAgents declared (EpReqEntails a1 a2 _ :: rest) =
+  (if agentDeclared a1 declared then [] else [agentId a1])
+    ++ (if agentDeclared a2 declared then [] else [agentId a2])
+    ++ findUndeclaredAgents declared rest
+
+||| All (source, target) pairs from ENTAILS requirements.
+public export
+entailsPairs : List EpistemicRequirement -> List (String, String)
+entailsPairs [] = []
+entailsPairs (EpReqEntails a1 a2 _ :: rest) =
+  (agentId a1, agentId a2) :: entailsPairs rest
+entailsPairs (_ :: rest) = entailsPairs rest
+
+||| Direct circular ENTAILS (a⊨b and b⊨a). Full graph-cycle detection is
+||| OWED (disclosed); this catches the direct symmetry violation.
+public export
+hasCircularEntails : List EpistemicRequirement -> Bool
+hasCircularEntails reqs =
+  let pairs = entailsPairs reqs
+  in any (\(a, b) => any (\(c, d) => a == d && b == c) pairs) pairs
+
+||| L10 STRUCTURAL part: an EPISTEMIC clause is present, has ≥1 agent,
+||| and every requirement-referenced agent is declared. This is exactly
+||| the part of L10 that IS closed under relational join (`joinEpistemic`
+||| unions agents and requirements; declaring MORE agents never makes a
+||| declared agent undeclared — see `Composition.epiStructJoin`).
+public export
+epiStructOK : Statement -> Bool
+epiStructOK stmt = case epistemicClause stmt of
+  Nothing => False
+  Just (EpClause agents reqs) => case agents of
+    []       => False
+    (_ :: _) => case findUndeclaredAgents agents reqs of
+      []       => True
+      (_ :: _) => False
+
+||| L10 ACYCLIC part: no direct (a⊨b, b⊨a) ENTAILS cycle among the
+||| clause's requirements. This is the ONE L10 sub-property that is
+||| provably NOT closed under join (two acyclic requirement sets can
+||| union to a cyclic one), so it is isolated here and supplied as an
+||| explicit composition side-condition (see `Composition.JoinSideCondition`
+||| and the disclosure in VERIFICATION-STANCE.adoc) — never faked.
+public export
+epiNoCycle : Statement -> Bool
+epiNoCycle stmt = case epistemicClause stmt of
+  Nothing                     => False
+  Just (EpClause _ reqs)      => not (hasCircularEntails reqs)
+
+||| L10 — EpistemicSafe: clause present, ≥1 agent, all requirement agents
+||| declared, AND no direct ENTAILS cycle. Mirrors `Checker.checkLevel10`
+||| exactly. Split as `epiStructOK && epiNoCycle` so the join-closed
+||| structural content and the (non-join-closed) acyclicity are separable
+||| in the composition proof.
+public export
+epistemicConsistentStmt : Statement -> Bool
+epistemicConsistentStmt stmt = epiStructOK stmt && epiNoCycle stmt

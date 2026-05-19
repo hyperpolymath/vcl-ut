@@ -523,11 +523,26 @@ l5Compose (MkL5 s1 sch t1) (MkL5 s2 _ t2) =
 -- SECTION 6: L6..L10 — GENUINE equational proofs about join* combiners
 -- ══════════════════════════════════════════════════════════════════════
 
-||| `joinLimit (Just a) (Just b)` is `Just (min a b)` — definitional.
-l6Compose : L6_CardinalitySafe q1 -> L6_CardinalitySafe q2 ->
-            L6_CardinalitySafe (composeJoin q1 q2)
-l6Compose (MkL6 s1 n1 p1) (MkL6 s2 n2 p2) =
-  MkL6 (composeJoin s1 s2) (min n1 n2) (rewrite p1 in rewrite p2 in Refl)
+-- PHASE 4b (standards#124). The L6–L10 predicates now carry the shared
+-- `Decide` deciders. L6–L9 are GENUINELY closed under `composeJoin`
+-- (`joinLimit`/`joinEffects`/`joinVersion` of two present clauses is
+-- present; all four ENFORCED×ENFORCED `joinLinear` cases stay enforced).
+-- L10's structural part (clause present, ≥1 agent, all requirement
+-- agents declared) is ALSO genuinely join-closed and proven below
+-- (`epiStructJoin`); its no-direct-ENTAILS-cycle part is provably NOT
+-- join-closed (two acyclic requirement sets can union to a cyclic one),
+-- so it is supplied as an explicit, minimal `JoinSideCondition`, never
+-- faked. No believe_me / postulate / assert_* / idris_crash / sorry.
+
+-- ── Maybe-level join-closure (L6–L9) ──────────────────────────────────
+
+||| `joinLimit` of two present LIMITs is present (`Just (min a b)`).
+presentJoinLimit : (la, lb : Maybe Nat) ->
+  isPresentM la = True -> isPresentM lb = True ->
+  isPresentM (joinLimit la lb) = True
+presentJoinLimit (Just _) (Just _) _ _ = Refl
+presentJoinLimit Nothing  _        p _ = void (notFalseTrue p)
+presentJoinLimit (Just _) Nothing  _ q = void (notFalseTrue q)
 
 ||| For any two `EffectDecl`s, `joinEffects (Just a) (Just b)` is `Just _`.
 joinEffectsJust : (a, b : EffectDecl)
@@ -549,11 +564,14 @@ joinEffectsJust EffConsume   EffWrite     = (_ ** Refl)
 joinEffectsJust EffConsume   EffReadWrite = (_ ** Refl)
 joinEffectsJust EffConsume   EffConsume   = (_ ** Refl)
 
-l7Compose : L7_EffectTracked q1 -> L7_EffectTracked q2 ->
-            L7_EffectTracked (composeJoin q1 q2)
-l7Compose (MkL7 s1 e1 p1) (MkL7 s2 e2 p2) =
-  let (c ** q) = joinEffectsJust e1 e2
-  in MkL7 (composeJoin s1 s2) c (rewrite p1 in rewrite p2 in q)
+||| `joinEffects` of two present effect decls is present.
+presentJoinEffects : (ea, eb : Maybe EffectDecl) ->
+  isPresentM ea = True -> isPresentM eb = True ->
+  isPresentM (joinEffects ea eb) = True
+presentJoinEffects (Just a) (Just b) _ _ =
+  let (_ ** q) = joinEffectsJust a b in rewrite q in Refl
+presentJoinEffects Nothing  _        p _ = void (notFalseTrue p)
+presentJoinEffects (Just _) Nothing  _ r = void (notFalseTrue r)
 
 ||| For any two `VersionConstraint`s, `joinVersion (Just a) (Just b)` is
 ||| `Just _` (case split on the four constructor shapes; Nat payloads
@@ -574,11 +592,49 @@ joinVersionJust (VerRange _ _)  (VerAtLeast _)  = (_ ** Refl)
 joinVersionJust (VerRange _ _)  (VerExact _)    = (_ ** Refl)
 joinVersionJust (VerRange _ _)  (VerRange _ _)  = (_ ** Refl)
 
-l8Compose : L8_TemporalSafe q1 -> L8_TemporalSafe q2 ->
+||| `joinVersion` of two present version constraints is present.
+presentJoinVersion : (va, vb : Maybe VersionConstraint) ->
+  isPresentM va = True -> isPresentM vb = True ->
+  isPresentM (joinVersion va vb) = True
+presentJoinVersion (Just a) (Just b) _ _ =
+  let (_ ** q) = joinVersionJust a b in rewrite q in Refl
+presentJoinVersion Nothing  _        p _ = void (notFalseTrue p)
+presentJoinVersion (Just _) Nothing  _ r = void (notFalseTrue r)
+
+||| `joinLinear` of two ENFORCED annotations stays enforced. All four
+||| `{LinUseOnce,LinBounded} × {LinUseOnce,LinBounded}` combinations
+||| yield `LinUseOnce` or `LinBounded` — genuinely join-closed.
+enforcedJoinLinear : (la, lb : Maybe LinearAnnotation) ->
+  linEnforcedM la = True -> linEnforcedM lb = True ->
+  linEnforcedM (joinLinear la lb) = True
+enforcedJoinLinear (Just LinUseOnce)     (Just LinUseOnce)     _ _ = Refl
+enforcedJoinLinear (Just LinUseOnce)     (Just (LinBounded _)) _ _ = Refl
+enforcedJoinLinear (Just (LinBounded _)) (Just LinUseOnce)     _ _ = Refl
+enforcedJoinLinear (Just (LinBounded _)) (Just (LinBounded _)) _ _ = Refl
+enforcedJoinLinear Nothing               _ p _ = void (notFalseTrue p)
+enforcedJoinLinear (Just LinUnlimited)   _ p _ = void (notFalseTrue p)
+enforcedJoinLinear (Just LinUseOnce)     Nothing             _ q = void (notFalseTrue q)
+enforcedJoinLinear (Just LinUseOnce)     (Just LinUnlimited) _ q = void (notFalseTrue q)
+enforcedJoinLinear (Just (LinBounded _)) Nothing             _ q = void (notFalseTrue q)
+enforcedJoinLinear (Just (LinBounded _)) (Just LinUnlimited) _ q = void (notFalseTrue q)
+
+l6Compose : {q1, q2 : Statement} ->
+            L6_CardinalitySafe q1 -> L6_CardinalitySafe q2 ->
+            L6_CardinalitySafe (composeJoin q1 q2)
+l6Compose {q1} {q2} (MkL6 p1) (MkL6 p2) =
+  MkL6 (presentJoinLimit (limit q1) (limit q2) p1 p2)
+
+l7Compose : {q1, q2 : Statement} ->
+            L7_EffectTracked q1 -> L7_EffectTracked q2 ->
+            L7_EffectTracked (composeJoin q1 q2)
+l7Compose {q1} {q2} (MkL7 p1) (MkL7 p2) =
+  MkL7 (presentJoinEffects (effectDecl q1) (effectDecl q2) p1 p2)
+
+l8Compose : {q1, q2 : Statement} ->
+            L8_TemporalSafe q1 -> L8_TemporalSafe q2 ->
             L8_TemporalSafe (composeJoin q1 q2)
-l8Compose (MkL8 s1 v1 p1) (MkL8 s2 v2 p2) =
-  let (c ** q) = joinVersionJust v1 v2
-  in MkL8 (composeJoin s1 s2) c (rewrite p1 in rewrite p2 in q)
+l8Compose {q1} {q2} (MkL8 p1) (MkL8 p2) =
+  MkL8 (presentJoinVersion (versionConst q1) (versionConst q2) p1 p2)
 
 ||| For any two `LinearAnnotation`s, `joinLinear (Just a) (Just b)` is
 ||| `Just _`.
@@ -594,22 +650,196 @@ joinLinearJust (LinBounded _) LinUnlimited   = (_ ** Refl)
 joinLinearJust (LinBounded _) LinUseOnce     = (_ ** Refl)
 joinLinearJust (LinBounded _) (LinBounded _) = (_ ** Refl)
 
-l9Compose : L9_LinearSafe q1 -> L9_LinearSafe q2 ->
+l9Compose : {q1, q2 : Statement} ->
+            L9_LinearSafe q1 -> L9_LinearSafe q2 ->
             L9_LinearSafe (composeJoin q1 q2)
-l9Compose (MkL9 s1 a1 p1) (MkL9 s2 a2 p2) =
-  let (c ** q) = joinLinearJust a1 a2
-  in MkL9 (composeJoin s1 s2) c (rewrite p1 in rewrite p2 in q)
+l9Compose {q1} {q2} (MkL9 p1) (MkL9 p2) =
+  MkL9 (enforcedJoinLinear (linearAnnot q1) (linearAnnot q2) p1 p2)
 
-||| `joinEpistemic (Just (EpClause ..)) (Just (EpClause ..))` is `Just _`.
-joinEpistemicJust : (a, b : EpistemicClause)
-  -> (c : EpistemicClause ** joinEpistemic (Just a) (Just b) = Just c)
-joinEpistemicJust (EpClause _ _) (EpClause _ _) = (_ ** Refl)
+-- ── L10: structural part is join-closed; acyclicity is NOT ────────────
 
-l10Compose : L10_EpistemicSafe q1 -> L10_EpistemicSafe q2 ->
+||| An append is `[]` only if both sides are.
+appendNilSplit : (xs, ys : List a) -> xs ++ ys = [] -> (xs = [], ys = [])
+appendNilSplit []        ys prf = (Refl, prf)
+appendNilSplit (_ :: _)  _  Refl impossible
+
+||| `(if b then [] else [x]) = []` forces `b = True`.
+ifNilForcesTrue : {0 a : Type} -> (b : Bool) -> (x : a) ->
+  (if b then [] else [x]) = (the (List a) []) -> b = True
+ifNilForcesTrue True  _ _   = Refl
+ifNilForcesTrue False _ Refl impossible
+
+||| `agentDeclared` is monotone under appending declared agents (left).
+||| Clean structural induction because `Decide.agentDeclared` is explicit
+||| `||` recursion (not Prelude `any`).
+agentDeclaredAppL : (a : Agent) -> (xs, ys : List Agent) ->
+  agentDeclared a xs = True -> agentDeclared a (xs ++ ys) = True
+agentDeclaredAppL a (d :: ds) ys prf with (agentId a == agentId d)
+  _ | True  = Refl
+  _ | False = agentDeclaredAppL a ds ys prf
+
+||| `agentDeclared` is monotone under appending declared agents (right).
+agentDeclaredAppR : (a : Agent) -> (xs, ys : List Agent) ->
+  agentDeclared a ys = True -> agentDeclared a (xs ++ ys) = True
+agentDeclaredAppR a []        ys prf = prf
+agentDeclaredAppR a (d :: ds) ys prf with (agentId a == agentId d)
+  _ | True  = Refl
+  _ | False = agentDeclaredAppR a ds ys prf
+
+||| If no requirement agent is undeclared wrt `d`, the same holds wrt any
+||| superset `d'` (`sub` witnesses `d ⊆ d'` by `agentDeclared`). The only
+||| reachable requirement shapes are those whose contribution is `[]`
+||| (otherwise the `findUndeclaredAgents d r = []` hypothesis is absurd),
+||| so each agent involved is declared in `d`, hence in `d'` via `sub`.
+fuaSuperset :
+  (d, d' : List Agent) ->
+  (sub : (a : Agent) -> agentDeclared a d = True -> agentDeclared a d' = True) ->
+  (r : List EpistemicRequirement) ->
+  findUndeclaredAgents d r = [] -> findUndeclaredAgents d' r = []
+fuaSuperset d d' sub [] _ = Refl
+fuaSuperset d d' sub (EpReqKnows a _ :: rest) pr with (agentDeclared a d) proof adp
+  _ | True  = rewrite sub a (rewrite adp in Refl) in fuaSuperset d d' sub rest pr
+  _ | False = absurd pr
+fuaSuperset d d' sub (EpReqBelieves a _ :: rest) pr with (agentDeclared a d) proof adp
+  _ | True  = rewrite sub a (rewrite adp in Refl) in fuaSuperset d d' sub rest pr
+  _ | False = absurd pr
+fuaSuperset d d' sub (EpReqCommon _ :: rest) pr =
+  fuaSuperset d d' sub rest pr
+fuaSuperset d d' sub (EpReqEntails a1 a2 _ :: rest) pr
+    with (agentDeclared a1 d) proof adp1
+  fuaSuperset d d' sub (EpReqEntails a1 a2 _ :: rest) pr | False = absurd pr
+  fuaSuperset d d' sub (EpReqEntails a1 a2 _ :: rest) pr | True
+      with (agentDeclared a2 d) proof adp2
+    fuaSuperset d d' sub (EpReqEntails a1 a2 _ :: rest) pr | True | False =
+      absurd pr
+    fuaSuperset d d' sub (EpReqEntails a1 a2 _ :: rest) pr | True | True =
+      rewrite sub a1 (rewrite adp1 in Refl) in
+      rewrite sub a2 (rewrite adp2 in Refl) in
+      fuaSuperset d d' sub rest pr
+
+||| `findUndeclaredAgents` over a requirements append is `[]` when each
+||| side is (the head contributions split off cleanly via
+||| `appendNilSplit`; no list-associativity gymnastics needed).
+fuaNilAppend :
+  (d : List Agent) -> (r, s : List EpistemicRequirement) ->
+  findUndeclaredAgents d r = [] -> findUndeclaredAgents d s = [] ->
+  findUndeclaredAgents d (r ++ s) = []
+fuaNilAppend d [] s _ ps = ps
+fuaNilAppend d (EpReqKnows a _ :: rest) s pr ps with (agentDeclared a d)
+  _ | True  = fuaNilAppend d rest s pr ps
+  _ | False = absurd pr
+fuaNilAppend d (EpReqBelieves a _ :: rest) s pr ps with (agentDeclared a d)
+  _ | True  = fuaNilAppend d rest s pr ps
+  _ | False = absurd pr
+fuaNilAppend d (EpReqCommon _ :: rest) s pr ps =
+  fuaNilAppend d rest s pr ps
+fuaNilAppend d (EpReqEntails a1 a2 _ :: rest) s pr ps
+    with (agentDeclared a1 d)
+  fuaNilAppend d (EpReqEntails a1 a2 _ :: rest) s pr ps | False = absurd pr
+  fuaNilAppend d (EpReqEntails a1 a2 _ :: rest) s pr ps | True
+      with (agentDeclared a2 d)
+    fuaNilAppend d (EpReqEntails a1 a2 _ :: rest) s pr ps | True | False =
+      absurd pr
+    fuaNilAppend d (EpReqEntails a1 a2 _ :: rest) s pr ps | True | True =
+      fuaNilAppend d rest s pr ps
+
+||| `epiStructOK`'s inner decision is `case findUndeclaredAgents .. of
+||| [] => True; (_::_) => False`. From that fold being `True`, recover the
+||| underlying `findUndeclaredAgents .. = []` equality (the `(_::_)` branch
+||| yields `False = True`, absurd). Genuine, no escape.
+undeclaredCaseNil : (us : List String) ->
+  (case us of { [] => True; (_ :: _) => False }) = True -> us = []
+undeclaredCaseNil []        _    = Refl
+undeclaredCaseNil (_ :: _)  Refl impossible
+
+||| Conversely, if `findUndeclaredAgents .. = []` then the `epiStructOK`
+||| inner fold is `True` (rewrite collapses the `case`).
+nilUndeclaredCase : (us : List String) ->
+  us = [] -> (case us of { [] => True; (_ :: _) => False }) = True
+nilUndeclaredCase _ prf = rewrite prf in Refl
+
+||| Top-level superset lift of `e1` to the joined agent list, factored out
+||| so the ascribed-`let` parse ambiguity (a `let x : T` whose `T` ends in
+||| `= []`) never arises. Left-append monotonicity.
+epiStructDecl1 :
+  (x1 : Agent) -> (xs1 : List Agent) ->
+  (x2 : Agent) -> (xs2 : List Agent) ->
+  (rs1 : List EpistemicRequirement) ->
+  findUndeclaredAgents (x1 :: xs1) rs1 = [] ->
+  findUndeclaredAgents ((x1 :: xs1) ++ (x2 :: xs2)) rs1 = []
+epiStructDecl1 x1 xs1 x2 xs2 rs1 d1 =
+  fuaSuperset (x1 :: xs1) ((x1 :: xs1) ++ (x2 :: xs2))
+    (\a => agentDeclaredAppL a (x1 :: xs1) (x2 :: xs2)) rs1 d1
+
+||| Right-append monotonicity counterpart of `epiStructDecl1`.
+epiStructDecl2 :
+  (x1 : Agent) -> (xs1 : List Agent) ->
+  (x2 : Agent) -> (xs2 : List Agent) ->
+  (rs2 : List EpistemicRequirement) ->
+  findUndeclaredAgents (x2 :: xs2) rs2 = [] ->
+  findUndeclaredAgents ((x1 :: xs1) ++ (x2 :: xs2)) rs2 = []
+epiStructDecl2 x1 xs1 x2 xs2 rs2 d2 =
+  fuaSuperset (x2 :: xs2) ((x1 :: xs1) ++ (x2 :: xs2))
+    (\a => agentDeclaredAppR a (x1 :: xs1) (x2 :: xs2)) rs2 d2
+
+||| The STRUCTURAL part of L10 (clause present, ≥1 agent, all requirement
+||| agents declared) IS closed under `composeJoin`: `joinEpistemic` unions
+||| agents and requirements; a nonempty agent list stays nonempty under
+||| append, and declaring MORE agents never makes a declared agent
+||| undeclared (`fuaSuperset` via `agentDeclaredAppL/R`).
+epiStructJoin : (q1, q2 : Statement) ->
+  epiStructOK q1 = True -> epiStructOK q2 = True ->
+  epiStructOK (composeJoin q1 q2) = True
+epiStructJoin q1 q2 e1 e2 with (epistemicClause q1)
+  epiStructJoin q1 q2 e1 e2 | Nothing = absurd e1
+  epiStructJoin q1 q2 e1 e2 | Just (EpClause as1 rs1) with (as1)
+    epiStructJoin q1 q2 e1 e2 | Just (EpClause as1 rs1) | [] = absurd e1
+    epiStructJoin q1 q2 e1 e2 | Just (EpClause as1 rs1) | (x1 :: xs1)
+        with (epistemicClause q2)
+      epiStructJoin q1 q2 e1 e2 | Just (EpClause as1 rs1) | (x1 :: xs1)
+          | Nothing = absurd e2
+      epiStructJoin q1 q2 e1 e2 | Just (EpClause as1 rs1) | (x1 :: xs1)
+          | Just (EpClause as2 rs2) with (as2)
+        epiStructJoin q1 q2 e1 e2 | Just (EpClause as1 rs1) | (x1 :: xs1)
+            | Just (EpClause as2 rs2) | [] = absurd e2
+        epiStructJoin q1 q2 e1 e2 | Just (EpClause as1 rs1) | (x1 :: xs1)
+            | Just (EpClause as2 rs2) | (x2 :: xs2) =
+          -- e1 collapses to: (case findUndeclaredAgents (x1::xs1) rs1 of
+          --   [] => True; (_::_) => False) = True ; likewise e2. Recover
+          -- the `= []` equalities, lift each to the joined agent list
+          -- (superset monotone), then fuaNilAppend over rs1 ++ rs2.
+          let d1 = undeclaredCaseNil (findUndeclaredAgents (x1 :: xs1) rs1) e1
+              d2 = undeclaredCaseNil (findUndeclaredAgents (x2 :: xs2) rs2) e2
+              decl1 = epiStructDecl1 x1 xs1 x2 xs2 rs1 d1
+              decl2 = epiStructDecl2 x1 xs1 x2 xs2 rs2 d2
+          in nilUndeclaredCase
+               (findUndeclaredAgents ((x1 :: xs1) ++ (x2 :: xs2)) (rs1 ++ rs2))
+               (fuaNilAppend ((x1 :: xs1) ++ (x2 :: xs2)) rs1 rs2 decl1 decl2)
+
+||| Extra evidence needed ONLY to compose at `EpistemicSafe`: the JOINED
+||| query is still free of a direct ENTAILS cycle. This is the single L10
+||| sub-property provably NOT closed under relational join (two acyclic
+||| requirement sets can union to a cyclic one). Trivial (`Unit`) at every
+||| other level, so `compositionPreservation` stays uniform while the
+||| non-closure is explicit in the TYPE — not hidden behind a vacuous
+||| predicate or a proof escape. Disclosed in VERIFICATION-STANCE.adoc.
+public export
+JoinSideCondition : Statement -> Statement -> SafetyLevel -> Type
+JoinSideCondition q1 q2 EpistemicSafe = epiNoCycle (composeJoin q1 q2) = True
+JoinSideCondition _  _  _             = Unit
+
+||| L10 composition: the structural part is genuinely join-closed
+||| (`epiStructJoin`); the acyclic part is supplied as the minimal
+||| `epiNoCycle (composeJoin q1 q2) = True` side-condition. Together they
+||| are exactly `epistemicConsistentStmt (composeJoin q1 q2) = True`.
+l10Compose : (q1, q2 : Statement) ->
+             epiNoCycle (composeJoin q1 q2) = True ->
+             L10_EpistemicSafe q1 -> L10_EpistemicSafe q2 ->
              L10_EpistemicSafe (composeJoin q1 q2)
-l10Compose (MkL10 s1 c1 p1) (MkL10 s2 c2 p2) =
-  let (c ** q) = joinEpistemicJust c1 c2
-  in MkL10 (composeJoin s1 s2) c (rewrite p1 in rewrite p2 in q)
+l10Compose q1 q2 ncyc (MkL10 p1) (MkL10 p2) =
+  let (s1, _) = andTrueSplit (epiStructOK q1) (epiNoCycle q1) p1
+      (s2, _) = andTrueSplit (epiStructOK q2) (epiNoCycle q2) p2
+  in MkL10 (andTrueIntro (epiStructJoin q1 q2 s1 s2) ncyc)
 
 -- ══════════════════════════════════════════════════════════════════════
 -- SECTION 7: the main theorem
@@ -619,73 +849,79 @@ l10Compose (MkL10 s1 c1 p1) (MkL10 s2 c2 p2) =
 ||| closed under relational join: a level-k certificate for q1 and q2
 ||| yields a level-k certificate for `composeJoin q1 q2`.
 |||
-||| L0/L1/L4/L6..L10 are genuine. L2/L3/L5 are produced at the correct
-||| indexed type by `lN Compose`, but the L2/L3/L5 predicates are still
-||| vacuous (Phase 2 work) — disclosed OWED in VERIFICATION-STANCE.adoc.
+||| PHASE 4b: L0/L1/L4 and now L2/L3/L5 (de-vacuized in Phase 2) and
+||| L6/L7/L8/L9 are ALL genuine and UNCONDITIONALLY join-closed. L10's
+||| structural content is genuine and join-closed (`epiStructJoin`); its
+||| direct-ENTAILS-acyclicity is provably NOT join-closed, so the theorem
+||| now takes an explicit `JoinSideCondition` — `Unit` at every level
+||| except `EpistemicSafe`, where it is the minimal
+||| `epiNoCycle (composeJoin q1 q2) = True`. The non-closure is therefore
+||| visible in the TYPE, not faked. See VERIFICATION-STANCE.adoc.
 export
 compositionPreservation :
   (q1, q2 : Statement) ->
   (schema : OctadSchema) ->
   (k : SafetyLevel) ->
   Composable q1 q2 ->
+  JoinSideCondition q1 q2 k ->
   SafetyCertificate q1 schema k ->
   SafetyCertificate q2 schema k ->
   SafetyCertificate (composeJoin q1 q2) schema k
-compositionPreservation q1 q2 _ ParseSafe _ _ _ =
+compositionPreservation q1 q2 _ ParseSafe _ _ _ _ =
   CertL0 (MkL0 (composeJoin q1 q2))
-compositionPreservation q1 q2 _ SchemaBound _
+compositionPreservation q1 q2 _ SchemaBound _ _
     (CertL1 _ l1a) (CertL1 _ l1b) =
   CertL1 (MkL0 (composeJoin q1 q2)) (l1Compose l1a l1b)
-compositionPreservation q1 q2 _ TypeCompat _
+compositionPreservation q1 q2 _ TypeCompat _ _
     (CertL2 _ l1a l2a) (CertL2 _ l1b l2b) =
   CertL2 (MkL0 (composeJoin q1 q2))
          (l1Compose l1a l1b) (l2Compose l2a l2b)
-compositionPreservation q1 q2 _ NullSafe _
+compositionPreservation q1 q2 _ NullSafe _ _
     (CertL3 _ l1a l2a l3a) (CertL3 _ l1b l2b l3b) =
   CertL3 (MkL0 (composeJoin q1 q2))
          (l1Compose l1a l1b) (l2Compose l2a l2b) (l3Compose l3a l3b)
-compositionPreservation q1 q2 _ InjectionProof _
+compositionPreservation q1 q2 _ InjectionProof _ _
     (CertL4 _ l1a l2a l3a l4a) (CertL4 _ l1b l2b l3b l4b) =
   CertL4 (MkL0 (composeJoin q1 q2))
          (l1Compose l1a l1b) (l2Compose l2a l2b) (l3Compose l3a l3b)
          (l4Compose l4a l4b)
-compositionPreservation q1 q2 _ ResultTyped _
+compositionPreservation q1 q2 _ ResultTyped _ _
     (CertL5 _ l1a l2a l3a l4a l5a) (CertL5 _ l1b l2b l3b l4b l5b) =
   CertL5 (MkL0 (composeJoin q1 q2))
          (l1Compose l1a l1b) (l2Compose l2a l2b) (l3Compose l3a l3b)
          (l4Compose l4a l4b) (l5Compose l5a l5b)
-compositionPreservation q1 q2 _ CardinalitySafe _
+compositionPreservation q1 q2 _ CardinalitySafe _ _
     (CertL6 _ l1a l2a l3a l4a l5a l6a)
     (CertL6 _ l1b l2b l3b l4b l5b l6b) =
   CertL6 (MkL0 (composeJoin q1 q2))
          (l1Compose l1a l1b) (l2Compose l2a l2b) (l3Compose l3a l3b)
          (l4Compose l4a l4b) (l5Compose l5a l5b) (l6Compose l6a l6b)
-compositionPreservation q1 q2 _ EffectTracked _
+compositionPreservation q1 q2 _ EffectTracked _ _
     (CertL7 _ l1a l2a l3a l4a l5a l6a l7a)
     (CertL7 _ l1b l2b l3b l4b l5b l6b l7b) =
   CertL7 (MkL0 (composeJoin q1 q2))
          (l1Compose l1a l1b) (l2Compose l2a l2b) (l3Compose l3a l3b)
          (l4Compose l4a l4b) (l5Compose l5a l5b) (l6Compose l6a l6b)
          (l7Compose l7a l7b)
-compositionPreservation q1 q2 _ TemporalSafe _
+compositionPreservation q1 q2 _ TemporalSafe _ _
     (CertL8 _ l1a l2a l3a l4a l5a l6a l7a l8a)
     (CertL8 _ l1b l2b l3b l4b l5b l6b l7b l8b) =
   CertL8 (MkL0 (composeJoin q1 q2))
          (l1Compose l1a l1b) (l2Compose l2a l2b) (l3Compose l3a l3b)
          (l4Compose l4a l4b) (l5Compose l5a l5b) (l6Compose l6a l6b)
          (l7Compose l7a l7b) (l8Compose l8a l8b)
-compositionPreservation q1 q2 _ LinearSafe _
+compositionPreservation q1 q2 _ LinearSafe _ _
     (CertL9 _ l1a l2a l3a l4a l5a l6a l7a l8a l9a)
     (CertL9 _ l1b l2b l3b l4b l5b l6b l7b l8b l9b) =
   CertL9 (MkL0 (composeJoin q1 q2))
          (l1Compose l1a l1b) (l2Compose l2a l2b) (l3Compose l3a l3b)
          (l4Compose l4a l4b) (l5Compose l5a l5b) (l6Compose l6a l6b)
          (l7Compose l7a l7b) (l8Compose l8a l8b) (l9Compose l9a l9b)
-compositionPreservation q1 q2 _ EpistemicSafe _
+compositionPreservation q1 q2 _ EpistemicSafe _ ncyc
     (CertL10 _ l1a l2a l3a l4a l5a l6a l7a l8a l9a l10a)
     (CertL10 _ l1b l2b l3b l4b l5b l6b l7b l8b l9b l10b) =
   CertL10 (MkL0 (composeJoin q1 q2))
           (l1Compose l1a l1b) (l2Compose l2a l2b) (l3Compose l3a l3b)
           (l4Compose l4a l4b) (l5Compose l5a l5b) (l6Compose l6a l6b)
           (l7Compose l7a l7b) (l8Compose l8a l8b) (l9Compose l9a l9b)
-          (l10Compose l10a l10b)
+          (l10Compose q1 q2 ncyc l10a l10b)

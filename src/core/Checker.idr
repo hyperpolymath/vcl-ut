@@ -455,12 +455,17 @@ checkLevel5Sound stmt schema m prf
 |||
 ||| @stmt The statement to check.
 ||| @return (True, _) if LIMIT is present; (False, diagnostic) otherwise.
+||| Defined THROUGH `Decide.cardinalityBoundedStmt` (Phase 4b), so the
+||| L6 predicate and this decision share one definition.
 public export
 checkLevel6 : Statement -> (Bool, String)
-checkLevel6 stmt =
-  case limit stmt of
-    Just n  => (True, "L6:CardinalitySafe — LIMIT " ++ show n ++ " present")
-    Nothing => (False, "L6:CardinalitySafe FAILED — no LIMIT clause on query")
+checkLevel6 stmt = l6Verdict (cardinalityBoundedStmt stmt)
+  where
+    l6Verdict : Bool -> (Bool, String)
+    l6Verdict True  =
+      (True,  "L6:CardinalitySafe — result cardinality is LIMIT-bounded")
+    l6Verdict False =
+      (False, "L6:CardinalitySafe FAILED — no LIMIT clause on query")
 
 ||| Level 7 — EffectTracked: the statement includes an EFFECTS declaration.
 ||| Side-effectful operations (INSERT/UPDATE/DELETE) must declare their
@@ -468,12 +473,16 @@ checkLevel6 stmt =
 |||
 ||| @stmt The statement to check.
 ||| @return (True, _) if effectDecl is present; (False, diagnostic) otherwise.
+||| Defined THROUGH `Decide.effectTrackedStmt` (Phase 4b).
 public export
 checkLevel7 : Statement -> (Bool, String)
-checkLevel7 stmt =
-  case effectDecl stmt of
-    Just _  => (True, "L7:EffectTracked — effect declaration present")
-    Nothing => (False, "L7:EffectTracked FAILED — no EFFECTS declaration")
+checkLevel7 stmt = l7Verdict (effectTrackedStmt stmt)
+  where
+    l7Verdict : Bool -> (Bool, String)
+    l7Verdict True  =
+      (True,  "L7:EffectTracked — effect declaration present")
+    l7Verdict False =
+      (False, "L7:EffectTracked FAILED — no EFFECTS declaration")
 
 ||| Level 8 — TemporalSafe: the statement includes a version constraint.
 ||| Queries against VeriSimDB's time-travel engine must specify temporal
@@ -481,12 +490,16 @@ checkLevel7 stmt =
 |||
 ||| @stmt The statement to check.
 ||| @return (True, _) if versionConst is present; (False, diagnostic) otherwise.
+||| Defined THROUGH `Decide.temporalBoundedStmt` (Phase 4b).
 public export
 checkLevel8 : Statement -> (Bool, String)
-checkLevel8 stmt =
-  case versionConst stmt of
-    Just _  => (True, "L8:TemporalSafe — version constraint present")
-    Nothing => (False, "L8:TemporalSafe FAILED — no version constraint")
+checkLevel8 stmt = l8Verdict (temporalBoundedStmt stmt)
+  where
+    l8Verdict : Bool -> (Bool, String)
+    l8Verdict True  =
+      (True,  "L8:TemporalSafe — version constraint present")
+    l8Verdict False =
+      (False, "L8:TemporalSafe FAILED — no version constraint")
 
 ||| Level 9 — LinearSafe: the statement includes a linearity annotation
 ||| with an actual consumption constraint (LinUseOnce or LinBounded).
@@ -494,14 +507,17 @@ checkLevel8 stmt =
 |||
 ||| @stmt The statement to check.
 ||| @return (True, _) if a consume constraint is present; (False, diagnostic) otherwise.
+||| Defined THROUGH `Decide.linearEnforcedStmt` (Phase 4b): rejects both
+||| absence AND the no-op `LinUnlimited`, matching the predicate exactly.
 public export
 checkLevel9 : Statement -> (Bool, String)
-checkLevel9 stmt =
-  case linearAnnot stmt of
-    Nothing          => (False, "L9:LinearSafe FAILED — no linearity annotation")
-    Just LinUnlimited => (False, "L9:LinearSafe FAILED — LinUnlimited is not a consume constraint")
-    Just LinUseOnce  => (True, "L9:LinearSafe — consume-after-1-use constraint present")
-    Just (LinBounded _) => (True, "L9:LinearSafe — bounded usage constraint present")
+checkLevel9 stmt = l9Verdict (linearEnforcedStmt stmt)
+  where
+    l9Verdict : Bool -> (Bool, String)
+    l9Verdict True  =
+      (True,  "L9:LinearSafe — enforced consumption bound (LinUseOnce/LinBounded)")
+    l9Verdict False =
+      (False, "L9:LinearSafe FAILED — no enforced linearity (absent or LinUnlimited)")
 
 ||| Level 10 — EpistemicSafe: the statement includes an EPISTEMIC clause
 ||| with well-formed agent declarations and consistent requirements.
@@ -516,139 +532,84 @@ checkLevel9 stmt =
 ||| @stmt The statement to check.
 ||| @return (True, _) if epistemic clause is present and consistent;
 |||         (False, diagnostic) otherwise.
+||| Defined THROUGH `Decide.epistemicConsistentStmt` (Phase 4b). The
+||| agent-declaration / direct-ENTAILS-cycle helper logic was hoisted
+||| verbatim into `Decide` so the L10 predicate and this decision share
+||| ONE definition (single source of truth, no drift). The richer
+||| diagnostic (which agent, etc.) is derived separately for the message
+||| but the verdict bit is exactly the decider.
 public export
 checkLevel10 : Statement -> (Bool, String)
-checkLevel10 stmt =
-  case epistemicClause stmt of
-    Nothing => (False, "L10:EpistemicSafe FAILED — no EPISTEMIC clause")
-    Just (EpClause agents reqs) =>
-      case agents of
-        [] => (False, "L10:EpistemicSafe FAILED — EPISTEMIC clause has no agents")
-        _  =>
-          let undeclared = findUndeclaredAgents agents reqs
-          in case undeclared of
-            [] =>
-              if hasCircularEntails reqs
-                then (False, "L10:EpistemicSafe FAILED — circular ENTAILS dependency")
-                else (True, "L10:EpistemicSafe — "
-                       ++ show (length agents) ++ " agent(s), "
-                       ++ show (length reqs) ++ " requirement(s) verified")
-            (name :: _) =>
-              (False, "L10:EpistemicSafe FAILED — agent '"
-                ++ name ++ "' used in REQUIRES but not declared in AGENTS")
+checkLevel10 stmt = l10Verdict (epistemicConsistentStmt stmt)
   where
-    ||| Get a string identifier for an agent (for comparison purposes).
-    agentId : Agent -> String
-    agentId AgEngine        = "ENGINE"
-    agentId (AgProver name) = "PROVER:" ++ name
-    agentId AgValidator     = "VALIDATOR"
-    agentId (AgUser name)   = "USER:" ++ name
-    agentId AgFederation    = "FEDERATION"
-
-    ||| Check if an agent is in the declared agents list.
-    agentDeclared : Agent -> List Agent -> Bool
-    agentDeclared a declared = any (\d => agentId a == agentId d) declared
-
-    ||| Find agents referenced in requirements but not declared.
-    ||| Returns list of undeclared agent name strings.
-    findUndeclaredAgents : List Agent -> List EpistemicRequirement -> List String
-    findUndeclaredAgents declared [] = []
-    findUndeclaredAgents declared (EpReqKnows a _ :: rest) =
-      if agentDeclared a declared
-        then findUndeclaredAgents declared rest
-        else agentId a :: findUndeclaredAgents declared rest
-    findUndeclaredAgents declared (EpReqBelieves a _ :: rest) =
-      if agentDeclared a declared
-        then findUndeclaredAgents declared rest
-        else agentId a :: findUndeclaredAgents declared rest
-    findUndeclaredAgents declared (EpReqCommon _ :: rest) =
-      findUndeclaredAgents declared rest
-    findUndeclaredAgents declared (EpReqEntails a1 a2 _ :: rest) =
-      let u1 = if agentDeclared a1 declared then [] else [agentId a1]
-          u2 = if agentDeclared a2 declared then [] else [agentId a2]
-      in u1 ++ u2 ++ findUndeclaredAgents declared rest
-
-    ||| Collect all (source, target) pairs from ENTAILS requirements.
-    entailsPairs : List EpistemicRequirement -> List (String, String)
-    entailsPairs [] = []
-    entailsPairs (EpReqEntails a1 a2 _ :: rest) =
-      (agentId a1, agentId a2) :: entailsPairs rest
-    entailsPairs (_ :: rest) = entailsPairs rest
-
-    ||| Check for direct circular ENTAILS (a->b and b->a).
-    ||| Full cycle detection would require a graph algorithm;
-    ||| for now we check the direct symmetry violation.
-    hasCircularEntails : List EpistemicRequirement -> Bool
-    hasCircularEntails reqs =
-      let pairs = entailsPairs reqs
-      in any (\(a, b) => any (\(c, d) => a == d && b == c) pairs) pairs
+    l10Verdict : Bool -> (Bool, String)
+    l10Verdict True  =
+      (True,  "L10:EpistemicSafe — clause present, agents declared, no direct ENTAILS cycle")
+    l10Verdict False =
+      (False, "L10:EpistemicSafe FAILED — missing clause / no agents / undeclared agent / direct ENTAILS cycle")
 
 -- ═══════════════════════════════════════════════════════════════════════
--- Soundness of the L6–L10 decision procedures (Phase 3a, standards#124)
+-- Soundness of the L6–L10 decision procedures (Phase 4b, standards#124)
 -- ═══════════════════════════════════════════════════════════════════════
 --
 -- Each `checkLevelNSound` proves: if `checkLevelN` accepts, the statement
 -- genuinely carries the corresponding `LN_*` witness. Same `with … proof
--- p` shape as `checkLevel4Sound`; no proof-escape.
+-- p` shape as `checkLevel2Sound`; no proof-escape.
 --
--- SCOPE (honest): the L6–L10 *predicates* assert exactly "the relevant
--- clause/annotation is present" (`limit/effectDecl/versionConst/
--- linearAnnot/epistemicClause stmt = Just _`). That is a real,
--- non-vacuous property (a query lacking the clause cannot inhabit it),
--- but it is *shallower* than what `checkLevelN` additionally enforces
--- (L9 rejects `LinUnlimited`; L10 also requires declared agents and no
--- direct ENTAILS cycle). These soundness lemmas are genuine for the
--- predicates as stated; the predicate↔checker shallowness gap is
--- disclosed in VERIFICATION-STANCE.adoc (Phase 3 residual), not masked.
+-- PHASE 4b: the L6–L10 predicates now carry the SHARED `Decide` decider
+-- (`cardinalityBoundedStmt`/`effectTrackedStmt`/`temporalBoundedStmt`/
+-- `linearEnforcedStmt`/`epistemicConsistentStmt`), and `checkLevelN` is
+-- defined THROUGH that same decider, so each soundness lemma is a direct
+-- equality extraction — not a check against a parallel re-implementation
+-- that could drift. The Phase-3 disclosed predicate↔checker shallowness
+-- gap (L9 `LinUnlimited`; L10 declared-agents / direct ENTAILS cycle) is
+-- hereby CLOSED at the level of these predicates. Remaining disclosed L10
+-- residual (full transitive cycle detection, proposition well-typedness)
+-- is in VERIFICATION-STANCE.adoc — scoped, not masked.
 
-||| L6 soundness: acceptance ⇒ a LIMIT is present.
+||| L6 soundness: acceptance ⇒ the cardinality decider holds.
 export
 checkLevel6Sound : (stmt : Statement) -> (m : String) ->
                    checkLevel6 stmt = (True, m) -> L6_CardinalitySafe stmt
-checkLevel6Sound stmt m prf with (limit stmt) proof p
-  checkLevel6Sound stmt m prf | Just n  = MkL6 stmt n p
-  checkLevel6Sound stmt m prf | Nothing = void (falseNotTrue (cong fst prf))
+checkLevel6Sound stmt m prf with (cardinalityBoundedStmt stmt) proof p
+  checkLevel6Sound stmt m prf | True  = MkL6 p
+  checkLevel6Sound stmt m prf | False = void (falseNotTrue (cong fst prf))
 
-||| L7 soundness: acceptance ⇒ an EFFECTS declaration is present.
+||| L7 soundness: acceptance ⇒ the effect-tracked decider holds.
 export
 checkLevel7Sound : (stmt : Statement) -> (m : String) ->
                    checkLevel7 stmt = (True, m) -> L7_EffectTracked stmt
-checkLevel7Sound stmt m prf with (effectDecl stmt) proof p
-  checkLevel7Sound stmt m prf | Just e  = MkL7 stmt e p
-  checkLevel7Sound stmt m prf | Nothing = void (falseNotTrue (cong fst prf))
+checkLevel7Sound stmt m prf with (effectTrackedStmt stmt) proof p
+  checkLevel7Sound stmt m prf | True  = MkL7 p
+  checkLevel7Sound stmt m prf | False = void (falseNotTrue (cong fst prf))
 
-||| L8 soundness: acceptance ⇒ a version constraint is present.
+||| L8 soundness: acceptance ⇒ the temporal-bound decider holds.
 export
 checkLevel8Sound : (stmt : Statement) -> (m : String) ->
                    checkLevel8 stmt = (True, m) -> L8_TemporalSafe stmt
-checkLevel8Sound stmt m prf with (versionConst stmt) proof p
-  checkLevel8Sound stmt m prf | Just v  = MkL8 stmt v p
-  checkLevel8Sound stmt m prf | Nothing = void (falseNotTrue (cong fst prf))
+checkLevel8Sound stmt m prf with (temporalBoundedStmt stmt) proof p
+  checkLevel8Sound stmt m prf | True  = MkL8 p
+  checkLevel8Sound stmt m prf | False = void (falseNotTrue (cong fst prf))
 
-||| L9 soundness: acceptance ⇒ a linearity annotation is present.
-||| (The accepting cases are exactly `LinUseOnce` / `LinBounded`; the
-||| witness `MkL9` records `linearAnnot stmt = Just la`.)
+||| L9 soundness: acceptance ⇒ linearity is genuinely ENFORCED
+||| (`LinUseOnce`/`LinBounded`; absence and `LinUnlimited` are rejected
+||| by the shared decider — the Phase-3 L9 gap is closed).
 export
 checkLevel9Sound : (stmt : Statement) -> (m : String) ->
                    checkLevel9 stmt = (True, m) -> L9_LinearSafe stmt
-checkLevel9Sound stmt m prf with (linearAnnot stmt) proof p
-  checkLevel9Sound stmt m prf | Nothing =
-    void (falseNotTrue (cong fst prf))
-  checkLevel9Sound stmt m prf | Just LinUnlimited =
-    void (falseNotTrue (cong fst prf))
-  checkLevel9Sound stmt m prf | Just LinUseOnce =
-    MkL9 stmt LinUseOnce p
-  checkLevel9Sound stmt m prf | Just (LinBounded n) =
-    MkL9 stmt (LinBounded n) p
+checkLevel9Sound stmt m prf with (linearEnforcedStmt stmt) proof p
+  checkLevel9Sound stmt m prf | True  = MkL9 p
+  checkLevel9Sound stmt m prf | False = void (falseNotTrue (cong fst prf))
 
-||| L10 soundness: acceptance ⇒ an EPISTEMIC clause is present.
+||| L10 soundness: acceptance ⇒ the epistemic-consistency decider holds
+||| (clause present, ≥1 agent, all requirement agents declared, no direct
+||| ENTAILS cycle — the Phase-3 L10 gap is closed at this predicate).
 export
 checkLevel10Sound : (stmt : Statement) -> (m : String) ->
                     checkLevel10 stmt = (True, m) -> L10_EpistemicSafe stmt
-checkLevel10Sound stmt m prf with (epistemicClause stmt) proof p
-  checkLevel10Sound stmt m prf | Just ec = MkL10 stmt ec p
-  checkLevel10Sound stmt m prf | Nothing =
-    void (falseNotTrue (cong fst prf))
+checkLevel10Sound stmt m prf with (epistemicConsistentStmt stmt) proof p
+  checkLevel10Sound stmt m prf | True  = MkL10 p
+  checkLevel10Sound stmt m prf | False = void (falseNotTrue (cong fst prf))
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Pipeline Runner
