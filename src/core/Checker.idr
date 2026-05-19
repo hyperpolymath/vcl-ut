@@ -212,36 +212,11 @@ containsLiteralString = hasStringLit
 -- `resolveSelectItemType` now lives in `VclTotal.Core.Decide` (see note
 -- above); `checkLevel5` is defined through `Decide.selectItemsTyped`.
 
-||| Check if a nullable field is used without a null guard in an expression.
-||| A "null guard" is an ECompare with Eq/NotEq against LitNull.
-||| Returns the list of unguarded nullable field references.
-findUnguardedNullableFields : Expr -> OctadSchema -> List FieldRef
-findUnguardedNullableFields expr schema =
-  let refs : List FieldRef
-      refs = extractFieldRefs expr
-      guarded : List FieldRef
-      guarded = findNullGuardedRefs expr
-  in filter (\ref => isNullable ref schema && not (elemBy fieldRefEq ref guarded)) refs
-  where
-    ||| Structural equality for FieldRef (same modality + field name).
-    fieldRefEq : FieldRef -> FieldRef -> Bool
-    fieldRefEq a b =
-      modalityToInt (modality a) == modalityToInt (modality b) &&
-      fieldName a == fieldName b
-
-    ||| Find all field refs that appear in a null-check pattern:
-    ||| ECompare Eq (EField ref _) (ELiteral LitNull _) or symmetric.
-    findNullGuardedRefs : Expr -> List FieldRef
-    findNullGuardedRefs (ECompare Eq (EField ref _) (ELiteral LitNull _) _) = [ref]
-    findNullGuardedRefs (ECompare Eq (ELiteral LitNull _) (EField ref _) _) = [ref]
-    findNullGuardedRefs (ECompare NotEq (EField ref _) (ELiteral LitNull _) _) = [ref]
-    findNullGuardedRefs (ECompare NotEq (ELiteral LitNull _) (EField ref _) _) = [ref]
-    findNullGuardedRefs (ECompare _ l r _) =
-      findNullGuardedRefs l ++ findNullGuardedRefs r
-    findNullGuardedRefs (ELogic _ l Nothing _) = findNullGuardedRefs l
-    findNullGuardedRefs (ELogic _ l (Just r) _) =
-      findNullGuardedRefs l ++ findNullGuardedRefs r
-    findNullGuardedRefs _ = []
+-- `findUnguardedNullableFields` (and its `fieldRefEq` /
+-- `findNullGuardedRefs` helpers) moved to `VclTotal.Core.Decide` as
+-- `nullSafeStmt` / `nullGuardedRefs` / `fieldRefEq` (Phase 2,
+-- standards#124): the L3 proof predicate and `checkLevel3` now decide
+-- via the SAME function, so `checkLevel3Sound` cannot drift.
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Individual Level Checks
@@ -328,22 +303,38 @@ checkLevel2Sound stmt schema m prf
 ||| @stmt   The statement to check.
 ||| @schema The schema providing nullability information.
 ||| @return (True, _) if no unguarded nullable fields; (False, diagnostic) otherwise.
+|||
+||| Defined through the shared decider `Decide.nullSafeStmt` (the same
+||| function the L3 proof predicate `AllNullableFieldsGuarded` carries),
+||| so `checkLevel3Sound` is a genuine soundness statement.
 public export
 checkLevel3 : Statement -> OctadSchema -> (Bool, String)
-checkLevel3 stmt schema =
-  let whereUnguarded : List FieldRef
-      whereUnguarded = maybe [] (\e => findUnguardedNullableFields e schema) (whereClause stmt)
-      havingUnguarded : List FieldRef
-      havingUnguarded = maybe [] (\e => findUnguardedNullableFields e schema) (having stmt)
-      allUnguarded : List FieldRef
-      allUnguarded = whereUnguarded ++ havingUnguarded
-  in case allUnguarded of
-    [] => (True, "L3:NullSafe — all nullable fields are guarded")
-    (r :: _) =>
-      ( False
-      , "L3:NullSafe FAILED — unguarded nullable field: "
-          ++ modalityName (modality r) ++ "." ++ fieldName r
-      )
+checkLevel3 stmt schema = l3Verdict (nullSafeStmt stmt schema)
+  where
+    l3Verdict : Bool -> (Bool, String)
+    l3Verdict True  =
+      (True,  "L3:NullSafe — all nullable fields are guarded (WHERE + HAVING)")
+    l3Verdict False =
+      (False, "L3:NullSafe FAILED — unguarded nullable field in WHERE/HAVING")
+
+||| **Soundness of the Level-3 decision procedure.**
+||| If `checkLevel3` accepts, the statement genuinely carries an
+||| `L3_NullSafe`: neither WHERE nor HAVING uses a schema-nullable field
+||| without an explicit NULL guard (`nullSafeStmt stmt schema = True`).
+||| Before Phase 2 `AllNullableFieldsGuarded` was inhabited by the
+||| content-free `GuardedNull` and only saw WHERE. Mirrors
+||| `checkLevel4Sound`. Tracked: hyperpolymath/standards#124.
+export
+checkLevel3Sound : (stmt : Statement) -> (schema : OctadSchema) ->
+                   (m : String) ->
+                   checkLevel3 stmt schema = (True, m) ->
+                   L3_NullSafe stmt schema
+checkLevel3Sound stmt schema m prf
+    with (nullSafeStmt stmt schema) proof p
+  checkLevel3Sound stmt schema m prf | True  =
+    MkL3 stmt schema (MkNullGuarded p)
+  checkLevel3Sound stmt schema m prf | False =
+    void (notFalseTrue (cong fst prf))
 
 ||| Level 4 — InjectionProof: no raw string literals in the WHERE clause.
 ||| All user-controlled values must arrive via EParam nodes (parameterised

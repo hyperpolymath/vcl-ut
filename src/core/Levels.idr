@@ -92,10 +92,26 @@ data AllComparisonsTypeSafe : Maybe Expr -> OctadSchema -> Type where
 
 
 ||| Proof that all nullable fields are guarded (NULL checks present).
+|||
+||| HISTORY (standards#124, Phase 2): this used to be
+|||
+|||   data AllNullableFieldsGuarded : Maybe Expr -> OctadSchema -> Type
+|||     where
+|||       NoWhereNull : AllNullableFieldsGuarded Nothing schema
+|||       GuardedNull : AllNullableFieldsGuarded (Just expr) schema
+|||
+||| which is *vacuous*: `GuardedNull` inhabited the predicate for *every*
+||| `Just expr` with zero structural content, and it only saw the WHERE
+||| clause (so it could not even be `checkLevel3`'s soundness target —
+||| the checker also inspects HAVING). It is now **Statement-indexed**
+||| and carries real evidence: the shared decider `Decide.nullSafeStmt`
+||| (which `Checker.checkLevel3` is defined through) returns `True`, i.e.
+||| neither the WHERE nor the HAVING clause uses a schema-nullable field
+||| without an explicit NULL guard. Soundness: `Checker.checkLevel3Sound`.
 public export
-data AllNullableFieldsGuarded : Maybe Expr -> OctadSchema -> Type where
-  NoWhereNull : AllNullableFieldsGuarded Nothing schema
-  GuardedNull : AllNullableFieldsGuarded (Just expr) schema
+data AllNullableFieldsGuarded : Statement -> OctadSchema -> Type where
+  MkNullGuarded : nullSafeStmt stmt schema = True ->
+                  AllNullableFieldsGuarded stmt schema
 
 ||| Proof that no raw user input appears in the query's WHERE clause.
 ||| User values must arrive via `EParam` nodes, never as embedded string
@@ -170,7 +186,7 @@ public export
 data L3_NullSafe : Statement -> OctadSchema -> Type where
   MkL3 : (stmt : Statement) ->
           (schema : OctadSchema) ->
-          AllNullableFieldsGuarded (whereClause stmt) schema ->
+          AllNullableFieldsGuarded stmt schema ->
           L3_NullSafe stmt schema
 
 ||| Level 4: Injection Proof — no unparameterised user input.

@@ -459,23 +459,47 @@ l2Compose (MkL2 s1 sch (MkAllCompat a1)) (MkL2 s2 _ (MkAllCompat a2)) =
   MkL2 (composeJoin s1 s2) sch
     (MkAllCompat (whereCompatJoin (whereClause s1) (whereClause s2) sch a1 a2))
 
-||| L3: `AllNullableFieldsGuarded` only distinguishes `Nothing` from
-||| `Just _`; the join is `Just _` whenever either input was.
-joinWhereNullGuarded :
-  (w1m, w2m : Maybe Expr) ->
-  AllNullableFieldsGuarded w1m sch -> AllNullableFieldsGuarded w2m sch ->
-  AllNullableFieldsGuarded (joinWhere w1m w2m) sch
-joinWhereNullGuarded Nothing  Nothing  NoWhereNull NoWhereNull = NoWhereNull
-joinWhereNullGuarded (Just _) Nothing  GuardedNull NoWhereNull = GuardedNull
-joinWhereNullGuarded Nothing  (Just _) NoWhereNull GuardedNull = GuardedNull
-joinWhereNullGuarded (Just _) (Just _) GuardedNull GuardedNull = GuardedNull
+||| **Genuine** L3 closure — the hardest of the three. The joined WHERE
+||| is `Nothing`, a verbatim side, or `Just (ELogic And a (Just b) TBool)`.
+||| Both `exprFieldRefsD` (uses) and `nullGuardedRefs` (guards) distribute
+||| over that AND node, so guards from either side cover uses from either
+||| side; each side's refs stay guarded under the larger combined guard
+||| set (guard-set monotonicity, `Decide.allRefsGuardedWeaken{L,R}`) and
+||| list-append closes it (`Decide.exprNullSafeConjoin`). No vacuous
+||| constructor; mirrors the L4 `wslJoin` shape.
+maybeNullSafeJoin :
+  (w1m, w2m : Maybe Expr) -> (sch : OctadSchema) ->
+  maybeExprNullSafe w1m sch = True ->
+  maybeExprNullSafe w2m sch = True ->
+  maybeExprNullSafe (joinWhere w1m w2m) sch = True
+maybeNullSafeJoin Nothing   Nothing   _   _  _  = Refl
+maybeNullSafeJoin (Just _)  Nothing   _   p1 _  = p1
+maybeNullSafeJoin Nothing   (Just _)  _   _  p2 = p2
+maybeNullSafeJoin (Just a)  (Just b)  sch p1 p2 =
+  exprNullSafeConjoin a b sch p1 p2
+
+||| `composeJoin` AND-conjoins the WHEREs and DROPS HAVING (`Nothing`,
+||| trivially null-safe), so statement-level null-safety is exactly the
+||| joined-WHERE fact.
+nullSafeStmtCompose :
+  (q1, q2 : Statement) -> (sch : OctadSchema) ->
+  nullSafeStmt q1 sch = True -> nullSafeStmt q2 sch = True ->
+  nullSafeStmt (composeJoin q1 q2) sch = True
+nullSafeStmtCompose q1 q2 sch n1 n2 =
+  let (w1, _) = andTrueSplit (maybeExprNullSafe (whereClause q1) sch)
+                             (maybeExprNullSafe (having q1) sch) n1
+      (w2, _) = andTrueSplit (maybeExprNullSafe (whereClause q2) sch)
+                             (maybeExprNullSafe (having q2) sch) n2
+  in andTrueIntro
+       (maybeNullSafeJoin (whereClause q1) (whereClause q2) sch w1 w2)
+       Refl
 
 l3Compose :
   L3_NullSafe q1 schema -> L3_NullSafe q2 schema ->
   L3_NullSafe (composeJoin q1 q2) schema
-l3Compose (MkL3 s1 sch a1) (MkL3 s2 _ a2) =
+l3Compose (MkL3 s1 sch (MkNullGuarded n1)) (MkL3 s2 _ (MkNullGuarded n2)) =
   MkL3 (composeJoin s1 s2) sch
-    (joinWhereNullGuarded (whereClause s1) (whereClause s2) a1 a2)
+    (MkNullGuarded (nullSafeStmtCompose s1 s2 sch n1 n2))
 
 ||| **Genuine** L5 closure. `AllSelectItemsTyped` now carries
 ||| `selectItemsTyped items sch = True`; `composeJoin` concatenates the
