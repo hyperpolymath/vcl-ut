@@ -7,7 +7,7 @@
 - **Languages**: Rust, ReScript, Idris2, Zig
 - **Existing ABI proofs**: `src/interface/abi/*.idr` + domain-specific Idris2: `src/core/Checker.idr`, `Grammar.idr`, `Levels.idr`, `Schema.idr`, `Composition.idr`
 - **Machine-verified**: the full `VclTotal` proof corpus — `verification/proofs/vclut-core.ipkg` builds clean under idris2 0.8.0 (`idris2 --build`, exit 0, `%default total`, **zero proof-escape symbols**, CI-gated by `.github/workflows/proof-corpus.yml`) as **12 modules** (`ABI.{Types,Layout,LayoutProofs}` + `Core.{Grammar,Schema,Decide,Levels,Checker,Composition,Epistemic}` + `Interface.{WireDecode,WireConformance}`), plus the self-contained `verification/proofs/SafetyL4Model.idr` (`--check`, exit 0). Phases 1–4 are on `origin/main` (PRs #21/#22/#23/#24); Phase 5 / vcl-ut#25 (trusted Rust parser P5a #26, wire codec P5b-step-1 #28, **certified Idris wire decoder + cross-language `Refl` conformance** P5b-step-2) reinforces the FFI boundary.
-- **Status (Phase 0 → 4 RESOLVED, honestly; Phase 5 boundary reinforcement in progress)**: the Phase-0 blockers are fixed, not faked — the corpus compiles and is machine-checked; `ABI.Types`/`Grammar` errors repaired; **L2/L3/L5 de-vacuized** (Phase 2, evidence-carrying predicates over `Core.Decide`); all ten levels carry `checkLevelNSound` and `Checker.certifyAt`/`certifyRequested` assemble a genuine dependent `SafetyCertificate` (Phase 3); the Zig FFI is no longer a fabricating stub — it is **fail-closed** with a proof-gated `Checker.certifiedLevel` mint (Phase 3d). **Phase 5 (vcl-ut#25)**: a trusted Rust/SPARK-grade parser + a deterministic versioned wire codec exist, and the *decode* side of the C-ABI `Statement` marshalling is now **certified** — `VclTotal.Interface.WireDecode` is a total (zero-escape) decoder proven byte-for-byte conformant with the Rust encoder by `Refl` (`WireConformance`). Remaining honest gaps are precisely scoped (P5c = typed-wasm PCC proof-transport — proof term + checker kernel the consumer re-runs, *re-checkable*, the estate-aligned objective; the C-ABI/Zig shim retained only as the fail-closed attestation fallback; P5d = signed-attestation *fallback* contract for C-only consumers; plus L3 subquery/heuristic scoping; L9/L10 predicate depth; the additive↔ceil `alignUp` sliver; the disclosed NaN-payload limitation of the Idris `Double` boundary). Re-checkable transport is impossible *only* over a C ABI, not over the estate's typed-wasm target. `verification/proofs/VERIFICATION-STANCE.adoc` is the authoritative, proof-backed catalogue and takes precedence over this file.
+- **Status (Phase 0 → 4 RESOLVED, honestly; Phase 5 boundary reinforcement in progress)**: the Phase-0 blockers are fixed, not faked — the corpus compiles and is machine-checked; `ABI.Types`/`Grammar` errors repaired; **L2/L3/L5 de-vacuized** (Phase 2, evidence-carrying predicates over `Core.Decide`); all ten levels carry `checkLevelNSound` and `Checker.certifyAt`/`certifyRequested` assemble a genuine dependent `SafetyCertificate` (Phase 3); the Zig FFI is no longer a fabricating stub — it is **fail-closed** with a proof-gated `Checker.certifiedLevel` mint (Phase 3d). **Phase 5 (vcl-ut#25)**: a trusted Rust/SPARK-grade parser + a deterministic versioned wire codec exist, and the *decode* side of the C-ABI `Statement` marshalling is now **certified** — `VclTotal.Interface.WireDecode` is a total (zero-escape) decoder proven byte-for-byte conformant with the Rust encoder by `Refl` (`WireConformance`). **P5c (vcl-ut#25) — Tier-1 recompute-PCC RESOLVED** (#26/#28/#29/#30/#31/#32): trusted Rust parser, certified `Statement`+`OctadSchema` decoder (`Refl`-pinned), faithful Rust decision port machine-pinned to the corpus, and a fail-closed recompute `wasm32` artefact the consumer re-runs. Remaining honest gaps precisely scoped: **P5d** = C-ABI signed-attestation *fallback* contract for non-wasm consumers (Tier-2, OWED); plus the disclosed limits (NaN-payload reconstruction; cross-module `Refl` non-reduction of `find`/`elemBy` ⇒ schema-resolution-dependent verdicts pinned Rust-side + input-value conformance; L3 subquery/heuristic scoping; L9/L10 predicate depth; additive↔ceil `alignUp` sliver). A re-checkable proof is impossible *only* over the C-ABI fallback tier; Tier-1 sidesteps it by recomputation, not proof transport. `verification/proofs/VERIFICATION-STANCE.adoc` is the authoritative, proof-backed catalogue and takes precedence over this file.
 
 ## What Needs Proving
 
@@ -52,15 +52,20 @@
   Idris decoder into the certified `Statement`, proven byte-for-byte
   conformant with the Rust encoder by `Refl` in
   `VclTotal.Interface.WireConformance`. The marshalling seam's *decode*
-  side is therefore now machine-verified. **P5c** (the estate-aligned
-  objective): transport the certificate over the **typed-wasm** target
-  as a proof term + a small checker kernel the consumer re-runs —
-  proof-carrying code, *re-checkable*, TCB = checker kernel + typed-wasm
-  verifier (re-checkable transport is impossible only over a C ABI; the
-  `ffi/zig` fail-closed shim is retained only as the C-ABI attestation
-  fallback). **P5d** (fallback tier): the signed-attestation contract
-  for consumers reachable only over C. Both OWED; see the two-tier
-  boundary model in `verification/proofs/VERIFICATION-STANCE.adoc`.
+  side is machine-verified. **P5c — RESOLVED (Tier-1 recompute-PCC):**
+  the consumer re-runs the certified decision itself from the
+  fail-closed `wasm32` module `src/interface/recompute-wasm`
+  (`vcl_recompute`); the decision core is a faithful Rust port of the
+  corpus (`Schema`/`Decide`/`Checker`) machine-pinned via
+  `WireConformance`. TCB = conformance-pinned decider image + wasm
+  runtime + the once-proved corpus (offline-re-checkable) — *not* a
+  trusted tag, *not* a transported proof object. Plain `wasm32`
+  suffices (type system not load-bearing under recompute);
+  `affinescriptiser` N/A (disclosed). **P5d — OWED (Tier-2 fallback):**
+  the C-ABI signed-attestation contract + `vclut_rs_verify` linkage,
+  for consumers that cannot run the wasm; the `ffi/zig` fail-closed
+  shim is its scaffolding. See the canonical two-tier boundary model
+  in `verification/proofs/VERIFICATION-STANCE.adoc` (authoritative).
 - Optional future work: prove the ReScript frontend faithfully tracks
   the Idris2 grammar (low priority; it is a convenience frontend, not a
   trust anchor).
