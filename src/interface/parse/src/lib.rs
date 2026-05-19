@@ -35,12 +35,14 @@
 )]
 
 pub mod ast;
+pub mod decider;
 pub mod lexer;
 pub mod parser;
 pub mod schema;
 pub mod wire;
 
 pub use ast::Statement;
+pub use decider::certified_level;
 pub use parser::{parse, ParseError};
 pub use schema::OctadSchema;
 pub use wire::{from_wire, from_wire_schema, to_wire, to_wire_schema, WireError};
