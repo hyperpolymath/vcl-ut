@@ -351,6 +351,12 @@ OWED section.
   *Residual (carried):* deepen the L9/L10 *predicates* to full
   `checkLevelN` semantics; FFI transport; the additive↔ceil sliver;
   the unchanged Phase-3 string→`Statement`/marshalling/Idris→C items.
+  This residual is *tracked, not forgotten*: the boundary-reinforcement
+  workstream (FFI proof-attestation transport + the missing
+  `String -> Statement` parser, priority 1; the secondary items above)
+  is hyperpolymath/vcl-ut#25. A C ABI carrying a *re-checkable*
+  dependent proof is impossible by construction — the honest target
+  there is trusted-certifier attestation, stated not hidden.
 
 == Provenance
 
