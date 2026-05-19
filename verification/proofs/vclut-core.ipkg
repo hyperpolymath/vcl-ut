@@ -37,3 +37,5 @@ modules = VclTotal.ABI.Types
         , VclTotal.Core.Checker
         , VclTotal.Core.Composition
         , VclTotal.Core.Epistemic
+        , VclTotal.Interface.WireDecode
+        , VclTotal.Interface.WireConformance

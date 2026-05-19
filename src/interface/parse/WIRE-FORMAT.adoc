@@ -4,16 +4,27 @@
 // SPDX-License-Identifier: PMPL-1.0-or-later
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
-The C-ABI marshalling format for a parsed `Statement`. The Rust
-encoder/decoder (`wire.rs`) is normative for v1; the P5b-step-2 Idris2
-decoder MUST decode this identical byte stream into `Grammar.idr`'s
-`Statement` (the certified type), proven total. Cross-language
-conformance is by shared golden vectors.
+The `Statement` marshalling format. The Rust encoder/decoder
+(`wire.rs`) is normative for v1; the P5b-step-2 Idris2 decoder MUST
+decode this identical byte stream into `Grammar.idr`'s `Statement`
+(the certified type), proven total. Cross-language conformance is by
+shared golden vectors.
 
 Design: a deterministic, versioned, length-prefixed binary TLV.
 *Rationale:* no parser dependency / no extra trust surface (vs CBOR),
-fully auditable, byte-exact, total decode. This is the boundary the
-hypatia<->verisim seam crosses; it is specified, not improvised.
+fully auditable, byte-exact, total decode. This is the byte
+representation of the `Statement` that crosses the hypatia<->verisim
+seam; it is specified, not improvised.
+
+NOTE: This format is *transport-agnostic*. It is the marshalling
+payload over the C-ABI **fallback** tier (trusted-certifier
+attestation, P5d) *and* the proof-term payload over the estate's
+**typed-wasm** target, where it rides with a checker kernel the
+consumer re-runs (proof-carrying code — re-checkable, TCB = checker
+kernel; the P5c objective). Re-checkable transport is impossible only
+over a C ABI, not over typed-wasm; see the two-tier boundary model in
+`verification/proofs/VERIFICATION-STANCE.adoc` ("What is NOT
+proven"), the authoritative catalogue.
 
 == Conventions
 
@@ -96,3 +107,41 @@ parser). `from_wire(to_wire(s)) == s` for every `Statement` (the
 round-trip proptest is the machine witness; bit-exact float preservation
 is pinned by a golden vector). `to_wire` is deterministic (canonical:
 exactly one byte string per value).
+
+== Certified decoder + cross-language conformance (P5b step 2)
+
+This format is no longer Rust-only. `VclTotal.Interface.WireDecode`
+(`src/interface/WireDecode.idr`, in the CI-gated proof corpus
+`verification/proofs/vclut-core.ipkg`) is a **second, independent
+decoder of this exact byte stream** into `Grammar.idr`'s *certified*
+`Statement`. It is machine-checked `%default total` with **zero
+proof-escape** (no `believe_me`/`postulate`/`assert_*`/`idris_crash`/
+`sorry`): the same trusted-boundary totality contract as the Rust
+`from_wire`, but discharged by the type-checker rather than asserted —
+recursion is bounded by an input-length *fuel* `Nat` (sound because
+every node costs >= 1 discriminant byte).
+
+Cross-language conformance is a *proof*, not a test:
+`src/interface/parse/tests/conformance_emit.rs` is the regeneration
+oracle (emits the exact `to_wire` image of fixed `Statement`s);
+`VclTotal.Interface.WireConformance` embeds those bytes verbatim and
+proves `fromWire goldenN = Right expectedN` by `Refl`. The corpus build
+fails unless the Idris decoder, evaluated at compile time on the Rust
+encoder's bytes, reduces to exactly the expected certified `Statement`.
+Fixtures cover the minimal case, the full clause/agent/nested-expression
+surface, and the float path.
+
+=== Disclosed limitation — NaN payload
+
+Idris2 0.8.0 has no pure, bit-exact `Bits64 -> Double`. The certified
+decoder reconstructs finite values (incl. subnormals and `f64::MIN`/
+`MAX`) and both infinities **bit-exactly** by exact power-of-two
+scaling. A NaN bit-pattern decodes to *a* NaN; the NaN *payload* is NOT
+preserved across the Idris `Double` boundary. This is disclosed, not
+papered over: every consumer still agrees "this is NaN" (the
+semantically meaningful invariant), and exhaustive bit-exact float
+preservation — including the NaN payload — remains witnessed on the
+Rust side by `wire.rs::golden_bit_exact_floats`. The omitted
+`VqlType` slots are filled `TAny` (the grammar's documented
+"unresolved type before type checking"; the 10-level checker resolves
+them at Level 2+) — faithful, not a shortcut.

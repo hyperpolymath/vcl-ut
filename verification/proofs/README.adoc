@@ -9,8 +9,9 @@ This directory holds the *machine-verified* proof artefacts for vcl-ut.
 `vclut-core.ipkg`::
   The machine-check package for the full `VclTotal` proof corpus.
   `idris2 --build verification/proofs/vclut-core.ipkg` exits 0 over
-  **10 modules** (`ABI.{Types,Layout,LayoutProofs}` +
-  `Core.{Grammar,Schema,Decide,Levels,Checker,Composition,Epistemic}`)
+  **12 modules** (`ABI.{Types,Layout,LayoutProofs}` +
+  `Core.{Grammar,Schema,Decide,Levels,Checker,Composition,Epistemic}` +
+  `Interface.{WireDecode,WireConformance}`)
   under `%default total` with **zero proof-escape symbols**. The
   `corpus/` subtree is a module→path symlink tree into `src/` (edits to
   `src/**` are checked here verbatim). CI-gated by
@@ -26,14 +27,30 @@ This directory holds the *machine-verified* proof artefacts for vcl-ut.
   soundness lemma `checkLevel4Sound`, a negative injection test, and the
   genuine compositionality proof `noRawUserInputCompose`.
 
+`VclTotal.Interface.WireDecode` + `.WireConformance`::
+  The certified half of the hypatia↔verisim marshalling seam (P5b
+  step 2, hyperpolymath/vcl-ut#25). `WireDecode` is a total
+  (`%default total`, zero proof-escape) decoder of the v1 wire format
+  (`src/interface/parse/WIRE-FORMAT.adoc`) into `Grammar.idr`'s
+  certified `Statement`; recursion is bounded by an input-length fuel
+  `Nat`. `WireConformance` proves, by `Refl`, that this decoder agrees
+  byte-for-byte with the trusted Rust encoder (`wire.rs::to_wire`) on
+  golden fixtures emitted by `src/interface/parse/tests/
+  conformance_emit.rs` — cross-language conformance as a build-time
+  proof. Disclosed: the NaN *payload* is not preserved across the
+  Idris `Double` boundary (finite + infinite values are bit-exact);
+  the Rust proptest remains the exhaustive float witness.
+
 `VERIFICATION-STANCE.adoc`::
   The authoritative, proof-backed statement of what is and is not
   verified. *Read this before trusting any "verified"/"type-safe"
-  phrasing elsewhere in the repo.* It records the full Phase 0→4
+  phrasing elsewhere in the repo.* It records the full Phase 0→5
   history (the Phase-0 corpus did not compile and was never
   machine-checked; Phases 1–4 fixed that *honestly* — corpus compiles,
   CI-gated, L1–L10 sound + dependent `SafetyCertificate`, FFI
-  fail-closed) and the precisely-scoped residual OWED items.
+  fail-closed; Phase 5 / vcl-ut#25 reinforces the boundary — trusted
+  Rust parser+codec, certified Idris wire decoder) and the
+  precisely-scoped residual OWED items.
 
 == Verifying
 
@@ -41,7 +58,7 @@ This directory holds the *machine-verified* proof artefacts for vcl-ut.
 ----
 export IDRIS2_PREFIX=<idris2-0.8.0-prefix>
 rm -rf verification/proofs/build                       # avoid stale-ttc false green
-idris2 --build verification/proofs/vclut-core.ipkg     # expect exit 0 (10 modules)
+idris2 --build verification/proofs/vclut-core.ipkg     # expect exit 0 (12 modules)
 cd verification/proofs && idris2 --check SafetyL4Model.idr   # expect exit 0
 ----
 

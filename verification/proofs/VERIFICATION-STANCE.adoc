@@ -40,9 +40,13 @@ typecheck. The concrete blockers were:
   `Composition` (forward refs, deleted `AllParameterised` still
   referenced, wrong `CertL6+` arities, non-reducing `rewrite`s).
 
-*Phase 1–4 status (RESOLVED):* every blocker above is fixed
-*honestly* and the corpus compiles (10 modules; Phase 4 = `LayoutProofs`
-+ L6–L10 `composeJoin` closure, PR #24). **Phase 2** de-vacuized L2/L3/L5
+*Phase 1–4 status (RESOLVED); Phase 5 boundary reinforcement (in
+progress):* every blocker above is fixed *honestly* and the corpus
+compiles (now **12 modules**: Phase 4 = `LayoutProofs` + L6–L10
+`composeJoin` closure, PR #24; Phase 5 / vcl-ut#25 adds
+`Interface.{WireDecode,WireConformance}` — the certified wire decoder
++ cross-language `Refl` conformance, P5b step 2). **Phase 2** de-vacuized
+L2/L3/L5
 (new shared decider module `VclTotal.Core.Decide`, evidence-carrying
 predicates, `checkLevel2/3/5Sound`, genuine `composeJoin` closure).
 **Phase 3** added soundness for L1 and L6–L10
@@ -248,21 +252,69 @@ OWED section.
   Int` returns a level *only* on the `Just`-certificate branch of
   `certifyRequested` (structurally — no proof-escape).
 +
-  *Inherent boundary (not a defect).* A C ABI cannot transport a
-  dependent `SafetyCertificate`; the honest model is *trusted-certifier
-  attestation* (as in proof-carrying code: the consumer trusts the
-  checker that minted the integer). What a hypatia/verisim caller
-  receives is therefore at most an attestation from the Idris certifier,
-  never a re-checkable proof object — by construction of any FFI.
+  *Boundary model — two tiers, not one (canonical; other mentions
+  refer here).* The achievable guarantee depends on the *transport*,
+  and the impossibility result is specific to an untyped one:
 +
-  *NAMED OWED (absent, not faked):* (1) **no string→`Statement`
-  parser exists anywhere in the repo** — the corpus certifies an
-  already-built AST, so the `verify(query_string)` FFI shape
-  *presupposes a component nobody has written*; (2) C-ABI
-  `Statement`/`OctadSchema` marshalling; (3) the Idris→C build that
-  would let the shim actually call `certifiedLevel`; (4) the real
-  backend symbol (`vclut_rs_verify`) is declared in intent but not
-  linked. Until (1)–(4) exist the FFI is honestly fail-closed.
+  ** *C-ABI tier (fallback).* A C ABI erases types to machine words,
+     so it cannot transport a re-checkable dependent
+     `SafetyCertificate`. Over a C ABI the honest ceiling is
+     *trusted-certifier attestation*: the consumer trusts the checker
+     that minted the token; the token is unforgeable and bound to
+     `(sha256(query), schema_id, level)` (P5d). This tier exists only
+     for consumers reachable solely over C.
+  ** *typed-wasm tier (estate target, the real objective).* The
+     estate's transport/compilation target is **typed-wasm**, whose
+     module boundary is *typed, not erased*. The proof term crosses
+     faithfully (no flattening to an `int`) and a value of the proof
+     type cannot be forged without the linear capability. Riding a
+     small **proof-checker kernel** along with it — which the consumer
+     runs — yields *proof-carrying code*: the consumer **re-validates**
+     the certificate. The TCB shrinks from "trust the whole certifier"
+     to "trust the checker kernel + the typed-wasm verifier". (typed-
+     wasm's own type system is linear/structural, *not* dependent, so
+     it does not re-check the safety predicate itself — the shipped
+     kernel does. That is standard PCC and is strictly stronger than
+     attestation.)
++
+  So "a re-checkable dependent proof is impossible by construction" is
+  true *of a C ABI*, **not of any FFI**: the estate-aligned objective
+  (P5c) is the typed-wasm PCC tier; C-ABI attestation (P5d) is the
+  explicit, weaker fallback — not the ceiling. (The current Zig shim is
+  the C tier; the earlier `ffi/zig` line is fail-closed scaffolding,
+  not the architectural endpoint.)
++
+  *NAMED OWED (absent, not faked) — Phase-5 progress folded in:*
+  (1) a string→`Statement` *frontend* now exists as the **trusted**
+  Rust/SPARK-grade `src/interface/parse` crate (P5a, #26): it parses to
+  a faithful Rust mirror of `Grammar.idr`, panic-free/total by
+  statically-enforced lints. It is *trusted*, not *certified* — it is
+  not itself the dependently-typed checker. (2) C-ABI `Statement`
+  marshalling: the *decode* direction is now **certified** —
+  `VclTotal.Interface.WireDecode` totally decodes the deterministic
+  versioned wire format (`src/interface/parse/WIRE-FORMAT.adoc`;
+  encoder `wire.rs::to_wire`, P5b step 1, #28) into the certified
+  `Statement` (`%default total`, zero proof-escape, fuel-bounded
+  recursion), and `VclTotal.Interface.WireConformance` proves it
+  byte-for-byte conformant with the Rust encoder by `Refl` (P5b
+  step 2). The *encode* direction (Idris `Statement`→wire) and
+  `OctadSchema` marshalling remain OWED. (3) the **typed-wasm PCC
+  transport** — the proof term + a checker kernel the consumer
+  re-runs, per the two-tier boundary model above — is the P5c
+  objective (the C-ABI/Zig shim is retained only as the fail-closed
+  attestation fallback, *not* the endpoint) and remains OWED; (4) the
+  real backend symbol (`vclut_rs_verify`) linkage remains OWED, as
+  does the P5d signed-attestation *fallback* contract. Until these
+  exist the FFI is honestly fail-closed. *Disclosed limitation:* the
+  certified decoder cannot reconstruct a NaN *payload* (Idris2 0.8.0
+  has no pure bit-exact `Bits64 -> Double`); it decodes any NaN
+  bit-pattern to a NaN — finite and infinite values are bit-exact.
+  The exhaustive bit-exact float witness (incl. NaN bits) remains the
+  Rust proptest `wire.rs::golden_bit_exact_floats`. This is a
+  disclosed limitation, not a hidden gap. Per the two-tier model
+  above, a re-checkable proof is impossible only over the *C-ABI*
+  fallback tier; the estate-target *typed-wasm* tier (P5c) **is**
+  re-checkable (PCC).
 
 == Consumer guidance (hypatia / verisim)
 
@@ -286,6 +338,17 @@ OWED section.
   deleted, not faked); its genuine alignment/no-padding theorems are
   OWED. `VclTotal.ABI.Foreign` contains *no proofs* (FFI plumbing) — do
   not treat its returned level tag as a verified claim.
+* *Transport target (forward guidance).* The end goal is **not**
+  "trust our attestation". Over the estate's typed-wasm boundary the
+  certificate will be transported as a proof term re-validated by a
+  small checker kernel you run (proof-carrying code): you will be able
+  to *re-check*, with a TCB of the checker kernel + the typed-wasm
+  verifier, not the whole certifier (P5c). Trusted-certifier
+  attestation (P5d) is the explicit *fallback* for consumers reachable
+  only over a C ABI — weaker, and labelled as such. Until P5c lands,
+  today's guidance stands (advisory tag only); it is a *plumbing*
+  gap, and the ceiling is PCC, not attestation. See the two-tier
+  boundary model in "What is NOT proven".
 
 == Remediation roadmap (phased, tracked standards#124)
 
@@ -329,9 +392,11 @@ OWED section.
   shim to `certifiedLevel`; the genuine `ABI.Layout` alignment/no-padding
   theorems; strengthen the L6–L10 predicates to the full checker
   semantics; `ABI.Foreign` plumbing; L3's disclosed subquery/heuristic
-  scoping. (A C ABI carrying a re-checkable dependent proof is *not*
-  on this list — it is impossible by construction; the honest target is
-  trusted-certifier attestation.)
+  scoping. (Re-checkable transport is *not* a gap to be closed over a
+  C ABI — impossible there by construction — but it **is** the
+  objective over the estate's typed-wasm target via PCC; see the
+  two-tier boundary model above. C-ABI attestation is the fallback
+  tier, not the ceiling.)
 . *Phase 4 (DONE in-corpus, this PR — discharges the Phase-3 "owed"
   layout + join-closure debt):*
   *(4a)* the genuine `ABI.Layout` alignment / no-padding / bounds
@@ -352,11 +417,51 @@ OWED section.
   `checkLevelN` semantics; FFI transport; the additive↔ceil sliver;
   the unchanged Phase-3 string→`Statement`/marshalling/Idris→C items.
   This residual is *tracked, not forgotten*: the boundary-reinforcement
-  workstream (FFI proof-attestation transport + the missing
+  workstream (typed-wasm PCC proof-transport + the missing
   `String -> Statement` parser, priority 1; the secondary items above)
-  is hyperpolymath/vcl-ut#25. A C ABI carrying a *re-checkable*
-  dependent proof is impossible by construction — the honest target
-  there is trusted-certifier attestation, stated not hidden.
+  is hyperpolymath/vcl-ut#25. Re-checkable transport is impossible only
+  over a *C ABI*; over the estate's typed-wasm target it is the
+  objective (PCC, TCB = checker kernel), with C-ABI attestation as the
+  fallback tier — see the two-tier boundary model above.
+. *Phase 5 (boundary reinforcement, hyperpolymath/vcl-ut#25 — in
+  progress):* the residual tracked above is being discharged in
+  precisely-scoped steps. *P5a (#26):* the **trusted** Rust/SPARK-grade
+  `src/interface/parse` parser (string → faithful Rust mirror of
+  `Grammar.idr`; panic-free/total by static lints) — the previously
+  *absent* string→AST frontend now exists (trusted, not certified).
+  *P5b step 1 (#28):* a deterministic, versioned, length-prefixed wire
+  codec (`wire.rs`, normative `WIRE-FORMAT.adoc`) — the C-ABI
+  marshalling format, no extra trust surface. *P5b step 2 (this PR):*
+  the **certified** decode side — `VclTotal.Interface.WireDecode`
+  totally decodes that exact format into the certified `Statement`
+  (`%default total`, ZERO proof-escape; recursion bounded by an
+  input-length fuel `Nat`, sound because every node costs ≥1
+  discriminant byte; omitted `VqlType` slots filled `TAny` per the
+  grammar's documented pre-typecheck convention), and
+  `VclTotal.Interface.WireConformance` proves byte-for-byte agreement
+  with the Rust `to_wire` encoder by `Refl` on shared golden fixtures
+  (regeneration oracle `tests/conformance_emit.rs`) — cross-language
+  conformance as a build-time proof, not a test. The marshalling
+  *decode* side is therefore now machine-verified.
+  *Disclosed limitation (not a hidden gap):* the certified decoder
+  decodes any NaN bit-pattern to *a* NaN (Idris2 0.8.0 has no pure
+  bit-exact `Bits64 -> Double`); finite values (incl. subnormals,
+  `f64::MIN`/`MAX`) and both infinities are bit-exact. The exhaustive
+  bit-exact float witness, NaN payload included, stays the Rust
+  proptest `wire.rs::golden_bit_exact_floats`. *Still OWED (precisely):*
+  the *encode* direction (Idris→wire) + `OctadSchema` marshalling;
+  **P5c — typed-wasm PCC transport**: carry the proof term across the
+  *typed* (non-erasing) typed-wasm boundary plus a small proof-checker
+  kernel the consumer re-runs, so the certificate is **re-validated**,
+  not merely attested (TCB = checker kernel + typed-wasm verifier; see
+  the two-tier boundary model above). The pre-existing `ffi/zig`
+  fail-closed shim is retained *only* as the C-ABI attestation
+  fallback for non-typed-wasm consumers — it is not the architectural
+  endpoint. *P5d (fallback tier):* the signed-attestation contract
+  over `(sha256(query), schema_id, level)` + ADR + the OWED→RESOLVED
+  stance flip, for consumers reachable only over C. Re-checkable
+  transport is impossible *only* over a C ABI; over the estate target
+  (typed-wasm) it is the explicit P5c objective.
 
 == Provenance
 
@@ -370,13 +475,19 @@ FFI fabricated-level lie deleted (fail-closed, `zig build test` green) +
 proof-gated `Checker.certifiedLevel` mint. Phase 4 2026-05-19:
 `ABI.LayoutProofs` (genuine alignment/no-padding/bounds, 10th ipkg
 module) + L6–L10 `composeJoin` closure (`l6..l9Compose`,
-`epiStructJoin`); corpus rebuilt clean, 10 modules, zero proof-escape.
-The corpus builds clean as
-*9 modules*
+`epiStructJoin`); corpus rebuilt clean, zero proof-escape.
+Phase 5 / vcl-ut#25 2026-05-19: P5a trusted Rust parser (#26) + P5b
+step 1 wire codec (#28); **P5b step 2 (this PR):**
+`VclTotal.Interface.WireDecode` (certified total wire decoder) +
+`VclTotal.Interface.WireConformance` (`Refl` cross-language conformance
+vs the Rust encoder), corpus rebuilt clean.
+The corpus now builds clean as
+*12 modules*
 (`idris2 0.8.0 --build verification/proofs/vclut-core.ipkg`, exit 0,
-`%default total`, zero proof-escape symbols — CI-enforced), the added
-modules being `VclTotal.Core.Decide` (shared deciders) and
-`VclTotal.ABI.Layout` (now sound).
+`%default total`, zero proof-escape symbols — CI-enforced):
+`VclTotal.ABI.{Types,Layout,LayoutProofs}` +
+`VclTotal.Core.{Grammar,Schema,Decide,Levels,Checker,Composition,
+Epistemic}` + `VclTotal.Interface.{WireDecode,WireConformance}`.
 No proof-escape symbol was used to force any green; every obligation
 that could not be honestly discharged is scoped OWED above rather than
 masked.
@@ -399,16 +510,27 @@ Notes for reproduction / honesty:
 The residual risk is now purely at the *boundary*, and the boundary no
 longer lies: the FFI is *fail-closed* (no fabricated level; `zig build
 test` green) and a genuine proof-gated mint (`Checker.certifiedLevel`)
-exists in the CI-gated corpus. What remains OWED is *plumbing and an
-unwritten parser*, not a soundness gap: there is **no string→`Statement`
-parser anywhere in the repo** (so the `verify(query_string)` FFI shape
-presupposes a component nobody has written), no C-ABI `Statement`
-marshalling, and no Idris→C build linking the shim to the certifier;
-plus the L6–L10 *predicate* shallowness, the genuine `ABI.Layout`
-alignment/no-padding theorems, `ABI.Foreign` plumbing, and L3's
-disclosed subquery/heuristic scoping. A C ABI carrying a *re-checkable
-dependent proof* is impossible by construction — the honest target is
-trusted-certifier attestation, and that trust boundary is stated, not
+exists in the CI-gated corpus. What remains OWED is *plumbing*, not a
+soundness gap. Phase 5 / vcl-ut#25 has closed the previously-headline
+"no parser" item: a string→AST frontend now exists as the **trusted**
+Rust/SPARK-grade `src/interface/parse` parser (P5a, #26 — trusted, not
+certified), and the `Statement` *decode* side is now **certified**
+(`VclTotal.Interface.WireDecode`, total/zero-escape, proven byte-for-byte
+conformant with the Rust encoder by `Refl` in
+`VclTotal.Interface.WireConformance`, P5b #28 + this PR). Still OWED:
+the *encode* direction + `OctadSchema` marshalling; **P5c — typed-wasm
+PCC transport** (proof term + checker kernel the consumer re-runs, so
+the certificate is re-validated, not merely attested; the `ffi/zig`
+fail-closed shim retained only as the C-ABI attestation fallback);
+the P5d signed-attestation *fallback* contract; plus the L6–L10
+*predicate* shallowness, the genuine `ABI.Layout` alignment/no-padding
+theorems, `ABI.Foreign` plumbing, L3's disclosed subquery/heuristic
+scoping, and the disclosed NaN-payload limitation of the Idris
+`Double` boundary (finite/infinite values bit-exact; Rust proptest is
+the exhaustive float witness). Re-checkable transport is impossible
+*only* over a C ABI; over the estate's typed-wasm target it is the
+explicit objective (PCC, TCB = checker kernel) — see the canonical
+two-tier boundary model above. That trust boundary is stated, not
 hidden. The former headline residuals (*non-compiling corpus*, *vacuous
 L2/L3/L5 predicates*, *decorative certificate*, *unsound `ABI.Layout`*,
 *lying FFI*) are all resolved.

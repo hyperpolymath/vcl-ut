@@ -12,13 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Verified
 
-**VclTotal proof corpus — Phase 0→4 remediation** (2026-05-18/19,
-hyperpolymath/standards#124). The `src/core/**` Idris2 corpus, which at
+**VclTotal proof corpus — Phase 0→4 remediation + Phase 5 boundary
+reinforcement** (2026-05-18/19, hyperpolymath/standards#124,
+hyperpolymath/vcl-ut#25). The `src/core/**` Idris2 corpus, which at
 Phase 0 did not compile and had never been machine-checked, is now
 CI-gated and green:
 
 - `verification/proofs/vclut-core.ipkg` builds clean under idris2 0.8.0
-  (`idris2 --build`, exit 0, `%default total`) as **10 modules**, with
+  (`idris2 --build`, exit 0, `%default total`) as **12 modules**, with
   **zero proof-escape symbols** (no `believe_me`/`postulate`/`assert_*`/
   `idris_crash`/`sorry`), enforced by `.github/workflows/proof-corpus.yml`.
 - Phase 1 (#21): corpus resurrection — `ABI.Types`/`Grammar` repaired,
@@ -33,6 +34,26 @@ CI-gated and green:
   bounds) + L6–L10 `composeJoin` closure (`l6..l9Compose`,
   `epiStructJoin`); L10 acyclicity carried by the explicit
   `JoinSideCondition` (provably non-closed, not faked).
+- Phase 5 / vcl-ut#25 (boundary reinforcement): trusted Rust/SPARK-grade
+  parser (P5a, #26) + deterministic versioned wire codec (P5b step 1,
+  #28); **P5b step 2 (this change)** — `VclTotal.Interface.WireDecode`,
+  a total (`%default total`, zero proof-escape) decoder of the v1 wire
+  format into the certified `Statement`, recursion bounded by an
+  input-length fuel `Nat`; `VclTotal.Interface.WireConformance` proves
+  it byte-for-byte conformant with the Rust `to_wire` encoder by `Refl`
+  on golden fixtures (regeneration oracle:
+  `src/interface/parse/tests/conformance_emit.rs`). The C-ABI
+  `Statement` marshalling *decode* side is now certified. Disclosed:
+  the NaN *payload* is not preserved across the Idris `Double` boundary
+  (finite + infinite values bit-exact; Rust proptest remains the
+  exhaustive float witness). OWED: **P5c — typed-wasm PCC transport**
+  (proof term + checker kernel the consumer re-runs; *re-checkable*,
+  TCB = checker kernel; the estate-aligned objective — the `ffi/zig`
+  fail-closed shim is retained only as the C-ABI attestation
+  *fallback*, not the endpoint); **P5d** — the signed-attestation
+  fallback contract for C-only consumers. Re-checkable transport is
+  impossible only over a C ABI, not over typed-wasm (two-tier boundary
+  model: `verification/proofs/VERIFICATION-STANCE.adoc`).
 
 `verification/proofs/VERIFICATION-STANCE.adoc` is the authoritative,
 precisely-scoped catalogue (residual OWED items disclosed, not masked).
