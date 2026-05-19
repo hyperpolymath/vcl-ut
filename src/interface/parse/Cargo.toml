@@ -1,4 +1,12 @@
 # SPDX-License-Identifier: PMPL-1.0-or-later
+
+# Standalone workspace root: decouples this trusted boundary crate from
+# the parent virtual workspace, whose pre-existing `src/interface`
+# member has an external path-dep (`../../../echidna/...`) that does not
+# resolve in a standalone checkout (CI). This crate has NO external
+# path-deps and must build/gate in isolation.
+[workspace]
+
 [package]
 name = "vcltotal-parse"
 version = "0.1.0"

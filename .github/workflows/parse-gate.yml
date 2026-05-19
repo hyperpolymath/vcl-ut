@@ -42,12 +42,18 @@ jobs:
           rustup component add clippy
           cargo --version && cargo clippy --version
 
+      # `vcltotal-parse` is its own workspace root (see its Cargo.toml).
+      # Operate via its manifest path so CI never traverses the parent
+      # virtual workspace (whose pre-existing `src/interface` member has
+      # an external path-dep that does not resolve in a standalone
+      # checkout). Self-contained: no external path-deps here.
       - name: Clippy — SPARK-grade lint set as a hard gate
         run: |
           set -euo pipefail
-          cargo clippy -p vcltotal-parse --all-targets -- -D warnings
+          cargo clippy --manifest-path src/interface/parse/Cargo.toml \
+            --all-targets --locked -- -D warnings
 
       - name: Tests + panic-free proptest invariant
         run: |
           set -euo pipefail
-          cargo test -p vcltotal-parse
+          cargo test --manifest-path src/interface/parse/Cargo.toml --locked

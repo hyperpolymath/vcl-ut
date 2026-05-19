@@ -33,5 +33,13 @@ members = [
     "src/interface/lint",
     "src/interface/lsp",
     "src/interface/dap",
-    "src/interface/parse",
 ]
+# NOTE: `src/interface/parse` (vcltotal-parse, #25 P5a) is deliberately
+# NOT a member here. The pre-existing `src/interface` member carries an
+# external path-dependency (`echidna-core = { path =
+# "../../../echidna/..." }`) that only resolves on the estate's
+# sibling-repo layout, so the whole virtual workspace fails to load in a
+# standalone checkout (e.g. CI). The trusted boundary parser must build
+# and gate in isolation, so it is its own workspace root (see
+# src/interface/parse/Cargo.toml `[workspace]`). Tracked separately:
+# the parent-workspace external-path-dep breakage is NOT a #25 concern.
