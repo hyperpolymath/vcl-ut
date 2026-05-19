@@ -40,14 +40,18 @@ typecheck. The concrete blockers were:
   `Composition` (forward refs, deleted `AllParameterised` still
   referenced, wrong `CertL6+` arities, non-reducing `rewrite`s).
 
-*Phase 1 + 2 status (this PR — RESOLVED):* every blocker above is fixed
-*honestly* and the corpus now compiles; **Phase 2 additionally
-de-vacuized L2/L3/L5** (new shared decider module
-`VclTotal.Core.Decide`, evidence-carrying predicates,
-`checkLevel2/3/5Sound`, genuine L2/L3/L5 `composeJoin` closure). `idris2
-0.8.0 --build verification/proofs/vclut-core.ipkg` exits 0 over
-`VclTotal.ABI.Types` + `VclTotal.Core.{Grammar,Schema,Decide,Levels,
-Checker,Composition,Epistemic}` (8 modules), under `%default total`,
+*Phase 1 + 2 + 3 status (RESOLVED):* every blocker above is fixed
+*honestly* and the corpus compiles. **Phase 2** de-vacuized L2/L3/L5
+(new shared decider module `VclTotal.Core.Decide`, evidence-carrying
+predicates, `checkLevel2/3/5Sound`, genuine `composeJoin` closure).
+**Phase 3** added soundness for L1 and L6–L10
+(`checkLevel1Sound`…`checkLevel10Sound`), a genuine dependent
+`SafetyCertificate` emitter (`Checker.certifyAt`/`certifyRequested`),
+and made `VclTotal.ABI.Layout` sound + CI-gated (unsound claims
+deleted, not faked). `idris2 0.8.0 --build
+verification/proofs/vclut-core.ipkg` exits 0 over `VclTotal.ABI.{Types,
+Layout}` + `VclTotal.Core.{Grammar,Schema,Decide,Levels,Checker,
+Composition,Epistemic}` (9 modules), under `%default total`,
 with *zero*
 `believe_me`/`really_believe_me`/`postulate`/`assert_total`/
 `assert_smaller`/`idris_crash`/`sorry` (CI-enforced by
@@ -127,17 +131,31 @@ OWED section.
 . *(Phase 1 — RESOLVED)* The Phase-1 corpus (ABI.Types + Core.*) now
   compiles and is CI-gated; in-repo L4 is machine-checked in situ. No
   longer outstanding.
-. *(Phase 1 — NEW OWED) `VclTotal.ABI.Layout` / `VclTotal.ABI.Foreign`
-  do not compile and are unsound.* `paddingFor` applies `(-)` to `Nat`
-  (no `Neg Nat`); `alignUpCorrect : … -> Divides align (alignUp size
-  align)` is "proved" by `DivideBy (… \`div\` align) Refl`, asserting the
-  false `alignUp size align = (alignUp size align \`div\` align) * align`;
-  `queryPlanHeaderNoPadding` asserts `24 = queryPlanHeaderLayout.totalSize`
-  which does not hold; `(align > 0)` (a `Bool`) is used as a type. These
-  are *unsound layout claims*, not mere non-compilation. Out of Phase 1's
-  enumerated scope (ABI.Types + Core.*); `Core.*` does not import them;
-  excluded from `vclut-core.ipkg`. Must be repaired or deleted before any
-  ABI memory-layout claim is relied upon (Phase 3 / FFI territory).
+. *(Phase 3c — RESOLVED for `ABI.Layout`; re-scoped for `ABI.Foreign`).*
+  `VclTotal.ABI.Layout` is now *sound, compiling, and CI-gated* (it is
+  the 9th module in `vclut-core.ipkg`). The three unsound claims were
+  *deleted, not faked*: `alignUpCorrect` (used `(align > 0)`, a `Bool`,
+  as a type, and a bogus `Refl` asserting the divisibility goal);
+  `offsetInBounds` (an open `?metavariable` — never a proof, false in
+  general); and `queryPlanHeaderNoPadding` (over-claimed "no padding",
+  and even the trivial `totalSize = 24` restatement does not reduce
+  under `Refl` because `StructLayout.fields : Vect n Field` blocks the
+  projection). `paddingFor`'s genuine non-compile (`(-)` needs `Neg
+  Nat`) was *fixed* to `minus`. The sound content (the
+  `safetyLevel`/`queryMode`/`vqlUtError` round-trip `Refl` proofs, the
+  layout data, `Divides`/`alignUp`/`paddingFor`) remains and is now
+  machine-checked. *Carried OWED (Phase 3, precisely):* the genuine
+  alignment/no-padding theorems (`alignUp` divisibility via real
+  `div`/`mod` lemmas; fold field sizes = `totalSize`) and a
+  membership-quantified `offsetInBounds`.
+  `VclTotal.ABI.Foreign` is *deliberately still excluded* but is *not
+  unsound*: it contains **no proofs at all** — only `%foreign` C
+  declarations and `Maybe`/`Either` wrappers. Its gaps are (a) it does
+  not compile as-is (FFI plumbing: missing `Data.Bits`, etc.) and (b)
+  the architectural stub-FFI issue (the level tag is an *asserted
+  integer* from the Zig side, not a transported proof). That is genuine
+  Phase 3+ architecture (implement the Zig/Rust side; transport an
+  opaque proof token), OWED and disclosed — not a false proof.
 . *(Phase 2 — RESOLVED) L2/L3/L5 predicates de-vacuized.* The
   content-free constructors (`ExprTypeSafe`/`WhereTypeSafe`,
   `AllNullableFieldsGuarded`'s `GuardedNull`, `AllSelectItemsTyped`'s
@@ -162,13 +180,23 @@ OWED section.
   L2/L5 type resolution is the existing annotation/schema lookup, no
   inference. These are the properties the checker *and* the proof now
   jointly mean — no stronger, no weaker.
-. *The certificate is still not emitted by `checkQuery`.*
-  `Checker.checkQuery` returns a plain `CheckResult` record and never
-  constructs a `SafetyCertificate`. Per-level soundness now exists for
-  L2/L3/L4/L5 (`checkLevelNSound`), but L1/L6–L10 have no soundness
-  lemma yet and nothing assembles the per-level facts into a transported
-  `SafetyCertificate`. The dependent `SafetyCertificate` type remains
-  decorative w.r.t. the runtime decision procedure (Phase 3).
+. *(Phase 3a/3b — RESOLVED in-corpus) The decision procedure now emits a
+  genuine dependent `SafetyCertificate`.* All ten levels have soundness
+  lemmas — `checkLevel1Sound` … `checkLevel10Sound` (L1's
+  `Decide.allFieldsBoundFromResolve` *builds* the inductive
+  `AllFieldsBound`, each `FieldBound` carrying the real `resolveFieldRef
+  ref schema = Just fd`). `Checker.certifyAt` / `certifyRequested`
+  assemble them: a `Just` result *is* a machine-checked
+  `SafetyCertificate stmt schema (requestedLevel stmt)`. `checkQuery`
+  (the `Bool`/`CheckResult` C-ABI path) is retained unchanged.
+  *Carried OWED (Phase 3, precisely):* the L6–L10 *predicates* assert
+  only "the relevant clause/annotation is present" — real and
+  non-vacuous, but shallower than what `checkLevelN` additionally
+  enforces (L9 ≠ `LinUnlimited`; L10 declared agents + acyclic
+  `ENTAILS`); strengthening those predicates is future work. And the
+  certificate is still *not transported across the FFI* (see the
+  `ABI.Foreign` item) — the in-corpus certificate is not yet a runtime
+  proof token handed to hypatia/verisim.
 . *`Composition.compositionPreservation`* (compiles): L0/L1/L2/L3/L4/L5/
   L6–L10 are now *all genuine*. L1 = a real list-membership subset proof
   (`composeJoinFieldsSubset`); L4 = `noRawUserInputCompose`; L6–L10 =
@@ -190,20 +218,24 @@ OWED section.
 
 * Treat *every* vcl-ut safety-level tag as an *advisory claim*, not a proof
   carrier. Do not weaken your own checks on the strength of a vcl-ut level.
-* As of Phase 2, L2 (type-compat), L3 (null-safe), L4 (injection-free)
-  and L5 (result-typed) each have a genuine machine-checked basis in the
-  compiling, CI-gated corpus: a non-vacuous predicate, a decider the
-  checker is defined through, and a `checkLevelNSound` lemma; and all are
-  closed under `composeJoin` with genuine proofs. **However** none of
-  this is transported through the FFI (stubbed); `checkQuery` does not
-  emit a `SafetyCertificate`; L1 is a corpus proof only (not a runtime
-  carrier) and L6–L10 still lack soundness lemmas. Do not cite vcl-ut as
-  "formally verified query safety" downstream; cite at most
-  "machine-checked L2–L5 safety predicates of the in-repo AST model,
-  with per-level checker soundness, not transported across the FFI",
-  noting the disclosed L3 subquery/heuristic scoping above.
-* `VclTotal.ABI.Layout`/`.Foreign` carry *unsound* layout proofs — do not
-  rely on any vcl-ut struct-layout/alignment claim.
+* As of Phase 3, *all ten levels* (L1–L10) have a genuine
+  machine-checked basis in the compiling, CI-gated corpus: non-vacuous
+  predicates, deciders the checker is defined through, `checkLevelNSound`
+  lemmas, and (L1–L10) closure under `composeJoin`; and
+  `Checker.certifyAt`/`certifyRequested` assemble a genuine dependent
+  `SafetyCertificate`. **However** this certificate is *not transported
+  across the FFI* (the Zig/Rust side is a stub; the level tag a
+  hypatia/verisim caller receives is an asserted integer, not the proof
+  token). Cite vcl-ut at most as "machine-checked L1–L10 safety
+  predicates + per-level checker soundness + a dependent
+  `SafetyCertificate`, for the in-repo AST model, *not transported
+  across the FFI*", noting the disclosed L3 subquery/heuristic scoping
+  and the L6–L10 predicate shallowness above. Do not weaken your own
+  checks on the strength of a vcl-ut FFI level tag.
+* `VclTotal.ABI.Layout` is now *sound + CI-gated* (unsound claims
+  deleted, not faked); its genuine alignment/no-padding theorems are
+  OWED. `VclTotal.ABI.Foreign` contains *no proofs* (FFI plumbing) — do
+  not treat its returned level tag as a verified claim.
 
 == Remediation roadmap (phased, tracked standards#124)
 
@@ -225,20 +257,35 @@ OWED section.
   *Residual (carried):* `checkQuery` still does not emit a
   `SafetyCertificate`; L1/L6–L10 have no `checkLevelNSound`; L3 carries
   the disclosed subquery-opacity / structural-heuristic scoping.
-. *Phase 3 (TODO):* soundness for L1/L6–L10; have `checkQuery` emit a
-  real `SafetyCertificate`; transport it as an opaque proof token
-  through a non-stub Zig/Rust FFI; repair or delete
-  `ABI.Layout`/`.Foreign`.
+. *Phase 3 (DONE in-corpus, this PR):*
+  *(3a)* soundness for L1 and L6–L10 — `checkLevel1Sound` …
+  `checkLevel10Sound`, all genuine, no escape (L1 builds the inductive
+  `AllFieldsBound`).
+  *(3b)* `Checker.certifyAt`/`certifyRequested` assemble the per-level
+  Sound lemmas into a real dependent `SafetyCertificate`; `checkQuery`
+  (C-ABI `Bool` path) retained.
+  *(3c)* `ABI.Layout` made *sound, compiling, CI-gated* (9th ipkg
+  module) by deleting the unsound `alignUpCorrect`/`offsetInBounds`/
+  `queryPlanHeaderNoPadding` and fixing `paddingFor`.
+  *Residual (Phase 3+, OWED, precisely):* transport the certificate as
+  an opaque proof token through a *non-stub* Zig/Rust FFI; the genuine
+  `ABI.Layout` alignment/no-padding theorems; strengthen the L6–L10
+  predicates to the full checker semantics; fix `ABI.Foreign` plumbing;
+  L3's disclosed subquery-opacity / structural-heuristic scoping.
 
 == Provenance
 
 Phase 0 audit + remediation 2026-05-18 (hyperpolymath/standards#124),
 findings reproduced by `idris2 0.8.0 --build`/`--check`. Phase 1
 resurrection 2026-05-18: corpus compiles clean. Phase 2 2026-05-19:
-L2/L3/L5 de-vacuized; the corpus now builds clean as *8 modules*
+L2/L3/L5 de-vacuized (new `VclTotal.Core.Decide`). Phase 3 2026-05-19:
+L1/L6–L10 soundness + `certifyAt`/`certifyRequested` dependent
+certificate + `ABI.Layout` made sound & gated. The corpus now builds
+clean as *9 modules*
 (`idris2 0.8.0 --build verification/proofs/vclut-core.ipkg`, exit 0,
-`%default total`, zero proof-escape symbols — CI-enforced), the new
-module being `VclTotal.Core.Decide` (the shared L2/L3/L5 deciders).
+`%default total`, zero proof-escape symbols — CI-enforced), the added
+modules being `VclTotal.Core.Decide` (shared deciders) and
+`VclTotal.ABI.Layout` (now sound).
 No proof-escape symbol was used to force any green; every obligation
 that could not be honestly discharged is scoped OWED above rather than
 masked.
@@ -258,8 +305,13 @@ Notes for reproduction / honesty:
   `core.symlinks` default true) is unaffected; this caveat is for local
   reproduction only.
 
-The residual risk is now the *uncertified `checkQuery`* (no
-`SafetyCertificate` emitted; L1/L6–L10 lack soundness lemmas), the
-disclosed *L3 subquery/heuristic scoping*, and the *unsound, excluded*
-`ABI.Layout/.Foreign` — all explicitly disclosed, not hidden. The
-former headline residual (*vacuous L2/L3/L5 predicates*) is resolved.
+The residual risk is now purely at the *boundary*: the genuine
+in-corpus `SafetyCertificate` is *not transported through the FFI* (stub
+Zig/Rust; the level tag a caller receives is an asserted integer), the
+L6–L10 *predicates* are shallow (clause-present, not the full checker
+semantics), `ABI.Layout`'s genuine alignment/no-padding theorems are
+OWED (the unsound ones were *deleted*, not faked), `ABI.Foreign` is
+unbuilt FFI plumbing, and L3 carries its disclosed subquery/heuristic
+scoping — all explicitly disclosed, not hidden. The former headline
+residuals (*non-compiling corpus*, *vacuous L2/L3/L5 predicates*,
+*decorative certificate*, *unsound `ABI.Layout`*) are all resolved.

@@ -28,6 +28,7 @@ authors = "Jonathan D.A. Jewell (hyperpolymath)"
 sourcedir = "corpus"
 
 modules = VclTotal.ABI.Types
+        , VclTotal.ABI.Layout
         , VclTotal.Core.Grammar
         , VclTotal.Core.Schema
         , VclTotal.Core.Decide

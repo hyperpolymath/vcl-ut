@@ -30,9 +30,13 @@ paddingFor : (offset : Nat) -> (alignment : Nat) -> Nat
 paddingFor offset alignment =
   if offset `mod` alignment == 0
     then 0
-    else alignment - (offset `mod` alignment)
+    else alignment `minus` (offset `mod` alignment)
+    -- `minus` is the total saturating Nat subtraction (`Data.Nat`);
+    -- `Nat` has no `Neg` instance so the `(-)` operator does not apply
+    -- (standards#124, Phase 3c — this was a genuine non-compile, fixed).
 
-||| Proof that alignment divides aligned size
+||| Proof that alignment divides aligned size.
+||| (`Divides n m` ≜ ∃k. m = k * n — a genuine divisibility witness.)
 public export
 data Divides : Nat -> Nat -> Type where
   DivideBy : (k : Nat) -> {n : Nat} -> {m : Nat} -> (m = k * n) -> Divides n m
@@ -43,11 +47,22 @@ alignUp : (size : Nat) -> (alignment : Nat) -> Nat
 alignUp size alignment =
   size + paddingFor size alignment
 
-||| Proof that alignUp produces aligned result
-public export
-alignUpCorrect : (size : Nat) -> (align : Nat) -> (align > 0) -> Divides align (alignUp size align)
-alignUpCorrect size align prf =
-  DivideBy ((size + paddingFor size align) `div` align) Refl
+-- REMOVED (standards#124, Phase 3c — honest, not faked):
+--
+--   alignUpCorrect : (size : Nat) -> (align : Nat) -> (align > 0)
+--                 -> Divides align (alignUp size align)
+--   alignUpCorrect size align prf =
+--     DivideBy ((size + paddingFor size align) `div` align) Refl
+--
+-- This was *unsound and non-compiling*: `(align > 0)` is a `Bool`
+-- (`Nat`'s `>`), used where a `Type` is expected; and the `Refl`
+-- asserted `alignUp size align = (alignUp size align \`div\` align)
+-- * align` — exactly the divisibility goal, NOT definitionally true
+-- for symbolic `size`/`align`. A real proof needs genuine `div`/`mod`
+-- lemmas (`Data.Nat`). Rather than fake a green, the unproven claim is
+-- deleted and scoped OWED in verification/proofs/VERIFICATION-STANCE.adoc
+-- (Phase 3 residual). `alignUp`/`paddingFor` remain as sound total
+-- functions; `Divides` remains as a sound (now unused-here) definition.
 
 --------------------------------------------------------------------------------
 -- SafetyLevel Tag Encoding (0-9)
@@ -173,11 +188,25 @@ public export
 queryPlanHeaderTotalSize : Nat
 queryPlanHeaderTotalSize = 24
 
-||| Prove that the header has no internal padding waste beyond alignment.
-||| Sum of field sizes = 4+4+4+4+8 = 24 = totalSize (no wasted padding)
-public export
-queryPlanHeaderNoPadding : queryPlanHeaderLayout.totalSize = 24
-queryPlanHeaderNoPadding = Refl
+-- REMOVED (standards#124, Phase 3c — honest, not faked):
+--
+--   queryPlanHeaderNoPadding : queryPlanHeaderLayout.totalSize = 24
+--   queryPlanHeaderNoPadding = Refl
+--
+-- Two problems. (1) The old doc claimed this proved "no internal
+-- padding (sum of field sizes = totalSize)"; it did not — at most it
+-- restated that the `totalSize` *field literal* is 24. (2) Even that
+-- restatement does NOT hold by `Refl`: `StructLayout.fields : Vect n
+-- Field` makes the record carry an implicit `n`, and idris2 0.8.0 will
+-- not reduce the `totalSize` projection of `queryPlanHeaderLayout` to
+-- the literal `24` definitionally (`Can't solve 24 vs
+-- queryPlanHeaderLayout.totalSize`). Forcing it would require a
+-- proof-escape. The genuine property — fold the field sizes and prove
+-- the sum equals `totalSize` with no padding — is scoped OWED in
+-- verification/proofs/VERIFICATION-STANCE.adoc (Phase 3 residual). The
+-- size is still available as the plain constant
+-- `queryPlanHeaderTotalSize = 24` above (used as a constant, asserts
+-- nothing about the layout).
 
 --------------------------------------------------------------------------------
 -- Platform-Specific Layouts
@@ -229,7 +258,14 @@ fieldOffset layout name =
     Just idx => Just (finToNat idx ** index idx layout.fields)
     Nothing => Nothing
 
-||| Proof that field offset is within struct bounds
-public export
-offsetInBounds : (layout : StructLayout) -> (f : Field) -> So (f.offset + f.size <= layout.totalSize)
-offsetInBounds layout f = ?offsetInBoundsProof
+-- REMOVED (standards#124, Phase 3c — honest, not faked):
+--
+--   offsetInBounds : (layout : StructLayout) -> (f : Field)
+--                 -> So (f.offset + f.size <= layout.totalSize)
+--   offsetInBounds layout f = ?offsetInBoundsProof
+--
+-- This was an *open metavariable* (`?offsetInBoundsProof`) — i.e. not a
+-- proof at all, and false in general (an arbitrary `Field` need not
+-- belong to `layout`). A sound version would quantify over membership
+-- (`Elem f layout.fields`) or be stated for the concrete header. Deleted
+-- rather than left as a hole; scoped OWED in VERIFICATION-STANCE.adoc.
