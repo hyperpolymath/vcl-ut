@@ -1,0 +1,98 @@
+= VCL-total Statement Wire Format v1 (P5b, vcl-ut#25)
+:toc:
+
+// SPDX-License-Identifier: PMPL-1.0-or-later
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+The C-ABI marshalling format for a parsed `Statement`. The Rust
+encoder/decoder (`wire.rs`) is normative for v1; the P5b-step-2 Idris2
+decoder MUST decode this identical byte stream into `Grammar.idr`'s
+`Statement` (the certified type), proven total. Cross-language
+conformance is by shared golden vectors.
+
+Design: a deterministic, versioned, length-prefixed binary TLV.
+*Rationale:* no parser dependency / no extra trust surface (vs CBOR),
+fully auditable, byte-exact, total decode. This is the boundary the
+hypatia<->verisim seam crosses; it is specified, not improvised.
+
+== Conventions
+
+* All multi-byte integers are *little-endian, fixed width*.
+* `u8` = 1 byte; `u32` = 4 bytes; `u64`/`i64` = 8 bytes (`i64`
+  two's-complement); `f64` = 8 bytes IEEE-754 (`f64::to_bits`,
+  bit-exact — NaN/inf preserved).
+* `bool` = 1 byte, `0x00` false / `0x01` true (any other byte =>
+  `WireError::BadBool`).
+* `string` = `u32` byte length, then that many UTF-8 bytes.
+* `option<T>` = `0x00` (none) | `0x01` (some) then `T`.
+* `list<T>` = `u32` count, then that many `T`.
+* Every sum type = a `u8` *discriminant* then its payload in the field
+  order below. Unknown discriminant => `WireError::BadTag`.
+
+== Header
+
+`56 43 4C 57` ("VCLW") then `u16` version. v1 = `01 00`.
+Bad magic/version => `WireError::BadMagic` / `BadVersion`.
+
+== Discriminants (STABLE — never renumber; append only)
+
+Where `Grammar.idr` already defines an integer mapping it is reused so
+the Idris decoder is a direct match:
+
+* `Modality` — `modalityToInt`: Graph 0, Vector 1, Tensor 2,
+  Semantic 3, Document 4, Temporal 5, Provenance 6, Spatial 7.
+* `Agent` — `agentToInt` tag: Engine 0, Prover 1 `+string`,
+  Validator 2, User 3 `+string`, Federation 4.
+* `EpistemicOp` — `epistemicOpToInt`: Knows 0, Believes 1,
+  CommonKnowledge 2.
+* `EpistemicRequirement` — `epReqToInt`: Knows 0 `agent,expr`,
+  Believes 1 `agent,expr`, Common 2 `expr`, Entails 3
+  `agent,agent,expr`.
+* `SafetyLevel` — `safetyLevelToInt` (Types.idr): ParseSafe 0 …
+  EpistemicSafe 10.
+
+Defined here for v1 (no Idris int map existed; now normative):
+
+* `Literal`: Str 0 `string`, Int 1 `i64`, Float 2 `f64`, Bool 3
+  `bool`, Null 4, Vector 5 `list<f64>`.
+* `CompOp`: Eq 0, NotEq 1, Lt 2, Gt 3, LtEq 4, GtEq 5, Like 6, In 7.
+* `LogicOp`: And 0, Or 1, Not 2.
+* `AggFunc`: Count 0, Sum 1, Avg 2, Min 3, Max 4.
+* `Source`: Octad 0 `string`, Federation 1 `string`, Store 2 `string`.
+* `ProofClause`: Attached 0, Witness 1 `string`, Assert 2 `expr`.
+* `EffectDecl`: Read 0, Write 1, ReadWrite 2, Consume 3.
+* `VersionConstraint`: Latest 0, AtLeast 1 `u64`, Exact 2 `u64`,
+  Range 3 `u64,u64`.
+* `LinearAnnotation`: Unlimited 0, UseOnce 1, Bounded 2 `u64`.
+* `SelectItem`: Field 0 `fieldref`, Modality 1 `modality`,
+  Aggregate 2 `aggfunc,expr`, Star 3.
+* `Expr`: Field 0 `fieldref`, Literal 1 `literal`, Compare 2
+  `compop,expr,expr`, Logic 3 `logicop,expr,option<expr>`,
+  Aggregate 4 `aggfunc,expr`, Param 5 `string`, Star 6,
+  Subquery 7 `statement`, Epistemic 8 `epistemicop,agent,expr`,
+  Announce 9 `agent,expr,expr`.
+
+Composite: `FieldRef` = `modality` then `string` (field name).
+`EpistemicClause` = `list<agent>` then `list<EpistemicRequirement>`.
+
+== Statement (field order = the `Grammar.idr` record)
+
+`list<SelectItem>`, `Source`, `option<Expr>` (where),
+`list<FieldRef>` (group by), `option<Expr>` (having),
+`list<(FieldRef, bool)>` (order by; bool = ascending),
+`option<u64>` (limit), `option<u64>` (offset),
+`option<ProofClause>`, `option<EffectDecl>`,
+`option<VersionConstraint>`, `option<LinearAnnotation>`,
+`option<EpistemicClause>`, `SafetyLevel` (requested level).
+
+After the final field the stream MUST be exhausted; trailing bytes =>
+`WireError::TrailingBytes`.
+
+== Totality contract
+
+The decoder is *total*: bounds-checked, no panics, every malformed
+input a typed `WireError` (same SPARK-grade lint posture as the
+parser). `from_wire(to_wire(s)) == s` for every `Statement` (the
+round-trip proptest is the machine witness; bit-exact float preservation
+is pinned by a golden vector). `to_wire` is deterministic (canonical:
+exactly one byte string per value).
