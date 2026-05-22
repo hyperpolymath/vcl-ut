@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 = VCL-total Architecture
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
@@ -246,10 +246,10 @@ consumers via the hyperpolymath ABI/FFI standard.
 JavaScript for browser-based tooling. Extends the VCL v3.0 grammar with 6
 new optional clauses.
 
-|**V-lang**
+|**zig**
 |HTTP API gateway
 |Exposes VCL-total as a REST API for external consumers. Fast compilation,
-minimal runtime. Follows the hyperpolymath V-lang API triple pattern.
+minimal runtime. Follows the hyperpolymath zig API triple pattern.
 
 |**Elixir**
 |VeriSimDB integration, query orchestration
@@ -268,7 +268,7 @@ tolerance.
                          │ HTTP/WebSocket
                          ▼
   ┌──────────────────────────────────────────────────────────┐
-  │               V-LANG API GATEWAY (v-api/)                │
+  │               zig API GATEWAY (v-api/)                │
   │  Routes: POST /check, POST /compile, GET /levels/:id     │
   └──────────────────────┬───────────────────────────────────┘
                          │ FFI (C ABI)
@@ -620,4 +620,4 @@ Properties of a proof certificate:
 
 == Licence
 
-PMPL-1.0-or-later
+MPL-2.0

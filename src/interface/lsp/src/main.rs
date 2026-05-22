@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 //! Language Server Protocol (LSP) implementation for VCL-total
 //!
 //! This server provides LSP support for the VCL-total query language.

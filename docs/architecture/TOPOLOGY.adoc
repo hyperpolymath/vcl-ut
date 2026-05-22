@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 = VCL-total System Topology
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
@@ -248,7 +248,7 @@ as a runtime binary. Its outputs are proof certificates and typed ASTs.
 |**Zig FFI Bridge** (`ffi/zig/`)
 |Native binary (compiled from Zig)
 |Co-located with the query gateway. Exposes `vqlut_parse`, `vqlut_check`,
-`vqlut_compile` as C-ABI functions. Linked into the V-lang API and Elixir
+`vqlut_compile` as C-ABI functions. Linked into the zig API and Elixir
 NIFs.
 
 |**ReScript Parser** (`src/parser/`)
@@ -256,7 +256,7 @@ NIFs.
 |Client-side (browser) for the PanLL query editor panel, or server-side
 (Deno) for the API gateway. The parser is lightweight enough for both.
 
-|**V-lang API Gateway** (`v-api/`)
+|**zig API Gateway** (`v-api/`)
 |Native binary (compiled from V)
 |Edge / API tier. Handles HTTP routing, authentication, rate limiting.
 Calls the Zig FFI for actual type checking.
@@ -289,7 +289,7 @@ performance-critical type checking in the hot path.
   │                    EDGE TIER                             │
   │                                                         │
   │  ┌──────────────────────────────────────────────────┐   │
-  │  │ V-lang API Gateway                               │   │
+  │  │ zig API Gateway                               │   │
   │  │   ↳ links Zig FFI (.so)                          │   │
   │  │   ↳ serves ReScript parser (.js) for browsers    │   │
   │  └──────────────────────┬───────────────────────────┘   │
@@ -361,4 +361,4 @@ performance-critical type checking in the hot path.
 
 == Licence
 
-PMPL-1.0-or-later
+MPL-2.0

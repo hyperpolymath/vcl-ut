@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 //! VCL-total DAP (Debug Adapter Protocol) Library
 //!
 //! Provides DAP message types and VCL query execution simulation

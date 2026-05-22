@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 = VCL-ut (VeriSim Consonance Language)
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-:spdx: PMPL-1.0-or-later
+:spdx: MPL-2.0
 :status: Pre-Alpha
 :toc: preamble
 :icons: font
@@ -165,7 +165,7 @@ levels 7-10:
 | Core type system | Idris2 | Dependent types for all 10 safety levels. `%default total`.
 | FFI bridge | Zig | C-ABI plan compilation. Zero-copy result sets.
 | Parser | ReScript | Surface syntax parsing, extending Verisim's VCL parser.
-| API layer | V-lang | REST/gRPC/GraphQL endpoints for statement submission.
+| API layer | zig | REST/gRPC/GraphQL endpoints for statement submission.
 | Verisim integration | Elixir | 8-modal octad storage connection via NIFs.
 |===
 

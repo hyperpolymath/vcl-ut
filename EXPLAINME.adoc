@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 = VCL-total (VCL Total Type-Safe) — Show Me The Receipts
 :toc:
 :icons: font
@@ -32,7 +32,7 @@ The README makes claims. This file backs them up.
 | **Idris2** | Dependent types, totality checking, quantitative type theory (levels 1-10)
 | **Zig** | FFI codegen to C ABI (zero-copy result sets)
 | **ReScript** | Parser extending VeriSimDB VCL grammar
-| **V-lang** | REST/gRPC/GraphQL API layer
+| **zig** | REST/gRPC/GraphQL API layer
 | **VeriSimDB** | 6-modal storage engine execution target
 |===
 
@@ -54,7 +54,7 @@ The README makes claims. This file backs them up.
 | `src/interface/ffi/verisimdb_bridge.zig` | Marshals query plans to VeriSimDB engine, unmarshals results
 | `src/parser/` | ReScript parser extending VeriSimDB VCL surface syntax
 | `src/parser/vcl_parser.res` | Lexer + parser for .vcltotal files, PROOF clause support
-| `src/api/` | V-lang API layer for external clients
+| `src/api/` | zig API layer for external clients
 | `src/api/rest.v` | REST endpoint bindings (HTTP API)
 | `src/api/grpc.v` | gRPC service definitions
 | `src/api/graphql.v` | GraphQL schema bindings (if enabled)

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 # Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
 # ⚠️ STOP - CRITICAL READING REQUIRED
@@ -69,7 +69,7 @@ These a2ml files MUST exist in `.machine_readable/` directory ONLY:
 - `src/interface/ffi/` — Zig FFI (C-ABI query plan compilation)
 - `src/contracts/` — VCL proof contracts
 - `src/parser/` — ReScript parser (surface syntax)
-- `adapter/` — V-lang API layer
+- `adapter/` — zig API layer
 
 ### Build Artefacts
 
@@ -84,7 +84,7 @@ These a2ml files MUST exist in `.machine_readable/` directory ONLY:
 4. **No SCM duplication** — `.machine_readable/` is authoritative.
 5. **Idris2 over Ephapax** — When proven Idris2 code conflicts with Ephapax
    linear types, always choose Idris2. Dependability first.
-6. **License** — PMPL-1.0-or-later throughout.
+6. **License** — MPL-2.0 throughout.
 7. **Author** — Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 8. **Container images** — Chainguard base, Podman, Containerfile.
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: PMPL-1.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 //! VCL-total Linting Server
 //!
 //! This tool lints VCL-total query files for syntax and style issues.
