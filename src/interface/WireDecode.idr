@@ -1,4 +1,4 @@
--- SPDX-License-Identifier: PMPL-1.0-or-later
+-- SPDX-License-Identifier: AGPL-3.0-or-later
 -- Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 
 ||| VCL-total Interface — Wire Decoder (P5b step 2, vcl-ut#25)

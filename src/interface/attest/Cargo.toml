@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: PMPL-1.0-or-later
+# SPDX-License-Identifier: AGPL-3.0-or-later
 
 # Standalone workspace root (same rationale as ../parse, ../recompute-wasm):
 # decoupled from the broken parent virtual workspace. This is the Tier-2
