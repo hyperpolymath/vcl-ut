@@ -1,33 +1,51 @@
 -- SPDX-License-Identifier: MPL-2.0
 -- Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 --
-||| VCL-total Foreign Function Interface Declarations
+||| VCL-total Legacy Foreign Function Interface Declarations (DEPRECATED)
 |||
-||| Declares all C-compatible functions implemented in the Zig FFI layer.
-||| The pipeline processes queries through progressive safety levels:
+||| ⚠️  DEPRECATED 2026-06-02 (standards#124, Phase 5+ follow-up).
 |||
-|||   parse -> bind_schema -> check_types -> check_effects -> compile
-|||
-||| Each stage returns a handle to an intermediate representation.
-||| The final query plan carries proof of the highest achieved safety level.
-|||
-||| All functions are declared here with type signatures.
-||| Implementations live in ffi/zig/src/main.zig
-|||
-||| HONEST SCOPE (standards#124, Phase 3d). `getSafetyLevel` decodes a
-||| level *tag* from an FFI integer; that integer is an *attestation*
-||| from a trusted certifier, NOT a transported dependent proof — a C
-||| ABI cannot carry a `SafetyCertificate` (inherent). The real
+||| This module binds Idris to the *legacy* Zig pipeline in
+||| `src/interface/ffi/src/main.zig`
+||| (`vqlut_parse → vqlut_bind_schema → vqlut_check_types →
+||| vqlut_check_effects → vqlut_compile → vqlut_get_safety_level`).
+||| The `achieved_level` field returned by `vqlut_get_safety_level` is
+||| *set by the Zig pipeline itself* based on which stage succeeded —
+||| it is a Zig-side trusted assertion, NOT a transported dependent
+||| proof and NOT an Idris-certified verdict. A C ABI cannot carry a
+||| `SafetyCertificate` (inherent architectural limit). The real
 ||| verification authority is the Idris2 corpus certifier
-||| (`VclTotal.Core.Checker.certifyRequested` / `certifiedLevel`), which
-||| only yields a level behind a genuine machine-checked certificate.
-||| The Zig shim is *fail-closed* as of Phase 3d (no fabricated level).
-||| This module is FFI plumbing — it contains *no proofs* and is not in
-||| the proof corpus. The string→AST parser, C-ABI Statement
-||| marshalling, and Idris→C build are NAMED OWED in
-||| verification/proofs/VERIFICATION-STANCE.adoc (absent, not faked).
+||| (`VclTotal.Core.Checker.certifyRequested` / `certifiedLevel`).
+|||
+||| Use the new honest paths instead:
+|||
+|||   * **Tier-1 (recompute-PCC over `wasm32`)** — consumer re-runs
+|||     the certified decision via `src/interface/recompute-wasm`
+|||     (`vcl_recompute`), comparing its verdict against the
+|||     producer's claim. No trusted certifier. See
+|||     `verification/proofs/VERIFICATION-STANCE.adoc` §"Boundary
+|||     model — two tiers".
+|||
+|||   * **Tier-2 (C-ABI Ed25519 signed attestation, FALLBACK)** —
+|||     producer signs `(sha256(stmt_wire), sha256(schema_wire),
+|||     level)`; consumer Ed25519-verifies. See `src/interface/attest`
+|||     (`vclut_rs_verify`) and the Idris bindings in
+|||     `VclTotal.ABI.Tier2` (`src/interface/abi/Tier2.idr`).
+|||
+||| This file is kept ONLY so external C/Zig callers that linked
+||| against the legacy `libvqlut` ABI before Phase 5 can still find an
+||| Idris-side description of the function signatures. No part of the
+||| proof corpus imports it (the stale `corpus/VclTotal/ABI/Foreign.idr`
+||| symlink was removed). New Idris consumers should target
+||| `VclTotal.ABI.Tier2`.
+|||
+||| HONEST SCOPE (legacy text retained for context). `getSafetyLevel`
+||| decodes a level *tag* from an FFI integer; that integer is an
+||| *attestation* from a trusted certifier, NOT a transported dependent
+||| proof. The Zig shim is *fail-closed* as of Phase 3d (no fabricated
+||| level). This module is FFI plumbing — it contains *no proofs*.
 
-module VclTotal.ABI.Foreign
+module VclTotal.Legacy.Foreign
 
 import VclTotal.ABI.Types
 import VclTotal.ABI.Layout
