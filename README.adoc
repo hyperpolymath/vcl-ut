@@ -16,6 +16,9 @@ stood for "Ultimate Type-safe". The canonical name is now **VCL-total**
 (VeriSim Consonance Language — Ubiquitous Type-safe). See CHANGELOG.md for
 the full rename scope. The GitHub repository URL is unchanged.
 
+[.lead]
+**VeriSimDB does not merely store records. It maintains identity consonance across modal witnesses and federation boundaries. VCL expresses propositions and epistemic requests over that consonance state. VCL-total validates whether proposed identity transitions are admissible.**
+
 == Overview
 
 VCL-total is the next-generation interaction language for
@@ -36,6 +39,118 @@ queries against a passive store. Operations split into propositional
 (`DECLARE`, `ASSERT`, `RETRACT`) and epistemic (`INSPECT`, `VERIFY`).
 "Query language" is therefore a misnomer; "consonance language" names
 the actual thing.
+
+== VCL-total in One Sentence
+
+VCL-total is the proof-bearing safety pipeline for VCL, the VeriSim Consonance
+Language. It checks whether identity transitions proposed to VeriSimDB are
+well-formed, type-safe, authorised, resource-safe, proof-supported, and
+_admissible_ before they affect live consonance state.
+
+== What VCL Is
+
+VCL is not SQL with extra types. VCL is a language of _propositions_ and
+_epistemic requests_ to a consonance engine. Typical VCL operations are
+identity-lifecycle operations:
+
+[cols="1,3"]
+|===
+|Operation |Meaning
+
+|`DECLARE`   |introduce a candidate identity claim
+|`ASSERT`    |strengthen or add evidence to an identity claim
+|`RETRACT`   |revoke, weaken, or retire a live claim
+|`INSPECT`   |observe consonance, drift, provenance, or federation state
+|`VERIFY`    |request proof-bearing validation of a claim or transition
+|`MERGE`     |join identities when consonance evidence supports it
+|`SPLIT`     |separate an over-coalesced identity
+|`NORMALISE` |repair drift when a justified repair path exists
+|===
+
+The surface language may look query-like in places, but the semantics are not
+"read rows from a passive store": VCL statements propose or inspect changes in
+an actively maintained identity-consonance system.
+
+== What VCL-total Proves
+
+VCL-total does not prove the entire database is globally correct. It checks
+whether a particular VCL statement or transition is _admissible_. A transition
+may require obligations such as:
+
+[source]
+----
+syntactic validity         schema conformance     type compatibility
+nullability safety         injection resistance   resource-usage bounds
+session/protocol validity  effect compatibility   modal consistency
+provenance integrity       freshness              authorisation
+federation trust           proof attachment
+----
+
+The practical proof shape is:
+
+[source]
+----
+IdentityState_before
+  + VCL transition
+  + evidence
+  + proof obligations
+  -> VerifiedTransition
+  -> IdentityState_after
+----
+
+== Relationship to VeriSimDB
+
+VeriSimDB maintains continuously-maintained identity claims across an octad of
+modal witnesses: graph, vector, tensor, semantic, document, temporal,
+provenance, and spatial. VCL is the production language for interacting with
+that consonance engine; VCL-total is the fully-typed validation layer behind
+it. Simple statements short-circuit at the early safety levels; proof-bearing
+statements and high-risk lifecycle transitions go through the deeper proof,
+effect, resource, and cross-cutting checks (L9-L10).
+
+[source]
+----
+User / system writes VCL
+        |
+        v
+VCL parser and binder
+        |
+        v
+VCL-total safety pipeline   (10 progressive levels)
+        |
+        v
+verified transition plan
+        |
+        v
+VeriSimDB consonance engine (octad of modal witnesses)
+----
+
+== Important Distinctions
+
+*Retraction is not deletion.* A retracted identity claim usually remains visible
+to provenance, audit, federation, and proof systems. Retraction means "this
+claim is no longer live"; tombstoning means "this identity or claim has been
+durably retired"; expungement is a separate, policy-governed operation.
+
+*Drift is not identity death.* A stale vector, a changed document, a broken
+provenance event, or a federated conflict does not destroy the subject identity.
+It creates a _typed condition_ requiring inspection, repair, quarantine,
+retraction, or arbitration.
+
+*VCL-total is not the expert-facing product.* The ordinary production language is
+VCL; VCL-total is the proof-bearing substrate that validates VCL statements. It
+may expose expert syntax for proof attachment, but its main role is to make
+routine VCL safe.
+
+== Terminology Guidance
+
+Prefer: consonance language, statement, transition, identity claim, consonance
+subject, modal witness, proof-bearing statement, verified transition, octad.
+
+Avoid or qualify: query language, query, record, CRUD, delete, proof-carrying
+query, 6-modal engine, passive store. Use "query" only for a read-only syntactic
+convenience, and make clear the semantic model is _epistemic inspection of
+consonance state_.
 
 == Lineage
 
@@ -72,7 +187,7 @@ TypeLL (type theory core — defines the 10 levels)
 |===
 
 NOTE: The dependent-types variant was originally labelled with the suffix
-"-DT" (Dependent Types) as the proof-carrying execution mode (statements
+"-DT" (Dependent Types) as the proof-bearing execution mode (statements
 with `PROOF` clauses). It is not a separate product — it is folded into
 VCL-total's L9 (Proof Attachment) and L10 (Cross-Cutting) levels.
 
