@@ -1,0 +1,24 @@
+# .hypatia-ignore — file-level exemptions from estate-wide hypatia rules
+#
+# ReScript (.res) files are permitted in this repository — ReScript is an
+# allowed estate language. Here it provides the standalone VCL surface
+# frontend (parser / AST / bridge) and shared definitions/errors:
+#   - src/bridges/      — VclTotal AST + parser + bridge (ReScript frontend)
+#   - src/definitions/  — shared VCL-total definitions
+#   - src/errors/       — VCL-total error types
+#
+# The language/package anti-pattern policy flags .res as a
+# banned_language_file by default; each intentional ReScript source is
+# whitelisted below by repo-relative path.
+
+cicd_rules/banned_language_file:src/bridges/VclTotalAst.res
+cicd_rules/banned_language_file:src/bridges/VclTotalBridge.res
+cicd_rules/banned_language_file:src/bridges/VclTotalParser.res
+cicd_rules/banned_language_file:src/definitions/VclTotalDefinitions.res
+cicd_rules/banned_language_file:src/errors/VclTotalError.res
+
+# The banned_config_file rule additionally flags rescript.json. That file is
+# the ReScript compiler config for exactly the three source directories above
+# (src/bridges, src/errors, src/definitions); it is intrinsic to the permitted
+# ReScript frontend, so it is whitelisted under its own rule here.
+cicd_rules/banned_config_file:rescript.json

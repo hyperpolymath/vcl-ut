@@ -15,6 +15,9 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+      # echidna-core path-dependency (src/interface/Cargo.toml) — provide as sibling.
+      - name: Provide echidna sibling
+        run: git clone --depth 1 https://github.com/hyperpolymath/echidna ../echidna
       - name: Run E2E validation
         run: bash tests/e2e.sh
   property:
@@ -26,6 +29,9 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+      # echidna-core path-dependency (src/interface/Cargo.toml) — provide as sibling.
+      - name: Provide echidna sibling
+        run: git clone --depth 1 https://github.com/hyperpolymath/echidna ../echidna
       - name: Run property tests
         run: cargo test --test property_test
       - name: Run integration tests

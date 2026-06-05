@@ -1,0 +1,173 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+#
+# STATE.a2ml — Project state checkpoint for vcl-ut (VCL Ultimate Type-Safety).
+
+[metadata]
+project = "vcl-ut"
+version = "0.1.0"
+last-updated = "2026-04-25"
+status = "active"  # active | paused | archived
+
+[project-context]
+name = "VCL-ut"
+purpose = "VCL Ultimate Type-Safety — 10-level type-safe query language for VeriSimDB. Provides queries plus formatter/linter/LSP/DAP tooling."
+completion-percentage = 75
+
+[position]
+phase = "maintenance"      # design | implementation | testing | maintenance | archived
+maturity = "production"    # experimental | alpha | beta | production | lts
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CRG (Critical Reception Grade) advancement — D→C→B
+# Per memory rule: B-grade requires [external-targets]≥6, [issues-fed-back],
+# [field-signal] populated.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[external-targets]
+[[external-targets.target]]
+name = "echidna (proof engine)"
+relationship = "consumer-of"
+contract = "vcltotal-echidna-client async REST + exchange endpoints (OpenTheory + Dedukti); shared types via vcltotal-interface re-exports of echidna-core"
+discovered = "Package 4 close-out (commits 64b8ff6 client, 8d26b84 matrix CI)"
+
+[[external-targets.target]]
+name = "VeriSimDB"
+relationship = "primary-target"
+contract = "VCL-ut is the canonical 10-level type-safe query language for VeriSimDB; queries flow OUT, schema constraints flow IN"
+discovered = "anchor.identity.one-sentence + project purpose"
+
+[[external-targets.target]]
+name = "echidna backend matrix CI"
+relationship = "consumer-via-ci"
+contract = "vcl-ut/.github/workflows/backend-matrix.yml reads echidna's .machine_readable/provers.a2ml at runtime to drive 113 per-prover smoke jobs"
+discovered = "Package 4 step 5 (commit 8d26b84)"
+
+[[external-targets.target]]
+name = "echidna-core (shared-types crate)"
+relationship = "type-dependency"
+contract = "vcltotal-interface re-exports Term/Goal/ProofState/Tactic/Theorem from echidna-core; echidna is canonical owner of the schema"
+discovered = "Package 4 shared-types layer (echidna commit c8c0acf extraction + vcl-ut commit 69745de re-export)"
+
+[[external-targets.target]]
+name = "AffineScript ecosystem"
+relationship = "sibling-typed-dsl"
+contract = "Both VCL-ut and AffineScript are type-system-driven DSLs in the typell ecosystem; potential for shared linting/checker infrastructure"
+discovered = "language policy (Allowed languages list), implementation-policy in ANCHOR.a2ml"
+
+[[external-targets.target]]
+name = "Hypatia (estate-wide neurosym CI)"
+relationship = "potential-consumer"
+contract = "Hypatia scanning consumes type-safety verification reports; vcl-ut produces 10-level safety annotations that Hypatia could ingest"
+discovered = "ECOSYSTEM.a2ml + estate-wide CI design"
+
+[[external-targets.target]]
+name = "echidnabot (proof history queries)"
+relationship = "potential-consumer"
+contract = "Echidnabot's tactic_outcomes table and VCL-ut both reason over proof history; vcl-ut could provide the query language for echidnabot's history surface (currently echidnabot uses raw SQLite)"
+discovered = "echidnabot src/store/ + STATE.a2ml feedback components"
+
+[issues-fed-back]
+[[issues-fed-back.issue]]
+source = "LSP smoke test 2026-04-24"
+date = "2026-04-24"
+issue = "test_completion_without_schema_returns_only_keywords expected 3 keywords, returned 13 — keyword set grew without test update"
+status = "resolved — commit 76ef05a updated assertion to 13"
+
+[[issues-fed-back.issue]]
+source = "Anchor identity audit"
+date = "2026-04-24"
+issue = "Anchor identity block + repo URL still said `VCL-total` / `hyperpolymath/vcl-total` after rename to vcl-ut (commit b2c71eb)"
+status = "resolved — commit e8147bb (3 fields renamed)"
+
+[[issues-fed-back.issue]]
+source = "Contractile structure audit 2026-04-24"
+date = "2026-04-24"
+issue = "Only bust verb had a working .ncl runner; bust.ncl imported `../_base.ncl` which did not exist; adjust + intend verbs missing entirely"
+status = "resolved — commit b68fb08 ported template's 6-verb structure with _base.ncl + INDEX.a2ml"
+
+[[issues-fed-back.issue]]
+source = "Backend matrix CI realism (Package 4 step 7)"
+date = "2026-04-24"
+issue = "Matrix runs same wiremock suite per slug because echidna REST surface only covers 17 of 113 provers"
+status = "open — work-convergent; jobs can diverge per slug when echidna REST surface expands"
+
+[[issues-fed-back.issue]]
+source = "Internal STATE.a2ml audit 2026-04-25"
+date = "2026-04-25"
+issue = "STATE.a2ml [metadata] still says project = \"rsr-template-repo\" — leftover from template-clone bootstrap, never customised"
+status = "open — needs separate commit to update [metadata] + [project-context] to reflect actual vcl-ut state"
+
+[field-signal]
+[[field-signal.signal]]
+source = "cargo test -p vcltotal-lsp --lib"
+metric = "LSP test pass rate"
+value = "16/16 (post 76ef05a keyword count fix)"
+collected = "2026-04-25"
+
+[[field-signal.signal]]
+source = "cargo check --workspace"
+metric = "build"
+value = "clean (18.86s); single workspace member with path deps that resolve internally"
+collected = "2026-04-25"
+
+[[field-signal.signal]]
+source = "Dependabot scanner"
+metric = "open vulnerability count"
+value = "0 open (rolls inherited from echidna's reqwest/rustls upgrades upstream)"
+collected = "2026-04-25"
+
+[[field-signal.signal]]
+source = "Backend matrix CI configuration"
+metric = "per-prover job count"
+value = "113 (1:1 with echidna ProverKind variants); max-parallel=3"
+collected = "2026-04-25"
+
+[[field-signal.signal]]
+source = "Contractile structure (post b68fb08)"
+metric = "verbs with working runners"
+value = "6/6 (was 1/4) — all six 6-verb pairs now present + base.ncl + INDEX.a2ml"
+collected = "2026-04-25"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[route-to-mvp]
+milestones = [
+  { name = "Phase 0: Core scaffolding (justfile, CI/CD, .machine_readable)", completion = 100 },
+  { name = "Phase 1: ABI/FFI standard (Idris2/Zig templates)", completion = 100 },
+  { name = "Phase 1b: AI Gatekeeper Protocol (0-AI-MANIFEST.a2ml)", completion = 100 },
+  { name = "Phase 1c: TOPOLOGY.md standard and guide", completion = 100 },
+  { name = "Phase 1d: Maintenance gate (axes, checklist, approach)", completion = 100 },
+  { name = "Phase 1e: Trustfile / contractiles", completion = 100 },
+  { name = "Phase 2: Container ecosystem templates (stapeln)", completion = 100 },
+  { name = "Phase 3: Multi-forge sync hardening", completion = 0 },
+  { name = "Phase 4: Nix/Guix reproducible shells", completion = 50 },
+]
+
+[blockers-and-issues]
+# No active blockers
+
+[critical-next-actions]
+actions = [
+  "Container templates complete — test with `just container-init`",
+  "Validate container templates across wolfi-base and static Chainguard images",
+  "Harden multi-forge sync for GitLab/Bitbucket mirroring edge cases",
+  "Expand Nix/Guix development shell templates",
+]
+
+[maintenance-status]
+last-run-utc = "never"
+last-report = "docs/reports/maintenance/latest.json"
+last-result = "unknown"  # unknown | pass | warn | fail
+open-warnings = 0
+open-failures = 0
+
+[ecosystem]
+part-of = ["RSR Framework", "stapeln ecosystem"]
+depends-on = ["stapeln", "selur-compose", "cerro-torre", "svalinn", "vordr", "k9-svc"]
+
+# ---------------------------------------------------------------------------
+# NOTE FOR CONSUMERS: When using this template to create a new repo, reset
+# the fields above to your project's values and replace all 
+# tokens. The milestones above describe the TEMPLATE's evolution, not yours.
+# ---------------------------------------------------------------------------

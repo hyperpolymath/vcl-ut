@@ -94,5 +94,12 @@ jobs:
         with:
           shared-key: backend-matrix
 
+      # The vcl-ut workspace has a path-dependency
+      # `echidna-core = { path = "../../../echidna/crates/echidna-core" }`
+      # (src/interface/Cargo.toml), so the whole workspace fails to load
+      # unless echidna is present as a sibling of the checkout. Provide it.
+      - name: Provide echidna sibling (echidna-core path-dependency)
+        run: git clone --depth 1 https://github.com/hyperpolymath/echidna ../echidna
+
       - name: Client wiremock suite (ECHIDNA_PROVER=${{ matrix.prover }})
         run: cargo test -p vcltotal-echidna-client --tests --locked

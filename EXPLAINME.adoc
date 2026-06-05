@@ -5,17 +5,26 @@
 
 The README makes claims. This file backs them up.
 
+[.lead]
+**VeriSimDB does not merely store records. It maintains identity consonance across modal witnesses and federation boundaries. VCL expresses propositions and epistemic requests over that consonance state. VCL-total validates whether proposed identity transitions are admissible.**
+
+== VCL vs VCL-total vs VeriSimDB
+
+* **VeriSimDB** — the federated consonance engine; maintains identity consonance across the *octad* of modal witnesses (graph, vector, tensor, semantic, document, temporal, provenance, spatial).
+* **VCL** — the production consonance language: propositions (`DECLARE` / `ASSERT` / `RETRACT`) and epistemic requests (`INSPECT` / `VERIFY`), plus `MERGE` / `SPLIT` / `NORMALISE`. It is not SQL-with-types and not queries against a passive store.
+* **VCL-total** — *this project*: the proof-bearing safety substrate behind VCL. It decides whether a proposed identity transition is admissible — well-formed, type-safe, authorised, resource-safe, proof-supported — before it affects live consonance state. The 10 type-safety levels below are *how* it proves that.
+
 == Claims Substantiation
 
 === Claim 1: "Satisfies all 10 levels of type safety — the 6 established IO-covered forms and 4 additional forms identified through research"
 
-**How it works:** VCL-total layers a progressive type-safety pipeline. Levels 1-6 (parse-time, schema-binding, type operations, null-tracking, injection-proof, result-type) are implemented in the Idris2 type checker (`src/interface/abi/VQLType.idr`) as dependent types. Parse-time safety uses a total parser (Idris2 `%default total`, no partiality). Schema-binding binds column references to Idris2 dependent records indexed by schema version. Null-tracking threads nullable flags through type-level join algebra. Injection-proof uses parameterized query types that forbid string interpolation by construction. Levels 7-10 (cardinality, effect-tracking, temporal, linearity) use quantitative type theory (QTT) on connection handles, session types for transaction state, modal types for world/scope-indexed queries. The ReScript parser extends VeriSimDB's surface syntax; the Zig FFI codegen produces C-ABI query plans that VeriSimDB's 6-modal engine executes.
+**How it works:** VCL-total layers a progressive type-safety pipeline. Levels 1-6 (parse-time, schema-binding, type operations, null-tracking, injection-proof, result-type) are implemented in the Idris2 type checker (`src/interface/abi/VQLType.idr`) as dependent types. Parse-time safety uses a total parser (Idris2 `%default total`, no partiality). Schema-binding binds column references to Idris2 dependent records indexed by schema version. Null-tracking threads nullable flags through type-level join algebra. Injection-proof uses parameterized query types that forbid string interpolation by construction. Levels 7-10 (cardinality, effect-tracking, temporal, linearity) use quantitative type theory (QTT) on connection handles, session types for transaction state, modal types for world/scope-indexed queries. The ReScript parser extends VeriSimDB's surface syntax; the Zig FFI codegen produces C-ABI transition plans that VeriSimDB's octad (8-modal) consonance engine executes.
 
 **Caveat:** Levels 7-10 are research-level and incompletely proven. Cardinality inference may have false negatives on complex aggregations. Temporal safety assumes monotonic clocks (breaks on time skew). Linearity is enforced syntactically but not yet proven to match Idris2's QTT semantics. For production, restrict to levels 1-6 (proven on 49 test cases).
 
 **Evidence:** `src/interface/abi/VQLType.idr` defines levels 1-6 with `%default total`; `src/interface/abi/VQLCardinality.idr` and `src/interface/abi/VQLLinear.idr` define levels 7, 10 (incomplete). `src/parser/` extends VCL parser. `src/interface/ffi/codegen.zig` emits query plans. Tests in `tests/` cover all 10 levels.
 
-=== Claim 2: "Proof-carrying queries (with PROOF clause) go through L9-L10 validation automatically"
+=== Claim 2: "Proof-bearing statements (with PROOF clause) go through L9-L10 validation automatically"
 
 **How it works:** When a user writes `SELECT * FROM users PROOF ATTACHED theorem_name`, the parser tags the query with proof metadata. The type checker looks up `theorem_name` in the proof store and type-checks the proof against the query's result type. If the proof type-checks in Idris2, a `ProvedResult` sigma type is returned; otherwise, a compile-time error blocks execution. The 6 proof types (EXISTENCE, INTEGRITY, CONSISTENCY, PROVENANCE, FRESHNESS, AUTHORIZATION) are Idris2 propositions with constructors matching their semantics. This ensures queries are executed only when supporting evidence is present.
 
@@ -33,7 +42,7 @@ The README makes claims. This file backs them up.
 | **Zig** | FFI codegen to C ABI (zero-copy result sets)
 | **ReScript** | Parser extending VeriSimDB VCL grammar
 | **zig** | REST/gRPC/GraphQL API layer
-| **VeriSimDB** | 6-modal storage engine execution target
+| **VeriSimDB** | octad (8-modal) consonance engine execution target
 |===
 
 == File Map
@@ -76,10 +85,10 @@ The README makes claims. This file backs them up.
 
 | Project | Integration |
 | **panic-attacker** | Scans VCL-total parser for injection vulnerabilities in PROOF clause parsing
-| **verisimdb** | VCL-total is the type-safe query interface to VeriSimDB's 6-modal engine
+| **verisimdb** | VCL-total is the proof-bearing safety substrate for VeriSimDB's octad (8-modal) consonance engine
 | **typell** | VCL-total instantiates TypeLL's 10-level framework for database queries
 | **panll** | PanLL panels visualize VCL-total query execution with proof status
 
 == Readiness
 
-**CRG Grade:** C (Beta) - Levels 1-6 production-ready (49 tests passing, 0 believe_me), Levels 7-10 experimental (research proofs incomplete). Can use L1-L6 today for type-safe queries; L7-10 for future proof-carrying use cases.
+**CRG Grade:** C (Beta) - Levels 1-6 production-ready (49 tests passing, 0 believe_me), Levels 7-10 experimental (research proofs incomplete). Can use L1-L6 today for type-safe consonance statements; L7-10 for future proof-bearing use cases.
