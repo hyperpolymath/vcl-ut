@@ -21,6 +21,7 @@ jobs:
   audit:
     name: Dependency audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: hashFiles('Cargo.lock') != ''
 
     steps:

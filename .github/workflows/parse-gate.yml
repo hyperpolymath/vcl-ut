@@ -28,6 +28,7 @@ jobs:
   parse-gate:
     name: vcltotal-parse — panic-free / clippy / tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository

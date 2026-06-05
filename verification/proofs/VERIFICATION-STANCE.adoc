@@ -1,9 +1,9 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 = VCL-ut Verification Stance (proof-backed)
 :toc:
 :sectnums:
 
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
 WARNING: vcl-ut is the interface between *hypatia* and *verisim*; both sides
 trust safety claims made here. This document states *precisely* what is and is
@@ -167,21 +167,57 @@ OWED section.
   `fieldWithin` (membership-quantified bound: any field *provably in*
   the layout, via `Data.Vect.Elem` and `Data.So.soAnd`, satisfies
   `foff + fsize <= cap` — the honest replacement for the deleted false
-  `offsetInBounds`/`?metavariable`). *Remaining sliver (precisely
-  scoped, NOT faked):* the additive `Layout.alignUp size a = size +
-  paddingFor size a` ↔ ceil `alignTo size a` equivalence for `a > 0`,
-  left as the documented `String` note `alignUpAdditiveEquivOWED`
-  (needs the `Data.Nat` Euclidean identity + the `Bool`↔`Prop` bridge
-  for `paddingFor`'s conditional) — a scope note, never a
-  `believe_me`.
-  `VclTotal.ABI.Foreign` is *deliberately still excluded* but is *not
-  unsound*: it contains **no proofs at all** — only `%foreign` C
-  declarations and `Maybe`/`Either` wrappers. Its gaps are (a) it does
-  not compile as-is (FFI plumbing: missing `Data.Bits`, etc.) and (b)
-  the architectural stub-FFI issue (the level tag is an *asserted
-  integer* from the Zig side, not a transported proof). That is genuine
-  Phase 3+ architecture (implement the Zig/Rust side; transport an
-  opaque proof token), OWED and disclosed — not a false proof.
+  `offsetInBounds`/`?metavariable`). *Phase 5 — partial advance on the
+  additive↔ceil sliver:* the previously-`String` OWED
+  `alignUpAdditiveEquivOWED` is replaced by a real proof
+  infrastructure that closes the substantive content for the
+  zero-remainder case:
+    * `EuclidView`/`euclid` — the Euclidean decomposition view, built
+      from `Data.Nat.Division.DivisionTheorem` + `boundModNatNZ`.
+    * `sIdentZero`/`sIdentSucc` — Euclidean identity refinements
+      tagged by the value of `modNatNZ s (S k) ItIsSucc`.
+    * `sPlusMinus` — the `r ≤ k` ⇒ `S r + (k - r) = S k` identity.
+    * `alignUpADividesZero` — `(modNatNZ s (S k) ItIsSucc = Z) ⇒
+      Divides (S k) (alignUpA s k)`. Genuine `Refl`-closed theorem
+      with witness `divNatNZ s (S k) ItIsSucc`, zero proof-escape.
++
+  The remaining residual is purely the non-zero remainder case's
+  *rewrite chain*: the math is `S r' + (k `minus` r') = S k` (closed
+  by `sPlusMinus` + `boundModNatNZ`), but the multi-step
+  `plusAssociative`/`plusCommutative` chain triggers an idris2 0.8.0
+  elaborator quirk (`FromString` mis-elaboration). Disclosed as
+  `alignUpADividesSuccOWED` — a precisely-scoped String stub that
+  names the obstruction. Strictly smaller than the original OWED
+  (which covered both cases) and is a toolchain-sequencing limit
+  rather than a missing lemma. Re-attempt under idris2 0.8.1+ or via
+  manual `replace` chaining; tracked at standards#124 follow-up.
++
+  The `Data.Nat.Division` dependency is now declared in
+  `verification/proofs/vclut-core.ipkg` (`depends = contrib`); the
+  bundled idris2-contrib package is pure stdlib and adds no new
+  trusted axioms.
+  `VclTotal.ABI.Foreign` *has been retired* (2026-06-02). It is now
+  `VclTotal.Legacy.Foreign` at `src/interface/legacy/Foreign.idr`,
+  flagged DEPRECATED at the top of the file, with the stale
+  `corpus/VclTotal/ABI/Foreign.idr` symlink deleted. The file is
+  retained ONLY so external C/Zig callers that linked the legacy
+  `libvqlut` ABI before Phase 5 can still find an Idris-side
+  description; no part of the proof corpus imports it and no other
+  Idris module in this repo imports it (`grep -r "import
+  VclTotal.ABI.Foreign"` → 0). The architectural "asserted integer
+  instead of transported proof" issue is no longer a stand-alone
+  OWED: the *honest* Idris-side path is now
+  **`VclTotal.ABI.Tier2`** at `src/interface/abi/Tier2.idr`, which
+  binds `vclut_verify_wire` (Zig shim → `vclut_rs_verify` in
+  `src/interface/attest`) and returns a 65-byte Ed25519-signed
+  attestation `[level:1][sig:64]` over `DOMAIN ‖ sha256(stmt_wire)
+  ‖ sha256(schema_wire) ‖ level`. Trust-model ceiling is the same
+  Tier-2 ceiling described under the boundary model below
+  (strictly weaker than Tier-1 recompute-PCC; strictly stronger
+  than the deprecated asserted-integer path). The `Tier2.idr`
+  module typechecks under idris2 0.8.0 (`--check` green) and
+  carries no proofs (it is plumbing); the safety properties live
+  in `src/interface/attest/src/lib.rs::tests`.
 . *(Phase 2 — RESOLVED) L2/L3/L5 predicates de-vacuized.* The
   content-free constructors (`ExprTypeSafe`/`WhereTypeSafe`,
   `AllNullableFieldsGuarded`'s `GuardedNull`, `AllSelectItemsTyped`'s
@@ -223,14 +259,23 @@ OWED section.
   *structural* part (clause present, ≥1 agent, every requirement agent
   declared) — proved by genuine superset monotonicity
   (`fuaSuperset`/`agentDeclaredAppL`/`agentDeclaredAppR` +
-  `fuaNilAppend`), no proof-escape. L10's no-direct-`ENTAILS`-cycle
+  `fuaNilAppend`), no proof-escape. L10's no-`ENTAILS`-cycle
   sub-property is *provably NOT* join-closed and remains carried by
   the explicit minimal `JoinSideCondition` (`epiNoCycle (composeJoin
   q1 q2) = True` only at `EpistemicSafe`; `Unit` elsewhere) — stated
-  in the TYPE, never faked. *Still future work (precisely):*
-  deepening the L9/L10 *predicates themselves* to the full
-  `checkLevelN` semantics (L9 ≠ `LinUnlimited`; L10 acyclic `ENTAILS`
-  as a predicate rather than a side-condition). And the
+  in the TYPE, never faked. *(Phase 5 follow-up — RESOLVED.)* The L9
+  predicate deepening landed in Phase 4b already (`L9_LinearSafe`
+  carries `linearEnforcedStmt stmt = True`, which rejects both
+  absence AND `LinUnlimited` — see `Levels.idr` line 249), so the
+  "L9 ≠ `LinUnlimited`" item was a stance-doc lag, not real debt.
+  The L10 *direct-only* cycle check was upgraded to full transitive
+  graph-cycle detection via finite-fuel transitive closure
+  (`Decide.transStep`/`transCloseN`/`transClose`/
+  `hasTransitiveCycle`); `epiNoCycle` now routes through
+  `hasTransitiveCycle`, which is strictly stronger than the previous
+  `hasCircularEntails` and catches `a⊨b⊨c⊨a` and longer chains. The
+  `JoinSideCondition`'s body-agnostic shape means the existing
+  `compositionPreservation` proof continues to work verbatim. The
   certificate is still *not transported across the FFI* (see the
   `ABI.Foreign` item) — the in-corpus certificate is not yet a runtime
   proof token handed to hypatia/verisim.
@@ -341,8 +386,10 @@ OWED section.
   (`%default total`, zero proof-escape, fuel-bounded;
   `WireConformance` `Refl`-pins it byte-for-byte to the Rust
   `to_wire*` encoder, P5b-2 #29 / P5c-1 #30). The *encode* direction
-  (Idris `Statement`/`OctadSchema`→wire) remains OWED (not needed by
-  the recompute tier — the producer encodes from Rust). (3) *RESOLVED:*
+  (Idris `Statement`/`OctadSchema`→wire) is *deferred-by-design*
+  (not OWED): the recompute tier's producer encodes from Rust, so an
+  Idris encoder would only duplicate the conformance-pinned Rust
+  encoder for no additional consumer-side guarantee. (3) *RESOLVED:*
   the decision-transport tier is delivered as Tier-1 recompute-`wasm32`
   (P5c-5 #32) with the faithful Rust decision port machine-pinned to
   the corpus (P5c-2/3/4 #31). (4) *RESOLVED:* the P5d C-ABI
@@ -361,8 +408,18 @@ OWED section.
   `vector.x` unresolved → Reject) is pinned Rust-side (decoded
   self-check) + by input-value conformance (`conform2`), not by Idris
   `Refl`; the find-free decision structure *is* `Refl`-pinned. (iii)
-  the L9/L10 predicate depth and the additive↔ceil `alignUp` sliver
-  remain as previously scoped.
+  the additive↔ceil `alignUp` sliver
+  remains as previously scoped (Nat-arithmetic Euclidean-identity
+  infrastructure is the unwritten dependency; the practical
+  alignment-divides guarantee is already machine-checked via the
+  canonical-form `alignToDivides` theorem, so closing the additive
+  equivalence is a documentation tightening, not a safety upgrade).
+  *L9/L10 predicate depth (item iii in earlier revisions) is no
+  longer a disclosed limit*: L9 was deepened in Phase 4b
+  (`linearEnforcedStmt` rejects `LinUnlimited`); L10 acyclicity now
+  uses full transitive-closure cycle detection
+  (`Decide.hasTransitiveCycle`), not just direct symmetry — see the
+  Phase-5 follow-up note in the L6–L10 join-closure entry above.
 
 == Consumer guidance (hypatia / verisim)
 
@@ -384,8 +441,16 @@ OWED section.
   checks on the strength of a vcl-ut FFI level tag.
 * `VclTotal.ABI.Layout` is now *sound + CI-gated* (unsound claims
   deleted, not faked); its genuine alignment/no-padding theorems are
-  OWED. `VclTotal.ABI.Foreign` contains *no proofs* (FFI plumbing) — do
-  not treat its returned level tag as a verified claim.
+  OWED. `VclTotal.Legacy.Foreign` (formerly `VclTotal.ABI.Foreign`,
+  retired 2026-06-02) contains *no proofs* (FFI plumbing) and its
+  returned level tag is a Zig-side trusted assertion, NOT a verified
+  claim — *do not use the legacy bindings*. The honest Idris-side
+  path is **`VclTotal.ABI.Tier2`**, which returns a Tier-2
+  Ed25519-signed attestation: still trust-the-certifier (the C-ABI
+  ceiling), but cryptographically bound and tamper-evident, with the
+  Rust crate's test suite enforcing the fail-closed contract. For
+  the strongest guarantee, use Tier-1 recompute-PCC over `wasm32`
+  (`src/interface/recompute-wasm`).
 * *Transport (DELIVERED — Tier-1 recompute-PCC, P5c, vcl-ut#25).* The
   guarantee is **not** "trust our attestation". You are shipped the
   `wasm32` module `src/interface/recompute-wasm` (`vcl_recompute`) +

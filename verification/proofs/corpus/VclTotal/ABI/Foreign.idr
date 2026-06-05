@@ -1,1 +1,0 @@
-../../../../../src/interface/abi/Foreign.idr

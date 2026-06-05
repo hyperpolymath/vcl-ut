@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 = ABI/FFI Standards
 {{~ Aditionally delete this line and fill out the template below ~}}
 
@@ -17,10 +19,13 @@ This library follows the **Hyperpolymath RSR Standard** for ABI and FFI design:
 ```
 ┌─────────────────────────────────────────────┐
 │  ABI Definitions (Idris2)                   │
-│  src/abi/                                   │
+│  src/interface/abi/                         │
 │  - Types.idr      (Type definitions)        │
 │  - Layout.idr     (Memory layout proofs)    │
-│  - Foreign.idr    (FFI declarations)        │
+│  - LayoutProofs.idr (Alignment proofs)      │
+│  - Tier2.idr      (Honest signed-attest)    │
+│  src/interface/legacy/                      │
+│  - Foreign.idr    (DEPRECATED FFI decls)    │
 └─────────────────┬───────────────────────────┘
                   │
                   │ generates (at compile time)
@@ -53,11 +58,20 @@ This library follows the **Hyperpolymath RSR Standard** for ABI and FFI design:
 ```
 vcl_total/
 ├── src/
-│   ├── abi/                    # ABI definitions (Idris2)
-│   │   ├── Types.idr           # Core type definitions with proofs
-│   │   ├── Layout.idr          # Memory layout verification
-│   │   └── Foreign.idr         # FFI function declarations
-│   └── lib/                    # Core library (any language)
+│   ├── interface/
+│   │   ├── abi/                # Honest ABI definitions (Idris2)
+│   │   │   ├── Types.idr       # Core type definitions with proofs
+│   │   │   ├── Layout.idr      # Memory layout (paddingFor, alignUp)
+│   │   │   ├── LayoutProofs.idr # Alignment-divides + bounds proofs
+│   │   │   └── Tier2.idr       # Idris bindings → vclut_verify_wire
+│   │   │                       # (Ed25519 attestation, honest path)
+│   │   ├── legacy/             # Pre-Phase-5 plumbing (DEPRECATED)
+│   │   │   └── Foreign.idr     # Legacy libvqlut bindings (Zig
+│   │   │                       # asserts level; no Idris certificate)
+│   │   ├── attest/             # Tier-2 Rust: signed attestation
+│   │   ├── recompute-wasm/     # Tier-1 Rust: consumer-side recompute
+│   │   └── ffi/                # Legacy Zig multi-stage pipeline
+│   └── core/                   # Idris2 corpus (the certifier itself)
 │
 ├── ffi/
 │   └── zig/                    # FFI implementation (Zig)

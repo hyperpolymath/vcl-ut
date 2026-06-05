@@ -1,6 +1,5 @@
--- SPDX-License-Identifier: AGPL-3.0-or-later
--- Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-
+-- SPDX-License-Identifier: MPL-2.0
+-- Copyright (c) Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 ||| VCL-total Core Decide — canonical safety deciders (single source of truth)
 |||
 ||| Phase 2 of the standards#124 HOLE remediation de-vacuizes the Level
@@ -672,13 +671,69 @@ entailsPairs (EpReqEntails a1 a2 _ :: rest) =
   (agentId a1, agentId a2) :: entailsPairs rest
 entailsPairs (_ :: rest) = entailsPairs rest
 
-||| Direct circular ENTAILS (a⊨b and b⊨a). Full graph-cycle detection is
-||| OWED (disclosed); this catches the direct symmetry violation.
+||| Direct circular ENTAILS (a⊨b and b⊨a). Retained as a fast-path /
+||| historical name; the canonical L10 check is `hasTransitiveCycle`
+||| below, which subsumes this case.
 public export
 hasCircularEntails : List EpistemicRequirement -> Bool
 hasCircularEntails reqs =
   let pairs = entailsPairs reqs
   in any (\(a, b) => any (\(c, d) => a == d && b == c) pairs) pairs
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- Transitive ENTAILS cycle detection (Phase 5 OWED → RESOLVED)
+-- ═══════════════════════════════════════════════════════════════════════
+--
+-- The Phase-4b L10 check restricted itself to direct (a⊨b, b⊨a) cycles
+-- with full graph-cycle detection explicitly OWED in
+-- VERIFICATION-STANCE.adoc. The closure below upgrades the check to
+-- arbitrary-length cycles via finite-fuel transitive closure.
+--
+-- All three functions are structurally total. No believe_me /
+-- postulate / assert_* — pure list recursion.
+
+||| One step of transitive closure: for each `(a, b)` and `(b, c)` in
+||| `pairs`, add `(a, c)`. Returns the union of `pairs` and the one-hop
+||| extension (`++` rather than dedup; the cycle check `any ((==) <$> fst
+||| <*> snd)` is duplicate-insensitive).
+private
+extendFrom : List (String, String) -> (String, String) -> List (String, String)
+extendFrom pairs (a, b) =
+  map (\q => (a, snd q)) (filter (\q => fst q == b) pairs)
+
+public export
+transStep : List (String, String) -> List (String, String)
+transStep pairs = pairs ++ concatMap (extendFrom pairs) pairs
+
+||| Iterate `transStep` `n` times.
+public export
+transCloseN : Nat -> List (String, String) -> List (String, String)
+transCloseN Z       ps = ps
+transCloseN (S k)   ps = transCloseN k (transStep ps)
+
+||| Transitive closure of an ENTAILS edge list, fuel-bounded by
+||| `length pairs`. For a graph with `m` distinct edges, every reachable
+||| `(a, b)` is present after at most `m` doubling steps; `m` linear
+||| steps suffice because each step extends paths by one hop and any
+||| simple cycle of length `n` requires `n ≤ m` edges. (Non-simple paths
+||| cannot introduce new `(v, v)` edges that simple paths miss.)
+public export
+transClose : List (String, String) -> List (String, String)
+transClose ps = transCloseN (length ps) ps
+
+||| True iff the ENTAILS graph contains *any* cycle (direct or
+||| transitive). A cycle exists iff some self-edge `(a, a)` appears in
+||| the transitive closure.
+|||
+||| Strictly stronger than `hasCircularEntails`: every direct cycle is
+||| also a length-2 transitive cycle, and additionally catches
+||| `a⊨b⊨c⊨a` and longer chains.
+public export
+hasTransitiveCycle : List EpistemicRequirement -> Bool
+hasTransitiveCycle reqs =
+  let pairs  = entailsPairs reqs
+      closed = transClose pairs
+  in any (\p => fst p == snd p) closed
 
 ||| L10 STRUCTURAL part: an EPISTEMIC clause is present, has ≥1 agent,
 ||| and every requirement-referenced agent is declared. This is exactly
@@ -695,17 +750,25 @@ epiStructOK stmt = case epistemicClause stmt of
       []       => True
       (_ :: _) => False
 
-||| L10 ACYCLIC part: no direct (a⊨b, b⊨a) ENTAILS cycle among the
-||| clause's requirements. This is the ONE L10 sub-property that is
+||| L10 ACYCLIC part: no ENTAILS cycle (direct *or* transitive) among
+||| the clause's requirements. This is the ONE L10 sub-property that is
 ||| provably NOT closed under join (two acyclic requirement sets can
 ||| union to a cyclic one), so it is isolated here and supplied as an
 ||| explicit composition side-condition (see `Composition.JoinSideCondition`
 ||| and the disclosure in VERIFICATION-STANCE.adoc) — never faked.
+|||
+||| Phase 5 upgrade: previously routed through `hasCircularEntails`
+||| (direct cycles only); now uses `hasTransitiveCycle` (finite-fuel
+||| transitive closure), closing the disclosed "full graph-cycle
+||| detection OWED" gap. The body signature is unchanged, so all
+||| consumers (Checker / Composition / Levels) and the side-condition
+||| machinery continue to work verbatim — the predicate is just
+||| strictly stronger.
 public export
 epiNoCycle : Statement -> Bool
 epiNoCycle stmt = case epistemicClause stmt of
   Nothing                     => False
-  Just (EpClause _ reqs)      => not (hasCircularEntails reqs)
+  Just (EpClause _ reqs)      => not (hasTransitiveCycle reqs)
 
 ||| L10 — EpistemicSafe: clause present, ≥1 agent, all requirement agents
 ||| declared, AND no direct ENTAILS cycle. Mirrors `Checker.checkLevel10`
