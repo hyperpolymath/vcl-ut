@@ -1,7 +1,7 @@
 = VCL-total Tier-2 Attestation Format v1 (P5d, vcl-ut#25)
 :toc:
 
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
 Normative format for the **Tier-2 (C-ABI trusted-certifier

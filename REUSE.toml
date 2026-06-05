@@ -1,0 +1,102 @@
+# SPDX-License-Identifier: MPL-2.0
+# REUSE-compliant global licensing metadata (REUSE Specification 3.3, REUSE.toml v1).
+# Covers files that legitimately cannot carry inline SPDX headers.
+# Files with inline SPDX headers take precedence; "aggregate" adds
+# copyright notices where the licence is already declared inline.
+
+version = 1
+
+# ── Documentation files (CC-BY-SA-4.0) ───────────────────────────────────────
+# Docs, whitepapers, guides, specs: all .adoc, .md, .bib, .tex, .cff, .txt
+# under docs/, plus root-level docs and scattered README/QUICKSTART/etc. files.
+
+[[annotations]]
+path = [
+  "docs/**",
+  "**/*.adoc",
+  "**/*.md",
+  "**/*.bib",
+  "**/*.tex",
+  "docs/attribution/CITATION.cff",
+  "docs/legal/EXHIBIT-A-ETHICAL-USE.txt",
+  "docs/legal/EXHIBIT-B-QUANTUM-SAFE.txt",
+  ".github/SUPPORT",
+  "CHANGELOG.md",
+  "CODE_OF_CONDUCT.md",
+  "CONTRIBUTING.md",
+  "SECURITY.md",
+  "README.adoc.invariants.md",
+  "TEST-NEEDS.md",
+  "PROOF-NEEDS.md",
+  "llm-warmup-dev.md",
+  "llm-warmup-user.md",
+  "verification/README.adoc",
+  "verification/proofs/README.adoc",
+  "verification/benchmarks/README.adoc",
+  "verification/coverage/README.adoc",
+  "verification/fuzzing/README.adoc",
+  "verification/safety_case/README.adoc",
+  "verification/simulations/README.adoc",
+  "verification/traceability/README.adoc",
+  "verification/tests/README.adoc",
+  "examples/README.adoc",
+  "features/README.adoc",
+  "features/boj-server/README.adoc",
+  "features/panic-attacker/README.adoc",
+  "features/ssg/README.adoc",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "CC-BY-SA-4.0"
+
+# ── Configuration, scripts, data, and other non-doc files (MPL-2.0) ──────────
+# Files that cannot carry inline headers: dotfiles, JSON, YAML, TOML configs,
+# shell scripts without headers, lockfiles, AI manifests, Nix/Guix, etc.
+
+[[annotations]]
+path = [
+  ".editorconfig",
+  ".envrc",
+  ".gitattributes",
+  ".gitignore",
+  ".gitlab-ci.yml",
+  ".hypatia-ignore",
+  ".pre-commit-config.yaml",
+  ".tool-versions",
+  ".zenodo.json",
+  "Cargo.lock",
+  "eclexiaiser.toml",
+  "k9iser.toml",
+  "rescript.json",
+  "stapeln.toml",
+  "contractile.just",
+  "Cargo.toml",
+  "EXPLAINME.adoc",
+  "QUICKSTART-DEV.adoc",
+  "QUICKSTART-MAINTAINER.adoc",
+  "QUICKSTART-USER.adoc",
+  "README.adoc",
+  "ROADMAP.adoc",
+  "arcvix-10-level-query-safety.bib",
+  "arcvix-10-level-query-safety.tex",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"
+
+[[annotations]]
+path = [
+  ".devcontainer/**",
+  ".github/**",
+  ".machine_readable/**",
+  ".well-known/**",
+  "container/**",
+  "contractiles/**",
+  "examples/**",
+  "features/**",
+  "src/**",
+  "verification/**",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
+SPDX-License-Identifier = "MPL-2.0"

@@ -1,7 +1,7 @@
 = vcltotal-attest
 :toc:
 
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
 P5d of hyperpolymath/vcl-ut#25 — **Tier-2: C-ABI trusted-certifier

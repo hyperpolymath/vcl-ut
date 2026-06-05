@@ -1,7 +1,7 @@
 = Why affinescriptiser is not used for the recompute-wasm entry
 :toc:
 
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
 P5c (vcl-ut#25) ships the recompute-PCC tier as a `wasm32` module
