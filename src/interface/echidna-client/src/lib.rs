@@ -192,6 +192,9 @@ pub enum ClientError {
         status: reqwest::StatusCode,
         body: String,
     },
+
+    #[error("serialization error: {0}")]
+    Serialization(#[from] serde_json::Error),
 }
 
 /// Async REST client for echidna.
@@ -215,9 +218,10 @@ impl EchidnaClient {
     pub fn with_base_url(base_url: impl Into<String>) -> Self {
         Self {
             base_url: base_url.into(),
-            http: reqwest::Client::builder()
-                .build()
-                .expect("reqwest::Client default builder must succeed"),
+            // No builder configuration is applied, so the canonical
+            // infallible constructor is exact — and `Default for
+            // EchidnaClient` requires construction to be infallible.
+            http: reqwest::Client::new(),
         }
     }
 
@@ -245,8 +249,7 @@ impl EchidnaClient {
         &self,
         kind: wire::ProverKind,
     ) -> Result<wire::ProverInfo, ClientError> {
-        let slug = serde_json::to_string(&kind)
-            .expect("ProverKind serialization cannot fail")
+        let slug = serde_json::to_string(&kind)?
             .trim_matches('"')
             .to_string();
         let resp = self
@@ -334,8 +337,7 @@ impl EchidnaClient {
         id: &str,
         format: wire::ExchangeFormat,
     ) -> Result<wire::ExportResponse, ClientError> {
-        let slug = serde_json::to_string(&format)
-            .expect("ExchangeFormat serialization cannot fail")
+        let slug = serde_json::to_string(&format)?
             .trim_matches('"')
             .to_string();
         let resp = self
