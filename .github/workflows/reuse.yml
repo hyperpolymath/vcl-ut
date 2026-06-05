@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: MPL-2.0
+# Fail-closed REUSE compliance gate.
+# Blocks merge if any file is missing SPDX copyright/licence information.
+---
+name: REUSE compliance
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  reuse-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install reuse
+        run: pip install reuse
+
+      - name: Check REUSE compliance
+        run: reuse lint

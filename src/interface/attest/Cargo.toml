@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 
 # Standalone workspace root (same rationale as ../parse, ../recompute-wasm):
 # decoupled from the broken parent virtual workspace. This is the Tier-2
@@ -12,7 +12,7 @@
 name = "vcltotal-attest"
 version = "0.1.0"
 edition = "2021"
-license = "PMPL-1.0-or-later"
+license = "MPL-2.0"
 authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
 repository = "https://github.com/hyperpolymath/vcl-ut"
 description = "P5d (#25): Tier-2 C-ABI trusted-certifier attestation. Mints/verifies an Ed25519 signature binding (sha256(stmt_wire), sha256(schema_wire), level); the level comes from the conformance-pinned `vcltotal_parse::certified_level`. Fail-closed."

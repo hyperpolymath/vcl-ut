@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MPL-2.0
 
 # Standalone workspace root: decouples this trusted boundary crate from
 # the parent virtual workspace, whose pre-existing `src/interface`
@@ -11,7 +11,7 @@
 name = "vcltotal-parse"
 version = "0.1.0"
 edition = "2021"
-license = "PMPL-1.0-or-later"
+license = "MPL-2.0"
 authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
 repository = "https://github.com/hyperpolymath/vcl-ut"
 description = "P5a (#25): trusted, panic-free String -> Statement parser for VCL-total; faithful Rust mirror of src/core/Grammar.idr, feeding the Idris2 certifier across the C-ABI."
