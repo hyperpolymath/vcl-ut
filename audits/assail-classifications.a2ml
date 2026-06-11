@@ -1,0 +1,35 @@
+;; SPDX-License-Identifier: MPL-2.0
+;; assail-classifications.a2ml — audited panic-attack findings for vcl-ut.
+;;
+;; Read by panic-attack >= 2.5.5 (load_user_classifications): findings
+;; matching (file, category) flip to suppressed = true after the kanren
+;; structural pass. Entries are AUDITED-SOUND residuals with rationale;
+;; the registry lives apart from the source so a code edit cannot
+;; self-suppress (panic-attack CLAUDE.md, User-Classification Registry).
+;;
+;; Audit trail: 2026-06-11 estate-loop session — fresh panic-attack
+;; 2.5.5 scan; every entry inspected at source. The Tier2.idr
+;; assert_total finding from the same scan was FIXED at source (fuel
+;; recursion), not classified — classification is only for sound
+;; residuals that cannot reasonably be removed.
+
+(assail-classifications
+  ;; ── FFI boundary unsafe: required by the C ABI, reviewed ─────────
+  ;; Mirrors the reference pattern in hyperpolymath/007
+  ;; audits/assail-classifications.a2ml (zig_bridge.rs UnsafeCode).
+  (classification
+    (file "src/interface/recompute-wasm/src/lib.rs")
+    (category "UnsafeCode")
+    (audit "in-file UNSAFE POLICY (lib.rs:40-46) + deny(clippy::undocumented_unsafe_blocks)")
+    (rationale "only unsafe is the documented host/guest memory-ABI block (alloc/dealloc pair); all decision logic lives in the forbid(unsafe_code) vcltotal-parse crate"))
+  (classification
+    (file "src/interface/attest/src/lib.rs")
+    (category "UnsafeCode")
+    (audit "in-file UNSAFE POLICY (lib.rs:38-42) + deny(clippy::undocumented_unsafe_blocks)")
+    (rationale "single documented C-ABI block in vclut_rs_verify with null/len checks and fail-closed -1 returns; decode logic in forbid(unsafe_code) crate"))
+  (classification
+    (file "ffi/zig/src/lib.zig")
+    (category "UnsafeCode")
+    (audit "Zig C-ABI bridge — single pointer cast at the exported boundary")
+    (rationale "the cast is the FFI contract itself; callee validates length before use"))
+)
