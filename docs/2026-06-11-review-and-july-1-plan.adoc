@@ -1,0 +1,144 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+= VCL-total Deep Review & July-1 Plan (2026-06-11)
+:toc: left
+:toclevels: 2
+:sectnums:
+
+== Purpose and verdict
+
+Fresh full review of VCL-total (vcl-ut), 2026-06-11, paired with the
+VeriSimDB review (`verisimdb/docs/reviews/2026-06-11-deep-review-and-july-1-plan.adoc`),
+with a targeted plan to 2026-07-01.
+
+*Verdict in one paragraph.* The formal core is real and unusually
+disciplined: ~12.4k LOC of Idris2 under `%default total`, the 10 safety
+levels formalised as dependent types with subsumption/soundness/totality/
+monotonicity, zero proof escapes (the `believe_me: 0` badge is true — all
+grep hits are audit-banner comments — and CI greps for escape symbols as a
+hard gate), plus a 3.4k-LOC Rust trusted-boundary parser with property
+tests and a written wire format. The single disqualifying flaw for an
+outside visitor is that *a standalone clone cannot build at all*: the root
+workspace hard-depends on `path = "../../../echidna/crates/echidna-core"`,
+which only resolves on the estate's sibling layout (CI passes only because
+it clones echidna as a sibling). Secondary issues are honesty-of-surface:
+a stale tests badge, a dummy `src/core` Rust crate, a duplicated Idris
+corpus, and no executable connection to VeriSimDB despite the README
+triad.
+
+== Verified ground truth (this session)
+
+* Root workspace: `cargo check` *fails to load* —
+  `failed to read /home/user/echidna/crates/echidna-core/Cargo.toml`.
+  Blast radius: `cargo build`/`cargo test` are dead for any standalone
+  clone, before compiling a single crate.
+* `src/interface/parse` (deliberately its own workspace root):
+  `cargo check` clean in 9.8 s; *19/19 tests pass* including two
+  property-based suites.
+* Idris: 29 `.idr` files, 12,434 LOC; `%default total`; zero
+  `believe_me`/`postulate`/`assert_*`/`idris_crash`/`sorry` outside
+  banner comments; `proof-corpus.yml` builds with pinned Idris2 0.8.0 and
+  fail-closes on escape symbols.
+* Rust LOC ~6.0k; 79 `#[test]` functions in-tree (only the parse
+  workspace's 19 are runnable standalone — the README badge says
+  "tests: 49 pass", which matches neither number).
+
+Per-crate reality:
+
+[cols="1,1,3"]
+|===
+|Crate |Verdict |Notes
+
+|`src/interface/parse` (3,418 LOC)
+|REAL — the Rust spine
+|Lexer, parser, AST, schema, decider, wire format (+`WIRE-FORMAT.adoc`),
+conformance-emit tests against the Idris side. Builds standalone by
+design.
+
+|`src/interface/echidna-client` (686)
+|REAL
+|Async REST client for the echidna proof engine, wiremock round-trip
+tests.
+
+|`src/interface` (umbrella)
+|The blocker
+|Carries `echidna-core = { path = "../../../echidna/..." }` ("Package 4:
+echidna-core owns the proof surface"). This is what kills the standalone
+workspace.
+
+|`src/core`
+|DUMMY
+|4-line `lib.rs`: "Actual implementation is in Idris files." The real
+checker lives in Idris (`Core/{Grammar,Schema,Decide,Levels,Checker,
+Epistemic,Composition}.idr`).
+
+|fmt (86) / lint (150) / lsp (637) / dap (437) / attest (386) /
+recompute-wasm (198)
+|THIN SHELLS
+|Honest scaffolds; not July-critical.
+|===
+
+The 10-level claim: formalised in `Core/Levels.idr` (each level a
+predicate over Statement + Schema; documented proofs of subsumption,
+soundness, totality, monotonicity) — this is the genuinely distinctive
+asset. Runtime enforcement today flows through the parse crate's decider
+for the static levels; the deeper levels (proof/effect/resource,
+L9–L10) bind to echidna and remain estate-coupled.
+
+== Where claims outrun the code
+
+. *"Clone and build" is broken* for anyone outside the estate — the one
+  flaw a visitor hits in minute one.
+. *Tests badge stale* (49 vs 79 in-tree vs 19 runnable standalone).
+. *No executable seam to VeriSimDB.* `vcl`/`vcltotal` appear in
+  verisimdb only in README/EXPLAINME prose.
+. *Duplicated Idris corpus* (`verification/proofs/corpus/VclTotal/...`
+  vs `src/...`) with no statement of which is canonical.
+. *`src/core` placeholder* can mislead a Rust-first reader about where
+  the substance lives (it's the Idris).
+
+== The July-1 plan
+
+Effort: S = half-day, M = 1–2 days. Items 1–3 are the credibility core.
+
+. *Standalone build fix (M, week 2, the headline).* Decouple
+  `echidna-core` from the default build: feature-gate the proof surface
+  behind `--features echidna` with a vendored trait shim (or split the
+  umbrella `src/interface` crate so the workspace loads without the
+  sibling). Acceptance: `git clone && cargo test` green with zero
+  siblings; the echidna-coupled E2E stays as a separate CI job that
+  clones the sibling (as `e2e.yml` already does).
+. *Badge + README truth pass (S, week 2).* Tests badge reflects what a
+  standalone clone runs; state plainly that the checker's substance is
+  Idris and `src/core` is a placeholder; name the canonical Idris corpus
+  and mark the other as generated/mirror.
+. *`vclt-gate` binary (M, week 3).* Tiny stdin->stdout admissibility
+  gate over the parse crate's decider: statement in, verdict JSON out
+  with level-tagged reasons (static levels L1–L4). This is the smallest
+  real bridge: VeriSimDB's VQL execute path invokes it when present
+  (env-gated), making the README triad (engine / VCL / VCL-total)
+  executable. Demo transcript lands in both READMEs.
+. *Release hygiene (S, week 3).* CI green; CHANGELOG entry; tag
+  `v0.2.0` alongside VeriSimDB's; QUICKSTART verified against a fresh
+  clone.
+
+Non-goals for July 1: L9–L10 runtime binding beyond echidna-client,
+LSP/DAP completion, the .tex paper, full VCL surface coverage in the
+parser. All stay on the roadmap, labelled.
+
+== Definition of "respectable" (acceptance criteria)
+
+. Fresh standalone clone: `cargo test` green, Idris corpus typechecks in
+  CI, no sibling checkouts required for the default path.
+. The admissibility gate runs inside a VeriSimDB demo — code, not prose.
+. README badges and claims all true as of the tag.
+
+== Strengths worth showcasing
+
+The total, escape-free Idris formalisation of the 10 levels (with a CI
+gate that keeps it that way); the cross-language wire-format conformance
+between Idris and Rust; property-tested trusted-boundary parsing; and
+the explicit consonance framing shared with VeriSimDB. Nothing in this
+plan dilutes those — it removes the packaging flaws that currently stop
+anyone from seeing them.
