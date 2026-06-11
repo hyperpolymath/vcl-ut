@@ -139,15 +139,18 @@ listToBuffer xs = do
 ||| a `List Bits8`. Reads bytes `[0, n)` in order.
 private
 bufferToList : Buffer -> Int -> IO (List Bits8)
-bufferToList buf n = go 0 []
+bufferToList buf n = go (integerToNat (cast n)) 0 []
   where
-    go : Int -> List Bits8 -> IO (List Bits8)
-    go i acc =
-      if i >= n
-        then pure (reverse acc)
-        else do
-          b <- getBits8 buf i
-          assert_total (go (i + 1) (b :: acc))
+    -- Structural recursion on the remaining-byte fuel: the totality
+    -- checker accepts this directly, closing the last assert_total in
+    -- the Tier-2 ABI (proof-corpus gate: zero proof-escape). For n <= 0
+    -- the fuel is Z and we return [] — same semantics as the previous
+    -- `i >= n` guard.
+    go : Nat -> Int -> List Bits8 -> IO (List Bits8)
+    go Z     _ acc = pure (reverse acc)
+    go (S k) i acc = do
+      b <- getBits8 buf i
+      go k (i + 1) (b :: acc)
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Safe public wrapper
