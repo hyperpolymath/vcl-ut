@@ -10,6 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-06-13
+
+### Added
+
+**vclt-gate — VeriSimDB admissibility gate producer** (B1–B3).
+`vclt-gate` is a standalone binary (`src/interface/parse/src/bin/vclt-gate.rs`)
+that wraps the existing trusted parser to act as an out-of-process
+admissibility gate for VeriSimDB's VCL executor:
+
+- **Binary protocol**: reads a single-line JSON payload
+  `{"schema_version":1,"statement":"...","schema":{}}` from stdin;
+  exits 0 (admit, `admissible:true`, `certified_level` ≥ 0),
+  1 (reject, `admissible:false`, `reasons:[...]`),
+  or 2 (gate_failed, unexpected error).
+- **`certified_level` surface** (`src/interface/parse/src/decider.rs`):
+  the `Decider` now exposes `certified_level_for` — the integer level
+  the corpus would certify for a parsed statement — directly to the gate
+  output, so consumers see the same grade the proof corpus assigns.
+- **Gate test suite** (`src/interface/parse/tests/gate.rs`): 6 tests
+  covering admit / reject / injection / level-plumbing; added to
+  `src/interface/parse/Cargo.toml` as an integration test target.
+- **Workspace cleanup** (`Cargo.toml`): removed `src/interface/lsp`,
+  `src/interface/dap`, `src/interface/echidna-client`, and `src/interface`
+  (all have external path-deps that break standalone CI); updated comment
+  explaining the `src/interface/parse` separate-workspace-root design.
+
 ### Verified
 
 **VclTotal proof corpus — Phase 0→4 remediation + Phase 5 boundary

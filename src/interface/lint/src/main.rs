@@ -25,7 +25,10 @@ fn main() -> std::io::Result<()> {
     let meta = fs::metadata(&input_path)
         .map_err(|e| std::io::Error::new(e.kind(), format!("{}: {e}", input_path.display())))?;
     if meta.len() > MAX_FILE_BYTES {
-        eprintln!("error: input file exceeds 50 MiB limit ({} bytes)", meta.len());
+        eprintln!(
+            "error: input file exceeds 50 MiB limit ({} bytes)",
+            meta.len()
+        );
         std::process::exit(1);
     }
     let content = fs::read_to_string(&input_path)

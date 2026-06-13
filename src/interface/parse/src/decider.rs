@@ -175,6 +175,15 @@ fn vqltype_eq(a: &VqlType, b: &VqlType) -> bool {
 }
 
 fn types_compatible(a: &VqlType, b: &VqlType) -> bool {
+    // On a wire-decoded statement, `resolveExprType` returns `TAny` for every
+    // non-`EField`/`ESubquery` node (literals, params, `*`, …), since the wire
+    // format omits `VqlType` annotations (see crate-level note in `decider.rs`).
+    // `TAny` is therefore the "not yet resolved" sentinel and is universally
+    // compatible — otherwise *every* literal comparison would fail L2 even for
+    // correctly-typed queries.
+    if matches!(a, VqlType::TAny) || matches!(b, VqlType::TAny) {
+        return true;
+    }
     if vqltype_eq(a, b) {
         return true;
     }
@@ -506,6 +515,32 @@ fn check_level(n: u8, stmt: &Statement, s: &OctadSchema) -> bool {
 
 fn safety_level_to_int(l: SafetyLevel) -> u8 {
     l as u8
+}
+
+/// Public wrapper around `check_level` for the vclt-gate binary and tests.
+/// Returns `true` if the statement satisfies level `n` against `schema`.
+/// Level 0 always passes; levels > 10 always fail (guard for future extension).
+pub fn check_level_n(n: u8, stmt: &Statement, schema: &OctadSchema) -> bool {
+    check_level(n, stmt, schema)
+}
+
+/// Human name for safety level `n` (matches the `SafetyLevel` enum tag and
+/// the `levels[].name` field in the vclt-gate JSON response).
+pub fn level_name(n: u8) -> &'static str {
+    match n {
+        0 => "ParseSafe",
+        1 => "SchemaBound",
+        2 => "TypeCompat",
+        3 => "NullSafe",
+        4 => "InjectionProof",
+        5 => "ResultTyped",
+        6 => "CardinalitySafe",
+        7 => "EffectTracked",
+        8 => "TemporalSafe",
+        9 => "LinearSafe",
+        10 => "EpistemicSafe",
+        _ => "Unknown",
+    }
 }
 
 /// Faithful port of `Checker.certifiedLevel`:

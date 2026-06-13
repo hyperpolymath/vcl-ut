@@ -110,7 +110,12 @@ pub fn parse(input: &str) -> Result<Statement, ParseError> {
 }
 
 fn parse_statement(p: &mut P) -> Result<Statement, ParseError> {
-    p.eat_kw("SELECT")?;
+    // Accept SELECT (legacy) and INSPECT (VCL epistemic read request) interchangeably.
+    if p.is_kw("INSPECT") || p.is_kw("VERIFY") {
+        p.bump();
+    } else {
+        p.eat_kw("SELECT")?;
+    }
     let select_items = parse_select_items(p)?;
     p.eat_kw("FROM")?;
     let source = parse_source(p)?;
@@ -470,7 +475,12 @@ fn parse_primary(p: &mut P) -> Result<Expr, ParseError> {
             if peek_modality(p).is_some() {
                 return Ok(Expr::Field(parse_field_ref(p)?));
             }
-            p.err(format!("unexpected word `{w}` in expression"))
+            // Bare identifier not preceded by $ — treat as an unqualified
+            // name parameter (schema-unresolved; fails SchemaBound at L1 if
+            // the schema is strict, but is not an injection concern).
+            let name = w.clone();
+            p.bump();
+            Ok(Expr::Param(name))
         }
         _ => p.err("expected an expression"),
     }

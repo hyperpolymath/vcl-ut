@@ -68,11 +68,9 @@ fn bench_query_parsing(c: &mut Criterion) {
 
     for n in [10, 50, 100] {
         let query = build_n_line_query(n);
-        group.bench_with_input(
-            BenchmarkId::new("n_line_query", n),
-            &query,
-            |b, q| b.iter(|| black_box(format_vqlut(black_box(q.as_str())))),
-        );
+        group.bench_with_input(BenchmarkId::new("n_line_query", n), &query, |b, q| {
+            b.iter(|| black_box(format_vqlut(black_box(q.as_str()))))
+        });
     }
 
     group.finish();
@@ -101,11 +99,9 @@ fn bench_lint_validation(c: &mut Criterion) {
 
     for n in [10, 50, 100] {
         let query = build_n_line_query(n);
-        group.bench_with_input(
-            BenchmarkId::new("n_line_lint", n),
-            &query,
-            |b, q| b.iter(|| black_box(lint_vqlut(black_box(q.as_str())))),
-        );
+        group.bench_with_input(BenchmarkId::new("n_line_lint", n), &query, |b, q| {
+            b.iter(|| black_box(lint_vqlut(black_box(q.as_str()))))
+        });
     }
 
     group.finish();
@@ -141,7 +137,7 @@ fn bench_round_trip_pipeline(c: &mut Criterion) {
 
     group.bench_function("idempotent_double_format", |b| {
         b.iter(|| {
-            let first  = format_vqlut(black_box(MEDIUM_QUERY));
+            let first = format_vqlut(black_box(MEDIUM_QUERY));
             let second = format_vqlut(black_box(&first));
             black_box(second)
         })

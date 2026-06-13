@@ -8,7 +8,7 @@ Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 
 image:https://zenodo.org/badge/DOI/10.5281/zenodo.19329501.svg[DOI,link="https://doi.org/10.5281/zenodo.19329501"]
 image:https://img.shields.io/badge/believe__me-0-brightgreen[believe_me: 0]
-image:https://img.shields.io/badge/tests-49_pass-brightgreen[tests: 49 pass]
+image:https://img.shields.io/badge/tests-102_pass-brightgreen[tests: 102 pass]
 image:https://img.shields.io/badge/OpenSSF-Best_Practices-green?logo=opensourcesecurity[OpenSSF Best Practices,link="https://www.bestpractices.dev/en/projects/new?repo_url=https://github.com/hyperpolymath/vcl-ut"]
 
 IMPORTANT: This project was renamed on 2026-04-05. Its former name used

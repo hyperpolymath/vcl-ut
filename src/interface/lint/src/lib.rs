@@ -41,8 +41,8 @@ pub fn lint_vqlut(content: &str) -> Vec<LintIssue> {
     // Check for lowercase keywords: flag keywords that appear (case-insensitive)
     // but are not already uppercase in the original text.
     let keywords = [
-        "select", "from", "where", "group", "order", "having", "limit",
-        "offset", "effects", "proof", "consume", "usage",
+        "select", "from", "where", "group", "order", "having", "limit", "offset", "effects",
+        "proof", "consume", "usage",
     ];
     for (i, line) in content.lines().enumerate() {
         let line_num = i + 1;
@@ -71,7 +71,9 @@ pub fn lint_vqlut(content: &str) -> Vec<LintIssue> {
         if trimmed.starts_with("SELECT") && trimmed.contains("SELECT *") {
             issues.push(LintIssue {
                 line: line_num,
-                message: "Prefer explicit column list over SELECT * for result-type safety (Level 5)".to_string(),
+                message:
+                    "Prefer explicit column list over SELECT * for result-type safety (Level 5)"
+                        .to_string(),
             });
         }
     }

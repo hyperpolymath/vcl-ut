@@ -14,8 +14,8 @@
 pub fn format_vqlut(content: &str) -> String {
     let mut formatted = String::new();
     let keywords = [
-        "SELECT", "FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT",
-        "OFFSET", "EFFECTS", "PROOF", "CONSUME",
+        "SELECT", "FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT", "OFFSET", "EFFECTS",
+        "PROOF", "CONSUME",
     ];
 
     for line in content.lines() {

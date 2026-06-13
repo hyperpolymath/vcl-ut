@@ -254,8 +254,14 @@ fn e2e_format_then_lint_clean_query() {
     let issues = lint_vqlut(&formatted);
     // After formatting, all keywords are uppercase (they already were).
     // Lines 1-2 still lack semicolons.
-    let semicolon_count = issues.iter().filter(|i| i.message.contains("semicolon")).count();
-    assert_eq!(semicolon_count, 2, "Formatted output: lines 1,2 lack semicolons");
+    let semicolon_count = issues
+        .iter()
+        .filter(|i| i.message.contains("semicolon"))
+        .count();
+    assert_eq!(
+        semicolon_count, 2,
+        "Formatted output: lines 1,2 lack semicolons"
+    );
 }
 
 #[test]
@@ -314,7 +320,10 @@ fn aspect_empty_input_format() {
 #[test]
 fn aspect_empty_input_lint() {
     let issues = lint_vqlut("");
-    assert!(issues.is_empty(), "Empty input should produce no lint issues");
+    assert!(
+        issues.is_empty(),
+        "Empty input should produce no lint issues"
+    );
 }
 
 #[test]
@@ -323,7 +332,10 @@ fn aspect_whitespace_only_format() {
     // Each line trims to empty, so should not be indented
     let lines: Vec<&str> = output.lines().collect();
     for line in &lines {
-        assert!(line.is_empty(), "Whitespace-only lines should trim to empty");
+        assert!(
+            line.is_empty(),
+            "Whitespace-only lines should trim to empty"
+        );
     }
 }
 
@@ -349,9 +361,15 @@ fn aspect_single_character_input() {
 fn aspect_very_long_line() {
     let long_query = format!("SELECT {}", "col, ".repeat(1000));
     let formatted = format_vqlut(&long_query);
-    assert!(formatted.starts_with("  SELECT"), "Long lines should still be formatted");
+    assert!(
+        formatted.starts_with("  SELECT"),
+        "Long lines should still be formatted"
+    );
     let issues = lint_vqlut(&long_query);
-    assert!(!issues.is_empty(), "Long line without semicolon should be flagged");
+    assert!(
+        !issues.is_empty(),
+        "Long line without semicolon should be flagged"
+    );
 }
 
 #[test]
@@ -545,7 +563,10 @@ fn fmt_indents_offset() {
 #[test]
 fn fmt_indents_effects() {
     let output = format_vqlut("EFFECTS { Read }");
-    assert!(output.starts_with("  EFFECTS"), "EFFECTS should be indented");
+    assert!(
+        output.starts_with("  EFFECTS"),
+        "EFFECTS should be indented"
+    );
 }
 
 #[test]
@@ -557,14 +578,20 @@ fn fmt_indents_proof() {
 #[test]
 fn fmt_indents_consume() {
     let output = format_vqlut("CONSUME AFTER 1 USE");
-    assert!(output.starts_with("  CONSUME"), "CONSUME should be indented");
+    assert!(
+        output.starts_with("  CONSUME"),
+        "CONSUME should be indented"
+    );
 }
 
 #[test]
 fn fmt_does_not_indent_offset_prefix() {
     // "OFFSETTING" starts with OFFSET but is not the keyword
     let output = format_vqlut("OFFSETTING values");
-    assert!(!output.starts_with("  "), "OFFSETTING should not be indented");
+    assert!(
+        !output.starts_with("  "),
+        "OFFSETTING should not be indented"
+    );
 }
 
 // ============================================================================

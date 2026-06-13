@@ -19,8 +19,7 @@ use vcl_total::lint::lint_vqlut;
 /// Generate a random ASCII string that could plausibly appear in a VCL query.
 fn arb_query_fragment() -> impl Strategy<Value = String> {
     // Use printable ASCII range to avoid encoding-related panics.
-    prop::string::string_regex("[a-zA-Z0-9 _,.*=><;()'\"\\-\n]{1,200}")
-        .expect("regex must compile")
+    prop::string::string_regex("[a-zA-Z0-9 _,.*=><;()'\"\\-\n]{1,200}").expect("regex must compile")
 }
 
 /// Generate a string starting with a recognised VCL-total keyword (uppercase).
@@ -38,8 +37,7 @@ fn arb_keyword_line() -> impl Strategy<Value = String> {
 
 /// Generate a multi-line query by joining keyword lines.
 fn arb_multiline_query() -> impl Strategy<Value = String> {
-    prop::collection::vec(arb_keyword_line(), 1..=5)
-        .prop_map(|lines| lines.join("\n"))
+    prop::collection::vec(arb_keyword_line(), 1..=5).prop_map(|lines| lines.join("\n"))
 }
 
 // ============================================================================

@@ -27,19 +27,16 @@ harness = false
 members = [
     ".",
     "src/core",
-    "src/interface",
-    "src/interface/echidna-client",
     "src/interface/fmt",
     "src/interface/lint",
-    "src/interface/lsp",
-    "src/interface/dap",
 ]
-# NOTE: `src/interface/parse` (vcltotal-parse, #25 P5a) is deliberately
-# NOT a member here. The pre-existing `src/interface` member carries an
-# external path-dependency (`echidna-core = { path =
-# "../../../echidna/..." }`) that only resolves on the estate's
-# sibling-repo layout, so the whole virtual workspace fails to load in a
-# standalone checkout (e.g. CI). The trusted boundary parser must build
-# and gate in isolation, so it is its own workspace root (see
-# src/interface/parse/Cargo.toml `[workspace]`). Tracked separately:
-# the parent-workspace external-path-dep breakage is NOT a #25 concern.
+# NOTE: `src/interface` (vcltotal-interface) and `src/interface/echidna-client`
+# are NOT workspace members here. `src/interface` carries an external
+# path-dependency (`echidna-core = { path = "../../../echidna/..." }`) that only
+# resolves on the estate's sibling-repo layout; including it breaks `cargo build`
+# on any standalone checkout (CI, fresh clone). Those crates are built
+# separately only when the echidna sibling is present (the estate e2e CI job).
+#
+# `src/interface/parse` (vcltotal-parse, #25 P5a) is its own workspace root
+# (see `src/interface/parse/Cargo.toml`) — it has no external path-deps and
+# builds in isolation; the vclt-gate binary lives there.
