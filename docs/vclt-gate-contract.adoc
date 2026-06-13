@@ -1,0 +1,368 @@
+// SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+= vclt-gate — VCL-total ↔ VeriSimDB Admissibility Gate Contract
+:toc: left
+:toclevels: 3
+:sectnums:
+
+== Status
+
+*Contract v1 — frozen seam.* This document is the single source of truth
+for the `vclt-gate` boundary between VCL-total (this repo, *producer*) and
+VeriSimDB (the consonance engine, *consumer*). It is written so the two
+sides can be built in independent sessions against a fixed wire contract
+without further coordination. Changes to the request/response shape require
+a `schema_version` bump and an update here.
+
+Owners:
+
+* *Producer* (this repo): the `vclt-gate` binary — a thin, pure wrapper over
+  `vcltotal-parse`'s lexer/parser + `decider::certified_level`.
+* *Consumer* (VeriSimDB): invokes the binary on the VCL execute path before
+  a statement is allowed to affect live consonance state.
+
+== Why a CLI subprocess (and not FFI / a library / a network call)
+
+The seam must decouple two repositories with different toolchains
+(Rust+Idris here; Rust+Elixir there) *without* one linking the other or
+sharing a build. A subprocess with a JSON-line protocol is the thinnest
+such seam:
+
+* No shared Cargo workspace, no FFI ABI, no version-locked dependency edge.
+* The producer ships a self-contained binary; the consumer needs only its
+  path. Either side can be rebuilt independently.
+* The boundary is trivially testable from both sides with fixture JSON.
+
+A future in-process binding (Idris2-ABI / Zig-FFI per estate policy) MAY
+replace the transport later; it MUST preserve the request/response schemas
+defined here so the verdict semantics are unchanged.
+
+== What the gate decides (and what it does NOT)
+
+The gate answers one question:
+
+____
+Is this VCL statement *admissible up to its declared static safety level*?
+____
+
+It computes the *recompute-tier verdict* `decider::certified_level(stmt,
+schema)` — an independent re-establishment of the corpus-proved safety
+predicate `checkLevelNSound` (machine-checked once in
+`verification/proofs/corpus/VclTotal/Core/Checker.idr`). The ten levels
+are structurally decidable from the parsed statement + schema alone (see
+§"Safety levels"), so the gate needs *no* theorem prover and *no* engine
+state.
+
+The gate explicitly does **NOT**:
+
+* Verify attached `PROOF` clauses (`ZKP` / `PROVEN` / `SANCTIFY` / …). Proof
+  *discharge* is the engine/echidna tier, not the static-safety tier. A
+  statement can be gate-admissible and still have its proof rejected
+  downstream.
+* Touch live consonance state, the network, the filesystem (beyond its own
+  stdin/stdout), or any clock. It is a pure function of its input (§"Purity").
+* Maintain state between invocations. One statement per call (batching is a
+  reserved future `schema_version`).
+
+== Transport
+
+* The consumer invokes the producer binary as a child process.
+* *Request*: a single JSON object on `stdin` (UTF-8, may be pretty or
+  compact; the binary reads to EOF).
+* *Response*: a single JSON object on `stdout` (compact, one line,
+  newline-terminated).
+* Human/diagnostic text, if any, goes to `stderr` only and is never part of
+  the contract.
+* *Exit code* carries the coarse verdict (§"Exit codes") so a consumer can
+  branch without parsing JSON in the happy path; the JSON carries the detail.
+
+== Request schema (`schema_version: 1`)
+
+[source,json]
+----
+{
+  "schema_version": 1,
+  "statement": "ASSERT GRAPH.knows FROM HEXAD 'e-1' WHERE depth < 3 LIMIT 10",
+  "schema": { "...": "OctadSchema JSON, optional — see §Schema payload" }
+}
+----
+
+[cols="1,1,3"]
+|===
+|Field |Required |Meaning
+
+|`schema_version` |yes |Integer. The binary MUST reject a version it does
+not understand with exit code 2 and `error.kind = "unsupported_version"`.
+
+|`statement` |yes |The VCL statement *text*. The binary lexes + parses it;
+a parse failure is a verdict (`certified_level = -1`, reason category
+`syntactic`), *not* a gate error.
+
+|`schema` |no |The octad schema the schema-dependent levels (L1/L2/L3/L5)
+recompute against, in the JSON form of §"Schema payload". If omitted, the
+binary uses the empty schema; schema-dependent levels then fail closed
+(an unknown field cannot be certified type-compatible). Statements whose
+requested level is schema-independent (L4, L6–L10) are unaffected.
+|===
+
+Unknown request fields MUST be ignored (forward-compat).
+
+== Response schema (`schema_version: 1`)
+
+[source,json]
+----
+{
+  "schema_version": 1,
+  "admissible": false,
+  "requested_level": 4,
+  "certified_level": -1,
+  "levels": [
+    { "level": 1, "name": "SchemaBound",     "status": "pass" },
+    { "level": 2, "name": "TypeCompat",      "status": "pass" },
+    { "level": 3, "name": "NullSafe",        "status": "pass" },
+    { "level": 4, "name": "InjectionProof",  "status": "fail",
+      "reason": "WHERE clause contains a raw string literal" }
+  ],
+  "reasons": [
+    "L4 InjectionProof: WHERE clause contains a raw string literal"
+  ]
+}
+----
+
+[cols="1,3"]
+|===
+|Field |Meaning
+
+|`admissible` |`true` iff `certified_level == requested_level` (i.e.
+`certified_level != -1`). This is the single boolean the consumer gates on.
+
+|`requested_level` |Integer 0–10: the level the statement declares
+(`Statement.requested_level`, the `SafetyLevel` tag).
+
+|`certified_level` |Integer. `-1` if the statement fails any level `1..k`
+(where `k = requested_level`); otherwise `k`. Faithful return of
+`decider::certified_level`.
+
+|`levels` |Per-level breakdown for `1..k`. `status ∈ {pass, fail}`. The
+binary SHOULD evaluate all of `1..k` (not just up to the first failure) so
+the array is a complete diagnostic; `certified_level` still reflects the
+short-circuit semantics. A failing level SHOULD carry a human `reason`.
+
+|`reasons` |Flat list of human-readable rejection reasons (empty when
+admissible). Stable enough to surface to an API caller.
+|===
+
+A `syntactic` (parse) failure renders as `certified_level: -1`, an empty or
+single-entry `levels` array, and a `reasons` entry prefixed `L0 ParseSafe:`.
+
+== Safety levels (authoritative)
+
+The level vocabulary is owned by `src/interface/parse/src/ast.rs`
+(`enum SafetyLevel`, tags 0–10) and `decider::check_level`. The gate MUST
+use these names and numbers verbatim:
+
+[cols="1,2,4"]
+|===
+|Tag |Name |`check_level` predicate (today)
+
+|0 |ParseSafe |statement lexes + parses (precondition; not in `levels`)
+|1 |SchemaBound |`check_level1` — referenced fields exist in schema
+|2 |TypeCompat |`where_comparisons_compatible` — WHERE comparisons well-typed
+|3 |NullSafe |`null_safe_stmt` — no unguarded nullable access
+|4 |InjectionProof |`!where_has_string_lit` — *passes iff* WHERE has no raw string literal
+|5 |ResultTyped |`select_items_typed` — every SELECT item resolves to a type
+|6 |CardinalitySafe |`limit.is_some()` — a LIMIT bound is present
+|7 |EffectTracked |`effect_decl.is_some()` — an effect declaration is present
+|8 |TemporalSafe |`version_const.is_some()` — a version constraint is present
+|9 |LinearSafe |`linear_enforced` — linear-resource annotation satisfied
+|10 |EpistemicSafe |`epistemic_consistent_stmt` — epistemic clause well-formed + acyclic
+|===
+
+*Subsumption* (proved in `Core/Levels.idr`): certification at level N implies
+levels `1..N` all pass. The consumer therefore needs only `admissible` +
+`certified_level`; the `levels` array is diagnostic.
+
+The producer binary MUST obtain its verdict by calling
+`decider::certified_level`, never by re-implementing the predicates, so the
+corpus soundness proof carries through to the gate.
+
+== Schema payload
+
+The optional `schema` object mirrors `src/interface/parse/src/schema.rs`
+`OctadSchema` (itself a 1:1 mirror of `src/core/Schema.idr`): the eight
+modality schemas in record order, each a list of field definitions.
+
+[source,json]
+----
+{
+  "graph":      { "fields": [ { "name": "knows", "ty": "TOctad", "nullable": false, "indexed": true } ] },
+  "vector":     { "fields": [ { "name": "embedding", "ty": { "TVector": 384 }, "nullable": false, "indexed": false } ] },
+  "tensor":     { "fields": [] },
+  "semantic":   { "fields": [] },
+  "document":   { "fields": [ { "name": "body", "ty": "TString", "nullable": true, "indexed": true } ] },
+  "temporal":   { "fields": [] },
+  "provenance": { "fields": [] },
+  "spatial":    { "fields": [] }
+}
+----
+
+`ty` is a `VqlType` (schema.rs): nullary variants as bare strings
+(`"TString"`, `"TInt"`, `"TOctad"`, …); parameterised variants as a
+single-key object (`{"TVector": 384}`, `{"TList": "TString"}`,
+`{"TNull": "TInt"}`, `{"TRecord": [["k","TString"]]}`). The exact serde
+encoding is the *producer's* to finalise against the existing `wire.rs`
+codec; the consumer constructs this payload from its `SchemaRegistry`.
+Until the producer publishes a schema-emit helper, the consumer MAY send no
+`schema` (empty schema, schema-dependent levels fail closed) — this is the
+honest conservative default, not a silent pass.
+
+== Exit codes
+
+[cols="1,2,4"]
+|===
+|Code |Meaning |Consumer action
+
+|0 |Admissible (`certified_level == requested_level`) |Proceed; the
+statement may affect live state.
+|1 |Inadmissible — verdict rendered (`certified_level == -1`) |Reject the
+statement; surface `reasons` to the caller (e.g. HTTP 422).
+|2 |Gate error — no verdict (bad request JSON, unsupported version,
+internal guard) |Treat as gate-unavailable; apply the fail policy (§Consumer).
+|===
+
+The binary MUST NOT exit non-zero-2 for an *inadmissible* statement: a
+rejection is a successful decision (exit 1), distinct from a gate fault
+(exit 2). On exit 2 it SHOULD still emit a JSON object with an `error`
+field (`{ "schema_version": 1, "error": { "kind": "...", "message": "..." } }`).
+
+== Purity guarantee (producer)
+
+The binary is a pure function of (`statement`, `schema`): no network, no
+filesystem access beyond stdin/stdout, no clock, no environment-dependent
+behaviour, no randomness, deterministic for identical input. This is what
+makes it safe to call synchronously on the consumer's write path.
+`decider::certified_level` already satisfies this; the wrapper MUST NOT add
+impurity.
+
+== Consumer integration (VeriSimDB)
+
+=== Activation
+
+A single environment variable, opt-in:
+
+[cols="1,3"]
+|===
+|`VERISIM_VCLT_GATE` |Filesystem path to the `vclt-gate` binary. Unset or
+`"off"` ⇒ gating disabled (current behaviour; full backward compatibility).
+|===
+
+=== Invocation point
+
+In the VCL/VQL execute path, *before* a statement is permitted to mutate
+live consonance state — i.e. ahead of the propositional transitions
+(`DECLARE` / `ASSERT` / `RETRACT` / `MERGE` / `SPLIT` / `NORMALISE`).
+Read-only epistemic requests (`INSPECT` / `VERIFY`) MAY skip the gate or
+gate in report-only mode; that choice is the consumer's and does not affect
+this contract.
+
+=== Fail policy
+
+[cols="1,3"]
+|===
+|Gate disabled |Execute as today. No gating. (Opt-in safety.)
+|Exit 0 |Proceed.
+|Exit 1 |Reject with the verdict `reasons`.
+|Exit 2 / binary missing / timeout |*Fail closed* by default: a configured
+safety gate that cannot render a verdict MUST NOT be silently bypassed —
+reject with a "gate unavailable" error. Override with
+`VERISIM_VCLT_GATE_FAILMODE=open` (proceed-with-warning) for operators who
+want advisory-only gating.
+|===
+
+The consumer MUST bound the subprocess with a timeout (suggested 2 s) and
+treat a timeout as exit 2.
+
+== Versioning & forward-compatibility
+
+* `schema_version` is an integer on both request and response. v1 is this
+  document.
+* The producer rejects request versions it does not implement (exit 2,
+  `unsupported_version`) rather than guessing.
+* Reserved, non-breaking future extensions (require only a minor note here,
+  not a version bump, since they are additive and ignorable): a `context`
+  object on the request (actor, freshness, federation hints) feeding the
+  deeper obligation checks; a `batch` request form; per-level `evidence`
+  on the response.
+* The L5–L10 predicates already evaluate today; no part of this contract is
+  blocked on the echidna proof tier. The proof tier, when wired, is a
+  *separate* downstream check, not a change to this gate.
+
+== Worked examples
+
+=== Admitted
+
+Request:
+
+[source,json]
+----
+{ "schema_version": 1,
+  "statement": "INSPECT GRAPH.knows FROM HEXAD 'e-1' WHERE depth < 3 LIMIT 10",
+  "schema": { "graph": { "fields": [ { "name": "depth", "ty": "TInt", "nullable": false, "indexed": true } ] },
+              "vector": {"fields":[]}, "tensor": {"fields":[]}, "semantic": {"fields":[]},
+              "document": {"fields":[]}, "temporal": {"fields":[]}, "provenance": {"fields":[]}, "spatial": {"fields":[]} } }
+----
+
+Response (exit 0):
+
+[source,json]
+----
+{ "schema_version": 1, "admissible": true, "requested_level": 6, "certified_level": 6,
+  "levels": [ {"level":1,"name":"SchemaBound","status":"pass"},
+              {"level":2,"name":"TypeCompat","status":"pass"},
+              {"level":3,"name":"NullSafe","status":"pass"},
+              {"level":4,"name":"InjectionProof","status":"pass"},
+              {"level":5,"name":"ResultTyped","status":"pass"},
+              {"level":6,"name":"CardinalitySafe","status":"pass"} ],
+  "reasons": [] }
+----
+
+=== Rejected (injection)
+
+Request `statement`: `ASSERT … WHERE name = 'Robert'); DROP …'` (a raw
+string literal in WHERE), requested level 4.
+
+Response (exit 1):
+
+[source,json]
+----
+{ "schema_version": 1, "admissible": false, "requested_level": 4, "certified_level": -1,
+  "levels": [ {"level":1,"name":"SchemaBound","status":"pass"},
+              {"level":2,"name":"TypeCompat","status":"pass"},
+              {"level":3,"name":"NullSafe","status":"pass"},
+              {"level":4,"name":"InjectionProof","status":"fail",
+               "reason":"WHERE clause contains a raw string literal"} ],
+  "reasons": [ "L4 InjectionProof: WHERE clause contains a raw string literal" ] }
+----
+
+== Build checklists (per side)
+
+*Producer (this repo) — the `vclt-gate` binary:*
+
+. New bin crate (or `[[bin]]` on `vcltotal-parse`) reading the request JSON,
+  calling the existing lexer/parser then `decider::certified_level`.
+. Serialise the response per §"Response schema"; map verdict to exit codes.
+. Implement `OctadSchema` JSON (de)serialisation consistent with `wire.rs`.
+. Conformance tests from fixture request/response pairs (the two worked
+  examples are the first two fixtures).
+
+*Consumer (VeriSimDB):*
+
+. Read `VERISIM_VCLT_GATE`; when set, shell out at the execute-path
+  pre-mutation point with a bounded timeout.
+. Build the request (`statement` text + `schema` from `SchemaRegistry`,
+  or omit `schema` for the conservative default).
+. Branch on exit code per §"Fail policy"; surface `reasons` on rejection.
+. An integration test: admitted statement proceeds; injection statement is
+  rejected with the gate's reason — the executable form of the README's
+  engine / VCL / VCL-total triad.
