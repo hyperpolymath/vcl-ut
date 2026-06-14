@@ -36,12 +36,41 @@ impl std::error::Error for ParseError {}
 
 use crate::lexer::{Spanned, Tok};
 
+/// Maximum expression-nesting depth. The grammar is mutually recursive
+/// (`parse_expr → … → parse_primary → parse_expr` for parens/aggregates/
+/// sub-queries, and `parse_not → parse_not` for `NOT` chains), so an
+/// adversarial input of thousands of nested `(` or `NOT` would otherwise
+/// exhaust the native stack — a process abort (SIGABRT), which is NOT a
+/// `panic!` (so the crate's `deny(clippy::panic)` cannot see it) and NOT a
+/// typed `ParseError`, violating the total / fail-closed contract. Past
+/// this bound the parser returns a typed error instead. 256 levels is far
+/// beyond any real query yet leaves the stack comfortably bounded.
+const MAX_EXPR_DEPTH: usize = 256;
+
 struct P {
     toks: Vec<Spanned>,
     pos: usize,
+    /// Current expression-nesting depth (see [`MAX_EXPR_DEPTH`]).
+    depth: usize,
 }
 
 impl P {
+    /// Enter one expression-nesting level; a typed error past the bound
+    /// (so deep nesting fails closed, never overflows the stack).
+    fn enter(&mut self) -> Result<(), ParseError> {
+        self.depth = self.depth.saturating_add(1);
+        if self.depth > MAX_EXPR_DEPTH {
+            return self.err(format!(
+                "expression nesting too deep (limit {MAX_EXPR_DEPTH})"
+            ));
+        }
+        Ok(())
+    }
+    /// Leave one expression-nesting level (tracks actual stack depth, so a
+    /// wide-but-shallow expression is not falsely rejected).
+    fn leave(&mut self) {
+        self.depth = self.depth.saturating_sub(1);
+    }
     fn peek(&self) -> Option<&Tok> {
         self.toks.get(self.pos).map(|s| &s.tok)
     }
@@ -98,7 +127,11 @@ pub fn parse(input: &str) -> Result<Statement, ParseError> {
         msg: e.msg,
         at: Some(e.at),
     })?;
-    let mut p = P { toks, pos: 0 };
+    let mut p = P {
+        toks,
+        pos: 0,
+        depth: 0,
+    };
     let stmt = parse_statement(&mut p)?;
     if p.is_sym(";") {
         p.bump();
@@ -107,6 +140,148 @@ pub fn parse(input: &str) -> Result<Statement, ParseError> {
         return p.err("trailing tokens after statement");
     }
     Ok(stmt)
+}
+
+/// Parse a complete VCL-total *operation* — the superset entry point. A
+/// leading `MERGE`/`SPLIT`/`NORMALISE` keyword selects the S2 consonance
+/// [`Transition`] arm (`VclOp::Transit`); any other leading verb is a
+/// relational [`Statement`] (`VclOp::Query`). `parse` above is the
+/// query-only view (it fail-closes on the transition verbs, unchanged);
+/// `parse_op` is what the trusted gate routes through so a transition
+/// reaches `decider::certified_transition_level`, NEVER the `Statement`
+/// certifier.
+pub fn parse_op(input: &str) -> Result<VclOp, ParseError> {
+    let toks = crate::lexer::lex(input).map_err(|e| ParseError {
+        msg: e.msg,
+        at: Some(e.at),
+    })?;
+    let mut p = P {
+        toks,
+        pos: 0,
+        depth: 0,
+    };
+    let op = if p.is_kw("MERGE") || p.is_kw("SPLIT") || p.is_kw("NORMALISE") {
+        VclOp::Transit(parse_transition(&mut p)?)
+    } else {
+        VclOp::Query(Box::new(parse_statement(&mut p)?))
+    };
+    if p.is_sym(";") {
+        p.bump();
+    }
+    if p.peek().is_some() {
+        return p.err("trailing tokens after operation");
+    }
+    Ok(op)
+}
+
+/// Parse one consonance transition. The requested level is fixed at
+/// `InjectionProof` (4) — the ceiling the S2 certificate establishes
+/// (`Transition.idr::certifiedTransitionLevel`); there is no L5+ ladder for
+/// a transition (no result set). NORMALISE REQUIRES an explicit
+/// justification clause (fail-closed if absent) — an unjustified normalise
+/// is unrepresentable, mirroring the Idris type.
+fn parse_transition(p: &mut P) -> Result<Transition, ParseError> {
+    if p.is_kw("MERGE") {
+        p.bump();
+        let left = parse_subject(p)?;
+        let right = parse_subject(p)?;
+        p.eat_kw("INTO")?;
+        let into = parse_subject(p)?;
+        let evidence = parse_opt_where(p)?;
+        Ok(Transition::Merge(
+            left,
+            right,
+            into,
+            evidence,
+            SafetyLevel::InjectionProof,
+        ))
+    } else if p.is_kw("SPLIT") {
+        p.bump();
+        let from = parse_subject(p)?;
+        p.eat_kw("INTO")?;
+        let out_l = parse_subject(p)?;
+        let out_r = parse_subject(p)?;
+        let evidence = parse_opt_where(p)?;
+        Ok(Transition::Split(
+            from,
+            out_l,
+            out_r,
+            evidence,
+            SafetyLevel::InjectionProof,
+        ))
+    } else {
+        p.eat_kw("NORMALISE")?;
+        let subject = parse_subject(p)?;
+        let justification = parse_repair(p)?;
+        Ok(Transition::Normalise(
+            subject,
+            justification,
+            SafetyLevel::InjectionProof,
+        ))
+    }
+}
+
+/// A subject identity handle: a bareword or a `'quoted'` string (same
+/// surface as a source argument, but a distinct AST node — identity, not
+/// location).
+fn parse_subject(p: &mut P) -> Result<SubjectRef, ParseError> {
+    match p.peek() {
+        Some(Tok::Str(s)) => {
+            let v = s.clone();
+            p.bump();
+            Ok(SubjectRef(v))
+        }
+        Some(Tok::Word(w)) => {
+            let v = w.clone();
+            p.bump();
+            Ok(SubjectRef(v))
+        }
+        _ => p.err("expected a subject identity handle (word or 'string')"),
+    }
+}
+
+/// An optional `WHERE <expr>` evidence clause on MERGE/SPLIT.
+fn parse_opt_where(p: &mut P) -> Result<Option<Expr>, ParseError> {
+    if p.is_kw("WHERE") {
+        p.bump();
+        Ok(Some(parse_expr(p)?))
+    } else {
+        Ok(None)
+    }
+}
+
+/// The NORMALISE repair justification:
+/// `FROM AUTHORITATIVE <modality>` | `MERGE MODALITIES` | `USER RESOLVE`.
+fn parse_repair(p: &mut P) -> Result<RepairJustification, ParseError> {
+    if p.is_kw("FROM") {
+        p.bump();
+        p.eat_kw("AUTHORITATIVE")?;
+        let m = parse_modality_kw(p)?;
+        Ok(RepairJustification::FromAuthoritative(m))
+    } else if p.is_kw("MERGE") {
+        p.bump();
+        p.eat_kw("MODALITIES")?;
+        Ok(RepairJustification::MergeModalities)
+    } else if p.is_kw("USER") {
+        p.bump();
+        p.eat_kw("RESOLVE")?;
+        Ok(RepairJustification::UserResolve)
+    } else {
+        p.err(
+            "NORMALISE requires a repair justification \
+             (FROM AUTHORITATIVE <modality> | MERGE MODALITIES | USER RESOLVE)",
+        )
+    }
+}
+
+fn parse_modality_kw(p: &mut P) -> Result<Modality, ParseError> {
+    match peek_modality(p) {
+        Some(m) => {
+            p.bump();
+            Ok(m)
+        }
+        None => p.err("expected a modality (GRAPH|VECTOR|TENSOR|SEMANTIC|DOCUMENT|TEMPORAL|PROVENANCE|SPATIAL)"),
+    }
 }
 
 fn parse_statement(p: &mut P) -> Result<Statement, ParseError> {
@@ -365,7 +540,13 @@ fn parse_field_ref(p: &mut P) -> Result<FieldRef, ParseError> {
 // ── Expressions: OR < AND < NOT < comparison < primary ────────────────
 
 fn parse_expr(p: &mut P) -> Result<Expr, ParseError> {
-    parse_or(p)
+    // Depth-guarded: every parenthesised / aggregate / sub-query descent
+    // re-enters here, so this is the chokepoint that bounds native-stack
+    // growth (paired with `parse_not`'s own guard for `NOT` chains).
+    p.enter()?;
+    let r = parse_or(p);
+    p.leave();
+    r
 }
 
 fn parse_or(p: &mut P) -> Result<Expr, ParseError> {
@@ -391,8 +572,12 @@ fn parse_and(p: &mut P) -> Result<Expr, ParseError> {
 fn parse_not(p: &mut P) -> Result<Expr, ParseError> {
     if p.is_kw("NOT") {
         p.bump();
-        let inner = parse_not(p)?;
-        return Ok(Expr::Logic(LogicOp::Not, Box::new(inner), None));
+        // `NOT` self-recurses without re-entering `parse_expr`, so it needs
+        // its own depth guard or a `NOT NOT NOT …` chain overflows the stack.
+        p.enter()?;
+        let inner = parse_not(p);
+        p.leave();
+        return Ok(Expr::Logic(LogicOp::Not, Box::new(inner?), None));
     }
     parse_comparison(p)
 }

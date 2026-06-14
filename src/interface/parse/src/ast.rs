@@ -210,7 +210,9 @@ pub enum SafetyLevel {
 /// `Grammar.idr`: `data Verb`. Read verbs (`Select`/`Inspect`/`Verify`) carry
 /// the existing relational semantics; the mutating verbs (`Assert`/`Declare`/
 /// `Retract`) are parsed as tags over the same body (S1). `Merge`/`Split`/
-/// `Normalise` stay unmodelled (fail-closed in the parser).
+/// `Normalise` are the S2 consonance-transition verbs: they do NOT fit the
+/// single-source, result-returning `Statement`, so they tag a [`Transition`]
+/// (parsed by `parser::parse_op`, NOT `parse`) — see [`Transition`]/[`VclOp`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Verb {
     Select,
@@ -245,4 +247,66 @@ pub struct Statement {
     pub requested_level: SafetyLevel,
     /// VCL consonance verb (S1) — mirrors `Grammar.idr`'s additive `verb`.
     pub verb: Verb,
+}
+
+// ── S2 consonance transitions (mirror of `src/core/Transition.idr`) ───
+//
+// MERGE / SPLIT / NORMALISE are the multi-subject / result-less
+// consonance transitions. They do NOT fit `Statement` (single `source`,
+// always result-returning), so they are a SEPARATE `Transition` type and
+// the top-level operation is the sum `VclOp`. This mirrors the Idris
+// constructors one-to-one (positional), so the marshaller stays a
+// structural map. The proof corpus (`Transition.idr`) certifies only the
+// statically-checkable obligations; the recompute port lives in
+// `decider::certified_transition_level`.
+
+/// `Transition.idr`: `data SubjectRef = MkSubjectRef String`. A consonance
+/// subject identity handle (the octad / identity UUID), DELIBERATELY
+/// distinct from [`Source`] (a read-LOCATION): two identities in the same
+/// store are different subjects, which `Source` equality could not tell
+/// apart. (Identity-vs-location beyond handle equality is OWED — see the
+/// Idris module note and `VERIFICATION-STANCE.adoc` §S2.)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubjectRef(pub String);
+
+/// `Transition.idr`: `data RepairJustification` — the justified repair path
+/// for a NORMALISE, mirroring the engine's authority-ranked regenerator.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RepairJustification {
+    /// `FromAuthoritative`: regenerate from the authoritative modality.
+    FromAuthoritative(Modality),
+    /// `MergeModalities`: merge across modalities.
+    MergeModalities,
+    /// `UserResolve`: escalate to a user decision.
+    UserResolve,
+}
+
+/// `Transition.idr`: `data Transition`. MERGE/SPLIT carry an optional
+/// `evidence` `Expr` (the consonance condition, e.g. a drift bound) and a
+/// requested level; NORMALISE carries its justification by construction (an
+/// unjustified normalise is UNREPRESENTABLE). Variants are positional,
+/// matching the Idris constructors exactly.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Transition {
+    /// `TMerge left right into evidence level`: two DISTINCT inputs → one
+    /// identity.
+    Merge(SubjectRef, SubjectRef, SubjectRef, Option<Expr>, SafetyLevel),
+    /// `TSplit from outL outR evidence level`: one identity → two DISTINCT
+    /// outputs.
+    Split(SubjectRef, SubjectRef, SubjectRef, Option<Expr>, SafetyLevel),
+    /// `TNormalise subject justification level`: repair transition, NO result
+    /// set, justified.
+    Normalise(SubjectRef, RepairJustification, SafetyLevel),
+}
+
+/// `Transition.idr`: `data VclOp = Query Statement | Transit Transition` —
+/// the top-level VCL operation: a relational query OR a consonance
+/// transition. The `Query` payload is boxed (as `Expr::Subquery` already
+/// boxes `Statement`) so the two arms are size-balanced; this is a pure
+/// Rust-layout choice and does NOT change the wire image — a `Query` is
+/// still tag `0` followed by the statement body.
+#[derive(Debug, Clone, PartialEq)]
+pub enum VclOp {
+    Query(Box<Statement>),
+    Transit(Transition),
 }

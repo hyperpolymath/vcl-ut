@@ -15,7 +15,7 @@
 
 use proptest::prelude::*;
 use vcltotal_parse::ast::*;
-use vcltotal_parse::{from_wire, to_wire};
+use vcltotal_parse::{from_wire, from_wire_op, to_wire, to_wire_op};
 
 fn modality() -> impl Strategy<Value = Modality> {
     prop_oneof![
@@ -259,6 +259,53 @@ fn statement() -> impl Strategy<Value = Statement> {
     })
 }
 
+// ── S2: VclOp (Query | Transit) strategies ───────────────────────────
+
+fn subject() -> impl Strategy<Value = SubjectRef> {
+    ".*".prop_map(SubjectRef)
+}
+
+fn repair() -> impl Strategy<Value = RepairJustification> {
+    prop_oneof![
+        modality().prop_map(RepairJustification::FromAuthoritative),
+        Just(RepairJustification::MergeModalities),
+        Just(RepairJustification::UserResolve),
+    ]
+}
+
+fn transition() -> impl Strategy<Value = Transition> {
+    let lvl = prop_oneof![
+        Just(SafetyLevel::ParseSafe),
+        Just(SafetyLevel::InjectionProof),
+    ];
+    prop_oneof![
+        (
+            subject(),
+            subject(),
+            subject(),
+            proptest::option::of(expr()),
+            lvl.clone()
+        )
+            .prop_map(|(a, b, c, ev, l)| Transition::Merge(a, b, c, ev, l)),
+        (
+            subject(),
+            subject(),
+            subject(),
+            proptest::option::of(expr()),
+            lvl.clone()
+        )
+            .prop_map(|(a, b, c, ev, l)| Transition::Split(a, b, c, ev, l)),
+        (subject(), repair(), lvl).prop_map(|(s, r, l)| Transition::Normalise(s, r, l)),
+    ]
+}
+
+fn vclop() -> impl Strategy<Value = VclOp> {
+    prop_oneof![
+        statement().prop_map(|s| VclOp::Query(Box::new(s))),
+        transition().prop_map(VclOp::Transit),
+    ]
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(2048))]
 
@@ -268,6 +315,29 @@ proptest! {
         let bytes = to_wire(&s);
         let back = from_wire(&bytes).expect("decode of own encoding must succeed");
         prop_assert_eq!(back, s);
+    }
+
+    /// The VCLT op codec is a bijection on the `VclOp` mirror.
+    #[test]
+    fn op_roundtrip(op in vclop()) {
+        let bytes = to_wire_op(&op);
+        let back = from_wire_op(&bytes).expect("decode of own op encoding must succeed");
+        prop_assert_eq!(back, op);
+    }
+
+    /// Totality: arbitrary bytes never panic the op decoder.
+    #[test]
+    fn op_decoder_total_on_garbage(bytes in proptest::collection::vec(any::<u8>(), 0..2048)) {
+        let _ = from_wire_op(&bytes);
+    }
+
+    /// Totality even with a valid VCLT header followed by garbage.
+    #[test]
+    fn op_decoder_total_with_valid_header(tail in proptest::collection::vec(any::<u8>(), 0..512)) {
+        let mut v = b"VCLT".to_vec();
+        v.extend_from_slice(&1u16.to_le_bytes());
+        v.extend_from_slice(&tail);
+        let _ = from_wire_op(&v);
     }
 
     /// Encoding is canonical/deterministic.
@@ -314,6 +384,43 @@ fn golden_minimal() {
     let b = to_wire(&s);
     assert_eq!(&b[0..4], b"VCLW");
     assert_eq!(from_wire(&b).unwrap(), s);
+}
+
+#[test]
+fn golden_op_transitions() {
+    // MERGE 'a' 'b' INTO 'c', no evidence, InjectionProof — the exact bytes
+    // the Idris `WireConformance.goldenT1` Refl decodes (magic VCLT).
+    let merge = VclOp::Transit(Transition::Merge(
+        SubjectRef("a".to_string()),
+        SubjectRef("b".to_string()),
+        SubjectRef("c".to_string()),
+        None,
+        SafetyLevel::InjectionProof,
+    ));
+    let b = to_wire_op(&merge);
+    assert_eq!(&b[0..4], b"VCLT");
+    assert_eq!(
+        b,
+        vec![86, 67, 76, 84, 1, 0, 1, 0, 1, 0, 0, 0, 97, 1, 0, 0, 0, 98, 1, 0, 0, 0, 99, 0, 4]
+    );
+    assert_eq!(from_wire_op(&b).unwrap(), merge);
+
+    // NORMALISE 's-1' USER RESOLVE — `WireConformance.goldenT2`.
+    let norm = VclOp::Transit(Transition::Normalise(
+        SubjectRef("s-1".to_string()),
+        RepairJustification::UserResolve,
+        SafetyLevel::InjectionProof,
+    ));
+    let nb = to_wire_op(&norm);
+    assert_eq!(
+        nb,
+        vec![86, 67, 76, 84, 1, 0, 1, 2, 3, 0, 0, 0, 115, 45, 49, 2, 4]
+    );
+    assert_eq!(from_wire_op(&nb).unwrap(), norm);
+
+    // A VCLW (statement) stream must NOT decode as a VCLT op — hard BadMagic.
+    let stmt_bytes = to_wire(&mk_float_stmt(1.0));
+    assert!(from_wire_op(&stmt_bytes).is_err());
 }
 
 #[test]

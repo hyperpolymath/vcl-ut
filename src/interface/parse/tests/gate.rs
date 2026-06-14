@@ -16,8 +16,8 @@
 )]
 
 use vcltotal_parse::{
-    ast::{Modality, Verb},
-    certified_level, parse,
+    ast::{Modality, RepairJustification, Transition, VclOp, Verb},
+    certified_level, certified_transition_level, parse, parse_op,
     schema::{FieldDef, ModalitySchema, OctadSchema, VqlType},
 };
 
@@ -167,10 +167,13 @@ fn parse_error_on_garbage() {
 
 // ── S1: consonance-verb discriminant ────────────────────────────────────────
 // The read verbs (SELECT/INSPECT/VERIFY) and the promoted mutating verbs
-// (ASSERT/DECLARE/RETRACT) parse as a verb tag over the same relational body;
-// MERGE/SPLIT/NORMALISE are deliberately fail-closed until their semantics (S2).
+// (ASSERT/DECLARE/RETRACT) parse as a verb tag over the same relational body.
+// MERGE/SPLIT/NORMALISE are NOT relational queries, so the query-only `parse`
+// entry still rejects them (their multi-subject / result-less syntax does not
+// fit `Statement`); the S2 superset entry `parse_op` accepts them as
+// transitions — see `s2_transitions_parse_and_certify`.
 #[test]
-fn s1_verb_tags_and_fail_closed() {
+fn s1_verb_tags_and_query_only_parse() {
     let body = "GRAPH.knows FROM STORE main";
     for (kw, want) in [
         ("SELECT", Verb::Select),
@@ -187,7 +190,78 @@ fn s1_verb_tags_and_fail_closed() {
     for kw in ["MERGE", "SPLIT", "NORMALISE"] {
         assert!(
             parse(&format!("{kw} {body}")).is_err(),
-            "{kw} must fail-closed (S2, multi-subject / result-less semantics)"
+            "{kw} is a transition, not a query — the query-only `parse` rejects it"
         );
+    }
+}
+
+// ── S2: consonance transitions parse via `parse_op` and certify via the
+// dedicated transition certifier (NEVER the Statement `certified_level`) ──────
+#[test]
+fn s2_transitions_parse_and_certify() {
+    let sch = empty_schema();
+
+    // A relational verb still routes to the Query arm.
+    match parse_op("SELECT * FROM STORE main").expect("query parses") {
+        VclOp::Query(s) => assert_eq!(s.verb, Verb::Select),
+        other => panic!("expected Query, got {other:?}"),
+    }
+
+    // MERGE two DISTINCT inputs INTO a third, no evidence ⇒ admissible (4).
+    match parse_op("MERGE 'a' 'b' INTO 'c'").expect("merge parses") {
+        VclOp::Transit(t) => {
+            assert!(matches!(t, Transition::Merge(..)));
+            assert_eq!(certified_transition_level(&t, &sch), 4);
+        }
+        other => panic!("expected Transit(Merge), got {other:?}"),
+    }
+
+    // self-MERGE ('a' with 'a') is NOT distinct ⇒ inadmissible (-1).
+    match parse_op("MERGE 'a' 'a' INTO 'c'").expect("merge parses") {
+        VclOp::Transit(t) => assert_eq!(certified_transition_level(&t, &sch), -1),
+        other => panic!("expected Transit, got {other:?}"),
+    }
+
+    // Evidence carrying a raw string literal ⇒ injection ⇒ inadmissible (-1).
+    match parse_op("MERGE 'a' 'b' INTO 'c' WHERE GRAPH.x = 'lit'").expect("parses") {
+        VclOp::Transit(t) => assert_eq!(certified_transition_level(&t, &sch), -1),
+        other => panic!("expected Transit, got {other:?}"),
+    }
+
+    // SPLIT one INTO two DISTINCT outputs ⇒ admissible (4).
+    match parse_op("SPLIT 'a' INTO 'b' 'c'").expect("split parses") {
+        VclOp::Transit(t) => {
+            assert!(matches!(t, Transition::Split(..)));
+            assert_eq!(certified_transition_level(&t, &sch), 4);
+        }
+        other => panic!("expected Transit(Split), got {other:?}"),
+    }
+
+    // An unjustified NORMALISE is unrepresentable ⇒ fail-closed at parse.
+    assert!(
+        parse_op("NORMALISE 's-1'").is_err(),
+        "NORMALISE without a repair justification must fail-closed"
+    );
+
+    // NORMALISE 's-1' USER RESOLVE ⇒ admissible (4); justification captured.
+    match parse_op("NORMALISE 's-1' USER RESOLVE").expect("normalise parses") {
+        VclOp::Transit(t) => {
+            assert!(matches!(
+                t,
+                Transition::Normalise(_, RepairJustification::UserResolve, _)
+            ));
+            assert_eq!(certified_transition_level(&t, &sch), 4);
+        }
+        other => panic!("expected Transit(Normalise), got {other:?}"),
+    }
+
+    // NORMALISE 's-1' FROM AUTHORITATIVE GRAPH ⇒ modality captured.
+    match parse_op("NORMALISE 's-1' FROM AUTHORITATIVE GRAPH").expect("parses") {
+        VclOp::Transit(Transition::Normalise(
+            _,
+            RepairJustification::FromAuthoritative(Modality::Graph),
+            _,
+        )) => {}
+        other => panic!("expected FromAuthoritative Graph, got {other:?}"),
     }
 }

@@ -23,12 +23,41 @@
 
 use vcltotal_parse::ast::*;
 use vcltotal_parse::schema::*;
-use vcltotal_parse::{to_wire, to_wire_schema};
+use vcltotal_parse::{certified_transition_level, to_wire, to_wire_op, to_wire_schema};
 
 fn line(name: &str, s: &Statement) {
     let b = to_wire(s);
     let body = b.iter().map(u8::to_string).collect::<Vec<_>>().join(",");
     println!("{name} = [{body}]");
+}
+
+fn line_op(name: &str, op: &VclOp) {
+    let b = to_wire_op(op);
+    let body = b.iter().map(u8::to_string).collect::<Vec<_>>().join(",");
+    println!("{name} = [{body}]");
+}
+
+// ── S2 VclOp fixtures (the regeneration oracle for WireConformance's
+//    `goldenOp*`/`goldenT*` Refl proofs) ───────────────────────────────
+
+/// `MERGE 'a' 'b' INTO 'c'` — distinct inputs, no evidence ⇒ admissible.
+fn t_merge() -> Transition {
+    Transition::Merge(
+        SubjectRef("a".to_string()),
+        SubjectRef("b".to_string()),
+        SubjectRef("c".to_string()),
+        None,
+        SafetyLevel::InjectionProof,
+    )
+}
+
+/// `NORMALISE 's-1' USER RESOLVE` — single subject, justified ⇒ admissible.
+fn t_normalise() -> Transition {
+    Transition::Normalise(
+        SubjectRef("s-1".to_string()),
+        RepairJustification::UserResolve,
+        SafetyLevel::InjectionProof,
+    )
 }
 
 fn line_schema(name: &str, s: &OctadSchema) {
@@ -176,6 +205,16 @@ fn emit() {
     println!("cl1 = {}", vcltotal_parse::certified_level(&f1(), &sch1()));
     println!("cl2 = {}", vcltotal_parse::certified_level(&f2(), &sch1()));
     println!("cl3 = {}", vcltotal_parse::certified_level(&f3(), &sch1()));
+    // S2 VclOp golden bytes (magic VCLT) + transition verdict oracle.
+    // `goldenOpQ1` = Query-wrapped f1 (the op stream around a statement);
+    // `goldenT1` = the MERGE transition; `goldenT2` = the NORMALISE.
+    line_op("goldenOpQ1", &VclOp::Query(Box::new(f1())));
+    line_op("goldenT1", &VclOp::Transit(t_merge()));
+    line_op("goldenT2", &VclOp::Transit(t_normalise()));
+    // Transition recompute-tier verdicts (schema-independent for these
+    // evidence-free fixtures): both admissible ⇒ InjectionProof = 4.
+    println!("ctl1 = {}", certified_transition_level(&t_merge(), &sch1()));
+    println!("ctl2 = {}", certified_transition_level(&t_normalise(), &sch1()));
 }
 
 /// Self-check: every fixture round-trips through the Rust codec, so the
@@ -196,5 +235,18 @@ fn fixtures_roundtrip() {
     for (s, want) in [(f1(), 1_i64), (f2(), -1_i64), (f3(), 0_i64)] {
         let decoded = vcltotal_parse::from_wire(&to_wire(&s)).unwrap();
         assert_eq!(vcltotal_parse::certified_level(&decoded, &sc), want);
+    }
+    // S2: VclOp streams round-trip through the VCLT codec, and the
+    // transition verdict holds on the *decoded* op (the gate's domain).
+    for op in [
+        VclOp::Query(Box::new(f1())),
+        VclOp::Transit(t_merge()),
+        VclOp::Transit(t_normalise()),
+    ] {
+        let decoded = vcltotal_parse::from_wire_op(&to_wire_op(&op)).unwrap();
+        assert_eq!(decoded, op);
+        if let VclOp::Transit(t) = decoded {
+            assert_eq!(certified_transition_level(&t, &sc), 4);
+        }
     }
 }

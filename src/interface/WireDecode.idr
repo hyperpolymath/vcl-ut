@@ -58,6 +58,7 @@ module VclTotal.Interface.WireDecode
 import VclTotal.ABI.Types
 import VclTotal.Core.Grammar
 import VclTotal.Core.Schema
+import VclTotal.Core.Transition
 import Data.List
 
 %default total
@@ -644,6 +645,81 @@ fromWire input = do
   if ver /= 1 then Left BadVersion else Right ()
   (stmt, r2) <- decStmt (length input) r1
   if length r2 /= 0 then Left TrailingBytes else Right stmt
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- S2: VclOp (Query | Transit) decoder — the consonance-transition stream
+-- (magic VCLT). MERGE/SPLIT/NORMALISE do not fit `Statement`, so the
+-- top-level operation is the sum `VclOp`. The transition body is
+-- non-recursive beyond an optional evidence `Expr`, so it threads the same
+-- input-length fuel into the `Statement`/`Expr` decoders above. Totality is
+-- structural / fuel-bounded, ZERO proof-escape — same posture as `fromWire`.
+-- The Rust `wire::from_wire_op` is the byte-identical mirror; the
+-- `WireConformance` `goldenT*`/`goldenOp*` Refls pin the agreement.
+-- ═══════════════════════════════════════════════════════════════════════
+
+public export
+decSubject : Parse SubjectRef
+decSubject inp = do (s, r) <- vstring inp
+                    Right (MkSubjectRef s, r)
+
+public export
+decRepair : Parse RepairJustification
+decRepair inp = do
+  (t, r) <- byte inp
+  case t of
+    0 => do (m, r1) <- decModality r; Right (FromAuthoritative m, r1)
+    1 => Right (MergeModalities, r)
+    2 => Right (UserResolve, r)
+    x => Left (BadTag "RepairJustification" x)
+
+public export
+decTransition : Nat -> Parse Transition
+decTransition fuel inp = do
+  (t, r0) <- byte inp
+  case t of
+    0 => do (l, r1)    <- decSubject r0
+            (rr, r2)   <- decSubject r1
+            (into, r3) <- decSubject r2
+            (ev, r4)   <- decOpt (decExpr fuel) r3
+            (lvl, r5)  <- decSafety r4
+            Right (TMerge l rr into ev lvl, r5)
+    1 => do (frm, r1)  <- decSubject r0
+            (ol, r2)   <- decSubject r1
+            (oR, r3)   <- decSubject r2
+            (ev, r4)   <- decOpt (decExpr fuel) r3
+            (lvl, r5)  <- decSafety r4
+            Right (TSplit frm ol oR ev lvl, r5)
+    2 => do (s, r1)    <- decSubject r0
+            (rj, r2)   <- decRepair r1
+            (lvl, r3)  <- decSafety r2
+            Right (TNormalise s rj lvl, r3)
+    x => Left (BadTag "Transition" x)
+
+public export
+decOp : Nat -> Parse VclOp
+decOp fuel inp = do
+  (t, r0) <- byte inp
+  case t of
+    0 => do (st, r1) <- decStmt fuel r0;       Right (Query st, r1)
+    1 => do (tr, r1) <- decTransition fuel r0; Right (Transit tr, r1)
+    x => Left (BadTag "VclOp" x)
+
+public export
+opMagic : List Bits8
+opMagic = [86, 67, 76, 84]   -- "VCLT"
+
+||| Decode a v1 `VCLT` wire stream into a `VclOp`. Total: every input
+||| yields `Right op` or a typed `Left WireErr`, never a crash. Fuel is the
+||| input length — a sound over-approximation of the node count.
+public export
+fromWireOp : List Bits8 -> Either WireErr VclOp
+fromWireOp input = do
+  (m, r0) <- takeN 4 input
+  if m /= opMagic then Left BadMagic else Right ()
+  (ver, r1) <- u16le r0
+  if ver /= 1 then Left BadVersion else Right ()
+  (op, r2) <- decOp (length input) r1
+  if length r2 /= 0 then Left TrailingBytes else Right op
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- P5c: OctadSchema decoder (schema marshalling for the recompute tier)

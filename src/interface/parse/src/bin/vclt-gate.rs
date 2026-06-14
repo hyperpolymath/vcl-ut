@@ -21,8 +21,8 @@ use serde_json::{json, Value};
 use std::io::{self, Read};
 use vcltotal_parse::schema::{FieldDef, ModalitySchema, VqlType};
 use vcltotal_parse::{
-    ast::{Agent, Modality, SafetyLevel, Statement},
-    certified_level, check_level_n, level_name, parse, OctadSchema,
+    ast::{Agent, Modality, SafetyLevel, Statement, Transition, VclOp},
+    certified_level, certified_transition_level, check_level_n, level_name, parse_op, OctadSchema,
 };
 
 fn main() {
@@ -78,8 +78,11 @@ fn run() -> i32 {
         None => empty_schema(),
     };
 
-    let stmt = match parse(stmt_text) {
-        Ok(s) => s,
+    // S2: the gate routes the full `VclOp`. A leading MERGE/SPLIT/NORMALISE
+    // is a consonance transition, certified by `certified_transition_level`
+    // (NEVER the Statement certifier); any other verb is a relational query.
+    let op = match parse_op(stmt_text) {
+        Ok(o) => o,
         Err(e) => {
             let response = json!({
                 "schema_version": 1,
@@ -99,6 +102,11 @@ fn run() -> i32 {
             println!("{}", response);
             return 1;
         }
+    };
+
+    let stmt = match op {
+        VclOp::Query(s) => *s,
+        VclOp::Transit(t) => return run_transition(&t, &schema),
     };
 
     let k = safety_level_to_u8(stmt.requested_level);
@@ -136,6 +144,62 @@ fn run() -> i32 {
         0
     } else {
         1
+    }
+}
+
+/// S2 transition gate: certify a consonance transition via
+/// `certified_transition_level` (the InjectionProof ceiling, 4, or -1) and
+/// render a transition-shaped response. A transition has no L5+ ladder (no
+/// result set), so the report names the single achievable rung plus the
+/// verb, NOT the L1..L10 statement ladder. Exit codes match the statement
+/// path: 0 admissible, 1 inadmissible.
+fn run_transition(t: &Transition, schema: &OctadSchema) -> i32 {
+    let cert = certified_transition_level(t, schema);
+    let admissible = cert != -1;
+    let (verb, subjects) = transition_shape(t);
+    let level_entry = json!({
+        "level": 4,
+        "name": "InjectionProof",
+        "status": if admissible { "pass" } else { "fail" }
+    });
+    let reasons: Vec<String> = if admissible {
+        vec![]
+    } else {
+        vec![
+            "transition inadmissible: self-merge / non-distinct outputs, or \
+             evidence carries a raw string literal / type-incompatible comparison"
+                .to_string(),
+        ]
+    };
+    let response = json!({
+        "schema_version": 1,
+        "kind": "transition",
+        "verb": verb,
+        "subjects": subjects,
+        "admissible": admissible,
+        "requested_level": 4,
+        "certified_level": cert,
+        "levels": [level_entry],
+        "reasons": reasons
+    });
+    println!("{response}");
+    if admissible {
+        0
+    } else {
+        1
+    }
+}
+
+/// The verb tag + subject-handle list for a transition (response metadata).
+fn transition_shape(t: &Transition) -> (&'static str, Vec<String>) {
+    match t {
+        Transition::Merge(l, r, into, _, _) => {
+            ("MERGE", vec![l.0.clone(), r.0.clone(), into.0.clone()])
+        }
+        Transition::Split(from, ol, or_, _, _) => {
+            ("SPLIT", vec![from.0.clone(), ol.0.clone(), or_.0.clone()])
+        }
+        Transition::Normalise(s, _, _) => ("NORMALISE", vec![s.0.clone()]),
     }
 }
 
