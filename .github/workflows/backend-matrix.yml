@@ -102,4 +102,9 @@ jobs:
         run: git clone --depth 1 https://github.com/hyperpolymath/echidna ../echidna
 
       - name: Client wiremock suite (ECHIDNA_PROVER=${{ matrix.prover }})
-        run: cargo test -p vcltotal-echidna-client --tests --locked
+        # `vcltotal-echidna-client` is intentionally NOT a member of the root
+        # workspace (v0.2.0 workspace cleanup: its transitive echidna-core
+        # path-dep breaks standalone CI), so `-p` cannot select it. It is its
+        # own standalone workspace root; run it by manifest path now that the
+        # echidna sibling has been cloned above.
+        run: cargo test --manifest-path src/interface/echidna-client/Cargo.toml --tests --locked

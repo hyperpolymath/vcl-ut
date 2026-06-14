@@ -15,6 +15,8 @@
 //! Pure function of (statement, schema): no network, no filesystem,
 //! no clock, no env-dependent behaviour beyond stdin/stdout/stderr.
 
+#![deny(clippy::unwrap_used, clippy::expect_used)]
+
 use serde_json::{json, Value};
 use std::io::{self, Read};
 use vcltotal_parse::schema::{FieldDef, ModalitySchema, VqlType};
@@ -267,10 +269,10 @@ fn parse_field_def(v: &Value) -> Result<FieldDef, String> {
 fn parse_vql_type(v: &Value) -> Result<VqlType, String> {
     match v {
         Value::String(s) => parse_nullary_type(s),
-        Value::Object(map) if map.len() == 1 => {
-            let (key, inner) = map.iter().next().expect("len==1 checked");
-            parse_parameterised_type(key, inner)
-        }
+        Value::Object(map) if map.len() == 1 => match map.iter().next() {
+            Some((key, inner)) => parse_parameterised_type(key, inner),
+            None => Err("expected single-key object for VqlType, found empty object".to_string()),
+        },
         other => Err(format!(
             "expected string or single-key object for VqlType, got {other}"
         )),
