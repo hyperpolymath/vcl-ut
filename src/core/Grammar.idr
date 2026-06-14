@@ -304,6 +304,7 @@ mutual
   ||| the same body. MERGE/SPLIT/NORMALISE stay unmodelled (fail-closed).
   public export
   data Verb = VSelect | VInspect | VVerify | VAssert | VDeclare | VRetract
+            | VMerge | VSplit | VNormalise   -- S2 transition verbs (see Transition.idr)
 
   ||| A complete VCL-total query statement.
   public export

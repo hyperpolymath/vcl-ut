@@ -219,6 +219,10 @@ pub enum Verb {
     Assert,
     Declare,
     Retract,
+    // S2 transition verbs (see `Transition`/`VclOp` below).
+    Merge,
+    Split,
+    Normalise,
 }
 
 /// `Grammar.idr`: `record Statement` (`orderBy` is `(field, ascending?)`;

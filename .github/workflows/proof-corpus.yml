@@ -71,6 +71,7 @@ jobs:
             src/core/Grammar.idr src/core/Schema.idr src/core/Decide.idr \
             src/core/Levels.idr src/core/Checker.idr \
             src/core/Composition.idr src/core/Epistemic.idr \
+            src/core/Transition.idr \
             src/interface/abi/Types.idr src/interface/abi/Layout.idr \
             src/interface/abi/LayoutProofs.idr \
             src/interface/WireDecode.idr src/interface/WireConformance.idr
