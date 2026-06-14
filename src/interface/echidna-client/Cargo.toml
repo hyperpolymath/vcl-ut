@@ -1,4 +1,16 @@
 # SPDX-License-Identifier: MPL-2.0
+
+# Standalone workspace root: this crate is deliberately NOT a member of the
+# parent virtual workspace (root `Cargo.toml`), because it depends on
+# `vcltotal-interface`, which carries an external path-dep
+# (`../../../echidna/crates/echidna-core`) that does not resolve on a
+# standalone checkout. Declaring an own `[workspace]` lets the estate e2e
+# CI job (`.github/workflows/backend-matrix.yml`) build/test it by
+# `--manifest-path` once the echidna sibling is present, without dragging
+# the unresolved path-dep into the default standalone build. Mirrors the
+# same pattern used by `src/interface/parse/Cargo.toml`.
+[workspace]
+
 [package]
 name = "vcltotal-echidna-client"
 version = "0.1.0"

@@ -44,6 +44,28 @@ jobs:
         with:
           sarif_file: results.sarif
 
+      - name: Upload SARIF artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: scorecard-results
+          path: results.sarif
+          retention-days: 5
+
+  # Gating job: kept separate so the scorecard job above remains
+  # uses-only. GitHub rejects a publish_results: true job that also
+  # contains run: steps with HTTP 400 ("job must only have steps with
+  # uses"). The minimum-score gate therefore runs here against the
+  # SARIF uploaded as an artifact by the scorecard job.
+  enforce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: scorecard
+    steps:
+      - name: Download SARIF artifact
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
+        with:
+          name: scorecard-results
+
       - name: Check minimum score
         run: |
           # Parse score from results

@@ -1,73 +1,23 @@
-= VCL-total Verification Stance
+= VCL-total Verification Stance (moved)
 :toc:
 :sectnums:
 
 // SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
-WARNING: vcl-ut is the interface between *hypatia* and *verisim*. Both sides
-trust safety claims made here. This document states *precisely* what is and is
-not currently proven, so that neither consumer over-trusts the boundary. It
-takes precedence over any "verified" / "type-safe" / "proven" phrasing in
-`README.adoc`, `PROOF-NEEDS.md`, or module doc-comments.
+NOTE: This file is a pointer only. The canonical, current verification stance
+for vcl-ut now lives at `verification/proofs/VERIFICATION-STANCE.adoc`.
 
-== Summary
+The canonical document is proof-backed and supersedes this `docs/` copy. As of
+2026-06-14, the Idris2 proof corpus is machine-checked: all ten safety levels
+(L1–L10) carry genuine soundness, and
+`idris2 0.8.0 --build verification/proofs/vclut-core.ipkg` exits 0.
 
-The 10-level safety story is, at present, *architecturally typed but not
-end-to-end proven*. The dependent-type apparatus exists but is *not connected*
-to the runtime checker or the FFI boundary that hypatia/verisim consume.
+The earlier text of this `docs/` file (which described the apparatus as
+architecturally typed but not end-to-end proven, with vacuous level predicates)
+is no longer accurate and has been removed. This copy is retained only as a
+redirect so existing links do not break.
 
-== What IS genuinely established
+See `verification/proofs/VERIFICATION-STANCE.adoc` for the authoritative,
+detail-complete stance.
 
-* `src/interface/abi/Types.idr` — `SafetyLevel`, `VclTotalError`, `QueryMode`
-  are real ADTs with total `DecEq` instances and total int<->tag round-trip
-  functions. The `Verify` namespace proves tag ranges with `So`. These are
-  sound, non-vacuous proofs.
-* `QueryHandle` is a genuine opaque type with an `So (ptr /= 0)` non-null
-  witness; it cannot be constructed null through the public API.
-* `src/core/Levels.idr` `SafetyCertificate` / `CanWeaken` define a real
-  subsumption lattice *at the type level*.
-
-== What is NOT proven (the honest gaps)
-
-. *The certificate is disconnected from the checker.* `src/core/Checker.idr`
-  decides every level with `Bool`-returning `checkLevelN` functions and never
-  constructs a `SafetyCertificate`. A query reported "Level 10" carries *no*
-  `Levels.idr` proof object. The dependent types are decorative w.r.t. the
-  actual decision procedure.
-. *Several level predicates are vacuous.* `NoRawUserInput` has the single
-  constructor `AllParameterised : NoRawUserInput stmt` (provable for *any*
-  statement, including injection-bearing ones); `AllNullableFieldsGuarded`'s
-  `GuardedNull` accepts *any* expression; `AllSelectItemsTyped`'s `ConsTyped`
-  requires no actual per-item typing evidence. As written, Levels 3, 4 and 5
-  prove nothing about the property they name.
-. *The FFI boundary is stringly/int-typed.* `src/interface/abi/Foreign.idr`
-  returns a bare `Bits32` error tag; the `parse` wrapper is an explicit
-  placeholder (returns `Left InternalError` on success). hypatia/verisim
-  receive an *asserted* level integer, not a transported proof.
-. *Layout/size proofs are vacuous.* `HasSize` / `HasAlignment` constructors
-  accept any `n`; `queryPlanHeaderSize : ... HasSize QueryPlanHeader 24` type-
-  checks regardless of the real layout. The 24-byte/8-align claim is unverified.
-
-== Consumer guidance
-
-* *hypatia / verisim*: treat the FFI level integer as an *advisory claim*, not
-  a proof carrier. Do not weaken your own checks on the strength of a VCL-total
-  level tag until gap (1) and (3) are closed.
-* Do not cite vcl-ut as "formally verified query safety" in downstream docs.
-
-== Closing the gaps
-
-The high-value, low-risk path (per `PROOF-NEEDS.md`): make `checkLevelN` return
-`Dec (Ln_... )` instead of `Bool`, give the vacuous predicates real
-constructors carrying evidence, and have the checker emit a `SafetyCertificate`
-that the Zig FFI transports as an opaque proof token. Tracked under
-hyperpolymath/standards#124.
-
-== Provenance
-
-Audit 2026-05-18 (corpus grep + read; no proof-escape symbols
-`believe_me`/`assert_total`/`postulate`/`sorry` are *applied* anywhere in
-`src/**` — the only match is a self-attesting comment in `Composition.idr`).
-The risk here is *not* proof escapes; it is *absent* proof masquerading as
-present proof at a trusted interface.
