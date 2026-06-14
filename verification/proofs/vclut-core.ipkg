@@ -25,6 +25,7 @@
 package vclut-core
 version = 0.1.0
 authors = "Jonathan D.A. Jewell (hyperpolymath)"
+depends = contrib
 sourcedir = "corpus"
 
 modules = VclTotal.ABI.Types

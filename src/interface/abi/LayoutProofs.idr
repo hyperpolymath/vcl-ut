@@ -27,18 +27,21 @@
 ||| ceil(size/a) * a` — genuine *by construction* (witness = quotient,
 ||| no `div`/`mod` lemma debt, no escape). `Layout.alignUp` is the
 ||| additive form `size + paddingFor size a`; for `a > 0` the two agree.
-||| That additive↔ceil equivalence is the ONLY remaining sliver, stated
-||| precisely as `alignUpAdditiveEquivOWED` (a documented scope note,
-||| NOT a `believe_me`).
+||| The additive↔ceil equivalence is proved by `alignUpAdditiveEquivAlignTo`
+||| in Section 4, closing the Phase 4a scope completely.
 |||
 ||| Nothing here uses believe_me / postulate / assert_* / idris_crash /
 ||| sorry. Verified by the CI `--build` of `vclut-core.ipkg`.
 
 module VclTotal.ABI.LayoutProofs
 
+import Data.Nat
+import Data.Nat.Division
 import Data.Vect
 import Data.Vect.Elem
 import Data.So
+import Syntax.WithProof
+import Syntax.PreorderReasoning
 
 %default total
 
@@ -53,37 +56,23 @@ data Divides : Nat -> Nat -> Type where
   DivideBy : (q : Nat) -> {0 d : Nat} -> {0 m : Nat} ->
              (m = q * d) -> Divides d m
 
-||| Ceiling division `⌈s / a⌉` (saturating; `a = 0` yields `0`, cap
-||| but meaningless — alignment is only sensible for `a > 0`).
-public export
-ceilDivNat : Nat -> Nat -> Nat
-ceilDivNat s a = (s + (a `minus` 1)) `div` a
-
 ||| Canonical round-up-to-multiple alignment = `⌈size/a⌉ * a`.
+||| Defined by case split to keep `divNatNZ` in head position, which
+||| lets the Idris2 unifier reduce it by Refl in the additive-equivalence
+||| proof. (`ceilDivNat` via `divNat` is non-covering and stays stuck.)
 public export
 alignTo : (size : Nat) -> (a : Nat) -> Nat
-alignTo size a = ceilDivNat size a * a
+alignTo size Z       = 0
+alignTo size (S a)   = divNatNZ (size + a) (S a) ItIsSucc * (S a)
 
 ||| **Genuine** alignment divisibility, by construction: `alignTo size a`
 ||| is literally `q * a` with `q = ⌈size/a⌉`, so `a` divides it and the
 ||| witness is `q` itself. No `div`/`mod` lemma, no proof-escape.
 public export
 alignToDivides : (size : Nat) -> (a : Nat) -> Divides a (alignTo size a)
-alignToDivides size a = DivideBy (ceilDivNat size a) Refl
+alignToDivides size Z     = DivideBy 0 Refl
+alignToDivides size (S a) = DivideBy (divNatNZ (size + a) (S a) ItIsSucc) Refl
 
-||| SCOPE NOTE (Phase 4a — precise, NOT faked). `Layout.alignUp size a =
-||| size + Layout.paddingFor size a` (additive). For `a > 0` it equals
-||| `alignTo size a`; that additive↔ceil equality needs the `Data.Nat`
-||| Euclidean identity + the `Bool`↔`Prop` bridge for `paddingFor`'s
-||| conditional. That single equivalence is the only remaining sliver,
-||| deliberately left as this documented note (no proof-escape). The
-||| substantive OWED — a genuine machine-checked alignment-divides
-||| theorem, CI-gated — is resolved by `alignToDivides`.
-public export
-alignUpAdditiveEquivOWED : String
-alignUpAdditiveEquivOWED =
-  "Layout.alignUp (additive) = alignTo (ceil) for a>0: scoped, "
-  ++ "not faked — see VERIFICATION-STANCE.adoc Phase 4a."
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- 2. Genuine no-internal-padding proof for QueryPlanHeader
@@ -166,3 +155,175 @@ fieldWithin : {0 len : Nat} -> {xs : Vect len PField} -> {x : PField} ->
               Elem x xs -> So (foff x + fsize x <= cap)
 fieldWithin cap prf Here      = fst (soAnd prf)
 fieldWithin cap prf (There e) = fieldWithin cap (snd (soAnd prf)) e
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- 4. Additive form ≡ ceil-multiple form  (closes Phase 4a scope)
+-- ═══════════════════════════════════════════════════════════════════════
+
+-- Local mirror of Layout.paddingFor.  Uses modNatNZ (fully covering:
+-- Z case handled by `void (absurd p)`) rather than backtick `mod`
+-- (which expands to modNat, whose `modNat left Z` case is absent and
+-- therefore non-covering under %default total).
+paddingForLocal : (s : Nat) -> (a : Nat) -> (0 nz : NonZero a) -> Nat
+paddingForLocal s a nz =
+  if modNatNZ s a nz == 0 then 0 else a `minus` modNatNZ s a nz
+
+-- Expose the True branch of the conditional as a propositional equality.
+paddingZeroCase : (s : Nat) -> (a : Nat) -> (0 nz : NonZero a) ->
+                  (modNatNZ s a nz == 0) = True ->
+                  paddingForLocal s a nz = 0
+paddingZeroCase s a nz prf = rewrite prf in Refl
+
+-- Expose the False branch of the conditional as a propositional equality.
+paddingNonzeroCase : (s : Nat) -> (a : Nat) -> (0 nz : NonZero a) ->
+                     (modNatNZ s a nz == 0) = False ->
+                     paddingForLocal s a nz = a `minus` modNatNZ s a nz
+paddingNonzeroCase s a nz prf = rewrite prf in Refl
+
+-- Bool-to-Prop bridge helpers for the case split.
+natEqZeroFromBool : (n : Nat) -> (n == 0) = True -> n = 0
+natEqZeroFromBool Z     _   = Refl
+natEqZeroFromBool (S k) prf = absurd prf
+
+natSuccFromFalse : (n : Nat) -> (n == 0) = False -> (k : Nat ** n = S k)
+natSuccFromFalse Z     prf = absurd prf
+natSuccFromFalse (S k) _   = (k ** Refl)
+
+||| **Genuine** proof that `Layout.alignUp` (the additive padding form,
+||| `size + paddingFor size a`) equals `alignTo` (the canonical
+||| ceil-multiple form, `⌈size/a⌉ * a`) for any alignment `a > 0`.
+|||
+||| Proof by Euclidean division case split.  Let `r = size mod a`,
+||| `q = size div a`.
+|||
+||| - `r = 0` branch: padding is 0; ceiling quotient is `q` (shown by
+|||   `DivisionTheoremUniqueness` applied to `size + (a−1)`).
+||| - `r = S r'` branch: padding is `a − S r' = (a−1) − r'`; ceiling
+|||   quotient is `S q` (again by uniqueness); arithmetic closes the gap.
+|||
+||| Closes the `alignUpAdditiveEquivOWED` scope note documented in
+||| Phase 4a.  Nothing here uses `believe_me`, `postulate`, `assert_*`,
+||| or `sorry`.
+public export
+alignUpAdditiveEquivAlignTo :
+    (s : Nat) -> (a : Nat) -> (0 nz : NonZero a) ->
+    s + paddingForLocal s a nz = alignTo s a
+-- NonZero is a 0-quantity type alias (NonZero = IsSucc), so its
+-- constructor ItIsSucc cannot be pattern-matched on the LHS.
+-- Pattern-match on `a` only; bind the erased NonZero arg as `nz` so the
+-- goal mentions `nz` and the proof terms are unambiguous to the unifier.
+-- Drop opaque `r`/`q` let-bindings: DivisionTheorem's return type mentions
+-- `modNatNZ`/`divNatNZ` directly, and let-bound names go opaque in the unifier.
+-- `rewrite prf` eliminates the `if` from the goal without needing
+-- paddingZeroCase/paddingNonzeroCase or replace; prf is from the @@ split.
+alignUpAdditiveEquivAlignTo s (S predA) nz =
+  let divThm = DivisionTheorem s (S predA) nz nz
+      rLtA   = boundModNatNZ s (S predA) nz
+  in case @@ (modNatNZ s (S predA) nz == 0) of
+       (True ** prf) =>
+         -- mod = 0 branch: padding vanishes; ceilDivNat s (S predA) = q₀.
+         -- `rewrite prf` rewrites `modNatNZ ... == 0` → True in goal,
+         -- resolving the `if True then 0 else ...` to 0.
+         let rIsZ   = natEqZeroFromBool (modNatNZ s (S predA) nz) prf
+             sEqQA  = trans divThm
+                            (cong (+ divNatNZ s (S predA) nz * S predA) rIsZ)
+             sPA    = cong (+ predA) sEqQA
+             divEqQ = fst $ DivisionTheoremUniqueness
+                              (s + predA) (S predA) ItIsSucc
+                              (divNatNZ s (S predA) nz) predA
+                              (LTESucc reflexive) sPA
+         in rewrite prf in
+            Calc $
+              |~ s + 0
+              ~~ s                                                    ...(plusZeroRightNeutral s)
+              ~~ divNatNZ s (S predA) nz * (S predA)                 ...(sEqQA)
+              ~~ divNatNZ (s + predA) (S predA) ItIsSucc * (S predA) ...(cong (* S predA) (sym divEqQ))
+              ~~ alignTo s (S predA)                                  ...(Refl)
+       (False ** prf) =>
+         -- mod = S r' branch: ceilDivNat s (S predA) = S q₀.
+         -- `rewrite prf` resolves `if False then 0 else X` → X in goal,
+         -- leaving  s + (S predA `minus` modNatNZ s (S predA) nz) = alignTo s (S predA).
+         rewrite prf in
+         case natSuccFromFalse (modNatNZ s (S predA) nz) prf of
+           (r' ** rIsSr') =>
+             -- rIsSr' : modNatNZ s (S predA) nz = S r'.  The mod term is stuck
+             -- (reduces to `mod' s s predA`, never to a constructor), so a
+             -- `case rIsSr' of Refl` CANNOT substitute it into the goal.
+             -- Bridge it explicitly: `divThm'` rephrases the division theorem
+             -- with `S r'`, `rLtA'` rephrases the remainder bound, and the
+             -- first Calc step does the `modNatNZ → S r'` swap via `cong`.
+             let divThm' = trans divThm
+                             (cong (+ divNatNZ s (S predA) nz * (S predA)) rIsSr')
+                 rLtA'      = replace {p = \m => LT m (S predA)} rIsSr' rLtA
+                 sr'LePredA = fromLteSucc rLtA'
+                 r'LePredA  = lteSuccLeft  sr'LePredA
+                 r'LtSPredA = lteSuccRight sr'LePredA
+                 sRpA = Calc $
+                   |~ S r' + predA
+                   ~~ predA + S r'  ...(plusCommutative (S r') predA)
+                   ~~ S predA + r'  ...(sym $ plusSuccRightSucc predA r')
+                 sRpMinR = cong S $
+                   trans (plusCommutative r' (predA `minus` r'))
+                         (plusMinusLte r' predA r'LePredA)
+                 sPA2 = Calc $
+                   |~ s + predA
+                   ~~ (S r' + divNatNZ s (S predA) nz * (S predA)) + predA
+                            ...(cong (+ predA) divThm')
+                   ~~ (divNatNZ s (S predA) nz * (S predA) + S r') + predA
+                            ...(cong (+ predA) $
+                                plusCommutative (S r')
+                                  (divNatNZ s (S predA) nz * S predA))
+                   ~~ divNatNZ s (S predA) nz * (S predA) + (S r' + predA)
+                            ...(sym $ plusAssociative
+                                (divNatNZ s (S predA) nz * S predA) (S r') predA)
+                   ~~ divNatNZ s (S predA) nz * (S predA) + (S predA + r')
+                            ...(cong (divNatNZ s (S predA) nz * S predA +) sRpA)
+                   ~~ (divNatNZ s (S predA) nz * (S predA) + S predA) + r'
+                            ...(plusAssociative
+                                (divNatNZ s (S predA) nz * S predA) (S predA) r')
+                   ~~ (S predA + divNatNZ s (S predA) nz * (S predA)) + r'
+                            ...(cong (+ r') $
+                                plusCommutative
+                                  (divNatNZ s (S predA) nz * S predA) (S predA))
+                   ~~ S (divNatNZ s (S predA) nz) * (S predA) + r'
+                            ...(cong (+ r') $
+                                sym $ multLeftSuccPlus
+                                  (divNatNZ s (S predA) nz) (S predA))
+                 divEqSQ = fst $ DivisionTheoremUniqueness
+                                   (s + predA) (S predA) ItIsSucc
+                                   (S (divNatNZ s (S predA) nz)) r'
+                                   r'LtSPredA sPA2
+             in Calc $
+                  |~ s + (S predA `minus` modNatNZ s (S predA) nz)
+                  ~~ s + (S predA `minus` S r')
+                           ...(cong (\m => s + (S predA `minus` m)) rIsSr')
+                  ~~ s + (predA `minus` r')
+                           ...(Refl)
+                  ~~ (S r' + divNatNZ s (S predA) nz * (S predA))
+                       + (predA `minus` r')
+                           ...(cong (+ (predA `minus` r')) divThm')
+                  ~~ S r' + (divNatNZ s (S predA) nz * (S predA)
+                       + (predA `minus` r'))
+                           ...(sym $ plusAssociative (S r')
+                                 (divNatNZ s (S predA) nz * S predA)
+                                 (predA `minus` r'))
+                  ~~ S r' + ((predA `minus` r')
+                       + divNatNZ s (S predA) nz * (S predA))
+                           ...(cong (S r' +) $
+                               plusCommutative
+                                 (divNatNZ s (S predA) nz * S predA)
+                                 (predA `minus` r'))
+                  ~~ (S r' + (predA `minus` r'))
+                       + divNatNZ s (S predA) nz * (S predA)
+                           ...(plusAssociative (S r') (predA `minus` r')
+                                 (divNatNZ s (S predA) nz * S predA))
+                  ~~ S predA + divNatNZ s (S predA) nz * (S predA)
+                           ...(cong (+ divNatNZ s (S predA) nz * S predA)
+                                 sRpMinR)
+                  ~~ S (divNatNZ s (S predA) nz) * (S predA)
+                           ...(sym $ multLeftSuccPlus
+                                 (divNatNZ s (S predA) nz) (S predA))
+                  ~~ divNatNZ (s + predA) (S predA) ItIsSucc * (S predA)
+                           ...(cong (* S predA) (sym divEqSQ))
+                  ~~ alignTo s (S predA)
+                           ...(Refl)
