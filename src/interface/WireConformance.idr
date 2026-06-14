@@ -36,6 +36,7 @@ import VclTotal.ABI.Types
 import VclTotal.Core.Grammar
 import VclTotal.Core.Schema
 import VclTotal.Core.Decide
+import VclTotal.Core.Transition
 import VclTotal.Interface.WireDecode
 
 %default total
@@ -168,3 +169,56 @@ clVerdict3a = Refl
 
 clVerdict3b : safetyLevelToInt ParseSafe = 0
 clVerdict3b = Refl
+
+-- ── S2: VclOp (Query | Transit) conformance — the `VCLT` stream ───────
+--
+-- Same discipline as conform{1,2,3}: the certified Idris `fromWireOp`
+-- decoder, run at compile time on the EXACT bytes the Rust `to_wire_op`
+-- emits (oracle `tests/conformance_emit.rs` `goldenOpQ1`/`goldenT1`/
+-- `goldenT2`), reduces by `Refl` to the expected `VclOp`.
+
+-- OpQ1: a Query-wrapped statement (the op stream around `expected1`).
+goldenOpQ1 : List Bits8
+goldenOpQ1 = [86,67,76,84,1,0,0,1,0,0,0,3,2,4,0,0,0,109,97,105,110,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]
+
+conformOpQ1 : fromWireOp WireConformance.goldenOpQ1 = Right (Query WireConformance.expected1)
+conformOpQ1 = Refl
+
+-- T1: MERGE 'a' 'b' INTO 'c' (distinct inputs, no evidence), level 4.
+mergeFix : Transition
+mergeFix = TMerge (MkSubjectRef "a") (MkSubjectRef "b") (MkSubjectRef "c") Nothing InjectionProof
+
+goldenT1 : List Bits8
+goldenT1 = [86,67,76,84,1,0,1,0,1,0,0,0,97,1,0,0,0,98,1,0,0,0,99,0,4]
+
+conformT1 : fromWireOp WireConformance.goldenT1 = Right (Transit WireConformance.mergeFix)
+conformT1 = Refl
+
+-- T2: NORMALISE 's-1' USER RESOLVE (single subject, justified), level 4.
+normFix : Transition
+normFix = TNormalise (MkSubjectRef "s-1") UserResolve InjectionProof
+
+goldenT2 : List Bits8
+goldenT2 = [86,67,76,84,1,0,1,2,3,0,0,0,115,45,49,2,4]
+
+conformT2 : fromWireOp WireConformance.goldenT2 = Right (Transit WireConformance.normFix)
+conformT2 = Refl
+
+-- ── S2 transition recompute-tier verdict pins (corpus `certifiedTransition
+--    Level` == the Rust `certified_transition_level` port, on the SAME
+--    decoded transitions) ──────────────────────────────────────────────
+--
+-- Both fixtures are evidence-free, so the verdict reduces independent of
+-- the schema (evidence type-compatibility is vacuous): structurally
+-- distinct subjects + no string-literal evidence ⇒ the InjectionProof
+-- ceiling (4). The Rust oracle emits `ctl1 = 4`, `ctl2 = 4`; the corpus
+-- `certifiedTransitionLevel` Refl-reduces to the same 4 here. (The DEEPER
+-- obligations — provenance-descent, engine-liveness, modality-presence,
+-- identity-vs-location — are OWED; see Transition.idr / VERIFICATION-
+-- STANCE.adoc §S2. This pins the partial, honest verdict, not a total one.)
+
+ctlVerdict1 : certifiedTransitionLevel WireConformance.mergeFix WireConformance.expectedS1 = 4
+ctlVerdict1 = Refl
+
+ctlVerdict2 : certifiedTransitionLevel WireConformance.normFix WireConformance.expectedS1 = 4
+ctlVerdict2 = Refl

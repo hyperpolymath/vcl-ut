@@ -9,7 +9,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use proptest::prelude::*;
-use vcltotal_parse::parse;
+use vcltotal_parse::{parse, parse_op};
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(4096))]
@@ -60,6 +60,74 @@ fn known_good_queries_parse() {
     for q in oks {
         assert!(parse(q).is_ok(), "should parse: {q}");
     }
+}
+
+// ── Deep nesting must fail-closed (typed error), NOT overflow the stack ──
+// Regression for the adversarial-review finding: the recursive-descent
+// expression grammar (parens, NOT chains, sub-queries) is depth-guarded so
+// an adversarial deeply-nested input returns a typed `ParseError`, never a
+// SIGABRT process abort. The depth cap (256) is comfortably within the gate
+// binary's main-thread stack; these witnesses run the parse on an
+// 8-MiB-stack thread (representative of the deployed gate) because libtest's
+// default *spawned* test threads are only ~2 MiB — too small to even reach
+// the cap in an unoptimised build, which would mask the real contract.
+fn parse_on_gate_stack<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
+    std::thread::Builder::new()
+        .stack_size(8 * 1024 * 1024)
+        .spawn(f)
+        .expect("spawn")
+        .join()
+        .expect("the parse must not abort the thread")
+}
+
+#[test]
+fn deep_parens_are_typed_error_not_overflow() {
+    let msg = parse_on_gate_stack(|| {
+        let depth = 100_000;
+        let q = format!(
+            "SELECT * FROM STORE s WHERE {}GRAPH.x = 1{}",
+            "(".repeat(depth),
+            ")".repeat(depth)
+        );
+        parse(&q).err().map(|e| e.msg)
+    });
+    assert_eq!(
+        msg.as_deref().map(|m| m.contains("too deep")),
+        Some(true),
+        "deep parens must fail-closed with a typed error; got: {msg:?}"
+    );
+}
+
+#[test]
+fn deep_not_chain_is_typed_error_not_overflow() {
+    let msg = parse_on_gate_stack(|| {
+        let q = format!("SELECT * FROM STORE s WHERE {}GRAPH.x", "NOT ".repeat(100_000));
+        parse(&q).err().map(|e| e.msg)
+    });
+    assert_eq!(
+        msg.as_deref().map(|m| m.contains("too deep")),
+        Some(true),
+        "deep NOT chain must fail-closed; got: {msg:?}"
+    );
+}
+
+#[test]
+fn deep_transition_evidence_is_typed_error_not_overflow() {
+    // The S2 transition WHERE-evidence path flows through the same grammar.
+    let msg = parse_on_gate_stack(|| {
+        let depth = 100_000;
+        let q = format!(
+            "MERGE 'a' 'b' INTO 'c' WHERE {}GRAPH.x = 1{}",
+            "(".repeat(depth),
+            ")".repeat(depth)
+        );
+        parse_op(&q).err().map(|e| e.msg)
+    });
+    assert_eq!(
+        msg.as_deref().map(|m| m.contains("too deep")),
+        Some(true),
+        "deep transition evidence must fail-closed; got: {msg:?}"
+    );
 }
 
 #[test]

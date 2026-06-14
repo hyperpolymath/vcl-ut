@@ -18,6 +18,11 @@ const MAGIC: [u8; 4] = *b"VCLW";
 /// Distinct magic for the P5c `OctadSchema` stream so a schema/statement
 /// mix-up is a hard `BadMagic`, never a silent mis-parse.
 const SCHEMA_MAGIC: [u8; 4] = *b"VCLS";
+/// Distinct magic for the S2 `VclOp` (Query | Transit) stream so an
+/// op/statement/schema mix-up is a hard `BadMagic`, never a silent
+/// mis-parse. The `VCLW` Statement stream is byte-unchanged (S2 reopens
+/// no S1 golden vector); a transition rides this separate `VCLT` stream.
+const OP_MAGIC: [u8; 4] = *b"VCLT";
 const VERSION: u16 = 1;
 
 /// Total decode failure (never a panic).
@@ -395,6 +400,72 @@ fn enc_epi_clause(c: &EpistemicClause, o: &mut Vec<u8>) {
 
 fn safety_tag(s: SafetyLevel) -> u8 {
     s as u8
+}
+
+// ── S2: VclOp (Query | Transit) codec (magic VCLT) ───────────────────
+
+fn enc_subject(sr: &SubjectRef, o: &mut Vec<u8>) {
+    put_str(o, &sr.0);
+}
+
+fn enc_repair(r: &RepairJustification, o: &mut Vec<u8>) {
+    match r {
+        RepairJustification::FromAuthoritative(m) => {
+            put_u8(o, 0);
+            enc_modality(m, o);
+        }
+        RepairJustification::MergeModalities => put_u8(o, 1),
+        RepairJustification::UserResolve => put_u8(o, 2),
+    }
+}
+
+fn enc_transition(t: &Transition, o: &mut Vec<u8>) {
+    match t {
+        Transition::Merge(l, r, into, ev, lvl) => {
+            put_u8(o, 0);
+            enc_subject(l, o);
+            enc_subject(r, o);
+            enc_subject(into, o);
+            put_opt(o, ev, enc_expr);
+            put_u8(o, safety_tag(*lvl));
+        }
+        Transition::Split(from, ol, or_, ev, lvl) => {
+            put_u8(o, 1);
+            enc_subject(from, o);
+            enc_subject(ol, o);
+            enc_subject(or_, o);
+            put_opt(o, ev, enc_expr);
+            put_u8(o, safety_tag(*lvl));
+        }
+        Transition::Normalise(s, just, lvl) => {
+            put_u8(o, 2);
+            enc_subject(s, o);
+            enc_repair(just, o);
+            put_u8(o, safety_tag(*lvl));
+        }
+    }
+}
+
+fn enc_op(op: &VclOp, o: &mut Vec<u8>) {
+    match op {
+        VclOp::Query(s) => {
+            put_u8(o, 0);
+            enc_stmt(s, o);
+        }
+        VclOp::Transit(t) => {
+            put_u8(o, 1);
+            enc_transition(t, o);
+        }
+    }
+}
+
+/// Serialise a `VclOp` to the v1 `VCLT` wire stream. Total.
+pub fn to_wire_op(op: &VclOp) -> Vec<u8> {
+    let mut o = Vec::new();
+    o.extend_from_slice(&OP_MAGIC);
+    o.extend_from_slice(&VERSION.to_le_bytes());
+    enc_op(op, &mut o);
+    o
 }
 
 fn enc_stmt(s: &Statement, o: &mut Vec<u8>) {
@@ -849,6 +920,84 @@ fn dec_stmt(d: &mut D) -> Result<Statement, WireError> {
         // matching `WireDecode.idr`, so the byte format stays stable.
         verb: Verb::Select,
     })
+}
+
+// ── S2: VclOp decoder (total: bounds-checked, no panic) ──────────────
+
+fn dec_subject(d: &mut D) -> Result<SubjectRef, WireError> {
+    Ok(SubjectRef(d.string()?))
+}
+
+fn dec_repair(d: &mut D) -> Result<RepairJustification, WireError> {
+    match d.u8()? {
+        0 => Ok(RepairJustification::FromAuthoritative(dec_modality(d)?)),
+        1 => Ok(RepairJustification::MergeModalities),
+        2 => Ok(RepairJustification::UserResolve),
+        t => Err(WireError::BadTag {
+            ty: "RepairJustification",
+            tag: t,
+        }),
+    }
+}
+
+fn dec_transition(d: &mut D) -> Result<Transition, WireError> {
+    match d.u8()? {
+        0 => {
+            let l = dec_subject(d)?;
+            let r = dec_subject(d)?;
+            let into = dec_subject(d)?;
+            let ev = d.opt(dec_expr)?;
+            let lvl = dec_safety(d)?;
+            Ok(Transition::Merge(l, r, into, ev, lvl))
+        }
+        1 => {
+            let from = dec_subject(d)?;
+            let ol = dec_subject(d)?;
+            let or_ = dec_subject(d)?;
+            let ev = d.opt(dec_expr)?;
+            let lvl = dec_safety(d)?;
+            Ok(Transition::Split(from, ol, or_, ev, lvl))
+        }
+        2 => {
+            let s = dec_subject(d)?;
+            let just = dec_repair(d)?;
+            let lvl = dec_safety(d)?;
+            Ok(Transition::Normalise(s, just, lvl))
+        }
+        t => Err(WireError::BadTag {
+            ty: "Transition",
+            tag: t,
+        }),
+    }
+}
+
+fn dec_op(d: &mut D) -> Result<VclOp, WireError> {
+    match d.u8()? {
+        0 => Ok(VclOp::Query(Box::new(dec_stmt(d)?))),
+        1 => Ok(VclOp::Transit(dec_transition(d)?)),
+        t => Err(WireError::BadTag {
+            ty: "VclOp",
+            tag: t,
+        }),
+    }
+}
+
+/// Decode a v1 `VCLT` wire stream into a `VclOp`. Total: every input
+/// yields `Ok`/`Err`, never a panic (same contract as [`from_wire`]).
+pub fn from_wire_op(input: &[u8]) -> Result<VclOp, WireError> {
+    let mut d = D { b: input, pos: 0 };
+    if d.take(4)? != OP_MAGIC {
+        return Err(WireError::BadMagic);
+    }
+    let ver = d.u16()?;
+    if ver != VERSION {
+        return Err(WireError::BadVersion(ver));
+    }
+    let op = dec_op(&mut d)?;
+    if d.pos != d.b.len() {
+        return Err(WireError::TrailingBytes);
+    }
+    Ok(op)
 }
 
 // ── P5c: OctadSchema codec (schema marshalling for the recompute tier)

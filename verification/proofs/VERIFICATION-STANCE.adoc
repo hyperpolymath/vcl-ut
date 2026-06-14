@@ -145,6 +145,98 @@ honest gaps (uncertified `checkQuery`; L1/L6–L10 soundness; L3 subquery/
 heuristic scoping; unsound excluded `ABI.Layout/.Foreign`) are in the
 OWED section.
 
+== S2 (consonance transitions) — scope, certification ceiling, and OWED
+
+*Surface.* S1 added the `Verb` discriminant
+(`VSelect/VInspect/VVerify/VAssert/VDeclare/VRetract`) as an *additive*
+`Statement` field: every L0..L10 predicate accesses `Statement` by named
+field and ignores `verb`, so the addition reopened ZERO existing proofs
+(the corpus is byte-identical except the one tag-only `Grammar.Verb`
+extension). S2 adds the three remaining verbs — `MERGE`, `SPLIT`,
+`NORMALISE` — but these are multi-subject / result-less and do NOT fit
+`record Statement` (single `source`, always result-returning). They are
+therefore a SEPARATE type `VclTotal.Core.Transition.Transition`, and the
+top-level operation is the sum `VclOp = Query Statement | Transit
+Transition`. Consequence: the entire L0..L10 statement corpus is
+*untouched* by S2 — no statement proof is weakened, re-opened, or made
+vacuous.
+
+*What S2 certifies (HONEST, PARTIAL).* `Transition.idr` certifies, by the
+same reflection-style `= True` discipline as L4..L10, a three-clause
+admissibility decider `transitionAdmissible t schema`:
+
+. *structural identity-distinctness* (`subjectsDistinct`) — `MERGE`'s two
+  inputs differ; `SPLIT`'s two outputs differ; `NORMALISE` is
+  single-subject (trivially distinct). This is proved NON-vacuous:
+  `certifiedSubjectsDistinct : TransitionSafe t schema -> subjectsDistinct
+  t = True` extracts the distinctness conjunct from the certificate (so a
+  self-merge cannot carry a certificate).
+. *evidence injection-safety* (`evidenceInjectionSafe`, L4 polarity) — the
+  optional evidence `Expr` embeds NO raw string literal; `Nothing`
+  evidence is safe. Reuses the single-source-of-truth `Grammar.hasStringLit`.
+. *evidence type-compatibility* (`evidenceTypeCompat`) — reuses
+  `Decide.whereComparisonsCompatible` on the evidence `Expr`; `Nothing` is
+  vacuously compatible.
+
+The achieved level is the `InjectionProof` rung (4) when admissible, else
+−1 (`certifiedTransitionLevel`). There is NO L5+ ladder for a transition:
+result-less `NORMALISE` *genuinely OMITS* `L5 ResultTyped` / `L6
+CardinalitySafe` (it has no result set) — they are ABSENT, not vacuously
+passed. An unjustified `NORMALISE` is *unrepresentable* (the
+`RepairJustification` is a by-construction field), and the parser
+fail-closes on a missing justification clause.
+
+*Conservatism (no over-claim).* The S2 path only ever *narrows* what is
+admitted: a transition that fails any clause certifies to −1, and a
+syntactically-incomplete transition (e.g. unjustified `NORMALISE`) is
+rejected at parse. A `Transit` is certified by `certified_transition_level`
+ONLY — the trusted gate (`bin/vclt-gate.rs`) routes
+`VclOp::Transit ⇒ run_transition`, NEVER down-casting a transition to the
+`Statement` `certified_level`. The Rust type system makes the down-cast
+unrepresentable (`certified_level` takes `&Statement`, not `&Transition`).
+
+*Cross-language machine-pin (the doubly-trusted seam).* The transition
+wire + verdict are pinned exactly as the statement path is:
+
+* `to_wire_op` (Rust) ⇄ `fromWireOp` (certified Idris) on a distinct
+  `VCLT` magic (a `VCLW`/`VCLS`/`VCLT` mix-up is a hard `BadMagic`). The
+  Idris decoder is `%default total`, fuel-bounded, ZERO proof-escape, and
+  reduces by `Refl` at compile time on the EXACT bytes the Rust encoder
+  emits: `WireConformance.conformOpQ1` (a `Query`-wrapped statement),
+  `conformT1` (`MERGE`), `conformT2` (`NORMALISE`). Oracle:
+  `tests/conformance_emit.rs` `goldenOpQ1/goldenT1/goldenT2`.
+* `certified_transition_level` (Rust port) ⇄ `certifiedTransitionLevel`
+  (corpus): `ctlVerdict1/ctlVerdict2` `Refl`-reduce the corpus verdict to
+  `4` on the same evidence-free fixtures the Rust oracle emits (`ctl1 =
+  ctl2 = 4`). The Rust decider is a line-by-line port of the corpus
+  deciders; the conformance is *same decider fact ⇒ same Rust verdict*.
+* `tests/wire.rs` adds the SPARK-grade totality witnesses for the new
+  codec (`op_roundtrip`, `op_decoder_total_on_garbage`,
+  `op_decoder_total_with_valid_header`).
+
+*DISCLOSED-OWED (recorded, fail-closed, NEVER faked).* The S2 certificate
+is a floor, not a ceiling. It does NOT establish:
+
+. *provenance-descent* — that a merged identity correctly inherits the
+  provenance of BOTH inputs (only structural distinctness is checked, not
+  identity conservation in the provenance graph).
+. *engine-liveness* — that the `MERGE` inputs / `SPLIT` source actually
+  exist and are live in the store (the gate is a pure function of
+  (operation, schema); existence is the engine's obligation).
+. *modality-presence for `NORMALISE`* — that the chosen
+  `RepairJustification` modality is actually present/authoritative for the
+  subject.
+. *identity-vs-location* — `SubjectRef` is an identity handle checked only
+  by *handle equality*; it is deliberately distinct from `Source` (a
+  read-location) but is not yet cross-checked against the provenance graph.
+
+*Boundary (this slice).* The Tier-2 recompute (`recompute-wasm`) and
+attestation (`attest`) pipelines remain STATEMENT-only: they consume the
+`VCLW` stream and `certified_level`. Extending the recompute/attestation
+TCB to the `VCLT` transition stream is a separate, disclosed unit of work
+(it requires a transition attestation format), not silently folded in
+here.
+
 == What is NOT proven (honest, precisely-scoped gaps — OWED)
 
 . *(Phase 1 — RESOLVED)* The Phase-1 corpus (ABI.Types + Core.*) now

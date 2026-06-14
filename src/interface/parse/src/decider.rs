@@ -33,7 +33,7 @@
 
 use crate::ast::{
     Agent, CompOp, EpistemicClause, EpistemicRequirement, Expr, FieldRef, Literal, Modality,
-    SafetyLevel, SelectItem, Statement,
+    SafetyLevel, SelectItem, Statement, SubjectRef, Transition,
 };
 use crate::schema::{ModalitySchema, OctadSchema, VqlType};
 
@@ -563,4 +563,80 @@ pub fn certified_level(stmt: &Statement, schema: &OctadSchema) -> i64 {
         lvl = lvl.saturating_add(1);
     }
     i64::from(k)
+}
+
+// ── S2: transition certification (port of `Transition.idr`) ──────────
+//
+// A faithful, line-by-line port of `VclTotal.Core.Transition`'s deciders
+// + `certifiedTransitionLevel`. A transition is NOT a statement: it has
+// no L5+ ladder (no result set), so this is a SEPARATE certifier — the
+// `Transit` arm of a `VclOp` routes here, NEVER down-casting to the
+// `Statement` `certified_level`. What it certifies is HONEST and PARTIAL
+// (structural identity-distinctness + evidence injection-safety + evidence
+// type-compatibility); the deeper obligations (provenance-descent,
+// engine-liveness, modality-presence, identity-vs-location) are OWED — see
+// `Transition.idr` and `VERIFICATION-STANCE.adoc` §S2.
+
+fn subject_eq(a: &SubjectRef, b: &SubjectRef) -> bool {
+    a.0 == b.0
+}
+
+/// `Transition.subjectsDistinct`: MERGE's two inputs differ; SPLIT's two
+/// outputs differ; NORMALISE is single-subject (trivially distinct).
+fn subjects_distinct(t: &Transition) -> bool {
+    match t {
+        Transition::Merge(l, r, _, _, _) => !subject_eq(l, r),
+        Transition::Split(_, ol, or_, _, _) => !subject_eq(ol, or_),
+        Transition::Normalise(_, _, _) => true,
+    }
+}
+
+/// `Transition.transitionEvidence`: the optional evidence `Expr`.
+fn transition_evidence(t: &Transition) -> Option<&Expr> {
+    match t {
+        Transition::Merge(_, _, _, ev, _) | Transition::Split(_, _, _, ev, _) => ev.as_ref(),
+        Transition::Normalise(_, _, _) => None,
+    }
+}
+
+/// `Transition.evidenceInjectionSafe` — L4 polarity: the evidence embeds
+/// NO raw string literal (the canonical injection vector). `None` is safe.
+fn evidence_injection_safe(t: &Transition) -> bool {
+    match transition_evidence(t) {
+        None => true,
+        Some(e) => !has_string_lit(e),
+    }
+}
+
+/// `Transition.evidenceTypeCompat` — reuses the single-source-of-truth
+/// `whereComparisonsCompatible` decider on the evidence `Expr`. `None`
+/// evidence is vacuously compatible.
+fn evidence_type_compat(t: &Transition, schema: &OctadSchema) -> bool {
+    match transition_evidence(t) {
+        None => true,
+        Some(e) => {
+            let mut cs = Vec::new();
+            extract_comparisons(e, &mut cs);
+            cs.iter()
+                .all(|(l, r)| types_compatible(&resolve_expr_type(l, schema), &resolve_expr_type(r, schema)))
+        }
+    }
+}
+
+/// `Transition.transitionAdmissible`: all statically-checkable obligations
+/// hold.
+fn transition_admissible(t: &Transition, schema: &OctadSchema) -> bool {
+    subjects_distinct(t) && evidence_injection_safe(t) && evidence_type_compat(t, schema)
+}
+
+/// Faithful port of `Transition.certifiedTransitionLevel`: the
+/// `InjectionProof` rung (4) when admissible, else -1. This is the
+/// transition recompute-tier verdict — the `Transit` arm of a `VclOp`
+/// routes here. NEVER down-cast a transition to `certified_level`.
+pub fn certified_transition_level(t: &Transition, schema: &OctadSchema) -> i64 {
+    if transition_admissible(t, schema) {
+        4
+    } else {
+        -1
+    }
 }
