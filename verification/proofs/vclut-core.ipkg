@@ -13,14 +13,16 @@
 -- proof-escape symbols. See VERIFICATION-STANCE.adoc for what that does and
 -- does not establish.
 --
--- SCOPE: this is the hypatia<->verisim safety predicate corpus
--- (ABI.Types + Core.*). `VclTotal.ABI.Layout` and `VclTotal.ABI.Foreign`
--- are deliberately NOT listed: they are a pre-existing, out-of-Phase-1
--- breakage (a `Nat` `(-)` type error in `paddingFor`, and unsound
--- "proofs" `alignUpCorrect`/`queryPlanHeaderNoPadding` that assert false
--- equalities). Including them would either break this package or force a
--- proof-escape. They are scoped OWED in VERIFICATION-STANCE.adoc for a
--- dedicated follow-up; nothing in Core.* depends on them.
+-- SCOPE: the hypatia<->verisim safety-predicate corpus. As of 2026-06-14
+-- this is ABI.{Types, Layout, LayoutProofs} + Core.* + Interface.Wire*
+-- (the 12 modules listed below). `VclTotal.ABI.Layout` was made sound and
+-- is now included; `VclTotal.ABI.LayoutProofs` discharges its genuine
+-- alignment / no-padding / bounds theorems (the former `Nat` `(-)` error in
+-- `paddingFor` was fixed, and the unsound `alignUpCorrect` /
+-- `queryPlanHeaderNoPadding` claims were deleted, not faked). Still NOT
+-- listed: the Foreign bindings (`module Foreign` in src/abi/Foreign.idr,
+-- `VclTotal.Legacy.Foreign` in src/interface/legacy/Foreign.idr) — out of
+-- scope and imported by nothing in the corpus. See VERIFICATION-STANCE.adoc.
 
 package vclut-core
 version = 0.1.0

@@ -60,8 +60,9 @@ predicates, `checkLevel2/3/5Sound`, genuine `composeJoin` closure).
 and made `VclTotal.ABI.Layout` sound + CI-gated (unsound claims
 deleted, not faked). `idris2 0.8.0 --build
 verification/proofs/vclut-core.ipkg` exits 0 over `VclTotal.ABI.{Types,
-Layout}` + `VclTotal.Core.{Grammar,Schema,Decide,Levels,Checker,
-Composition,Epistemic}` (9 modules), under `%default total`,
+Layout, LayoutProofs}` + `VclTotal.Core.{Grammar,Schema,Decide,Levels,
+Checker,Composition,Epistemic}` + `VclTotal.Interface.{WireDecode,
+WireConformance}` (12 modules), under `%default total`,
 with *zero*
 `believe_me`/`really_believe_me`/`postulate`/`assert_total`/
 `assert_smaller`/`idris_crash`/`sorry` (CI-enforced by
@@ -81,14 +82,17 @@ scripts/honesty-guard.sh [PATH…]` (default `src/`); it strips Idris line/doc/b
 comments before matching, so tokens merely *named* in prose are not flagged, and
 it exits non-zero on any escape symbol found outside a comment.
 
-*New finding (Phase 1):* `src/interface/abi/Layout.idr` and
-`src/interface/abi/Foreign.idr` (`VclTotal.ABI.Layout/.Foreign`) do *not*
-compile under idris2 0.8.0 and contain *unsound* scaffolding (`paddingFor`
-uses `(-)` on `Nat`; `alignUpCorrect` asserts `n = (n \`div\` a) * a` by
-`Refl`; `queryPlanHeaderNoPadding` asserts a false size equality). They
-are outside Phase 1's enumerated scope (ABI.Types + Core.*), nothing in
-`Core.*` imports them, and they are deliberately excluded from
-`vclut-core.ipkg`. See OWED below.
+*Phase-1 finding — UPDATED 2026-06-14 (resolved for `Layout`):* the
+original Phase-1 finding was that `src/interface/abi/Layout.idr` did not
+compile under idris2 0.8.0 and held *unsound* scaffolding (`paddingFor`
+used `(-)` on `Nat`; `alignUpCorrect` asserted `n = (n \`div\` a) * a` by
+`Refl`; `queryPlanHeaderNoPadding` asserted a false size equality). That is
+now *resolved*: those claims were fixed or deleted (not faked), `Layout.idr`
+compiles, and `VclTotal.ABI.{Layout,LayoutProofs}` are both in
+`vclut-core.ipkg` and machine-checked. The only ABI sources still excluded
+are the Foreign bindings (`module Foreign` in `src/abi/Foreign.idr`,
+`VclTotal.Legacy.Foreign` in `src/interface/legacy/Foreign.idr`) — out of
+Phase-1 scope, imported by nothing in the corpus. See OWED below.
 
 == What IS genuinely machine-verified by this PR
 

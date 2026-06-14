@@ -4,13 +4,14 @@
 # proof-corpus.yml — Machine-checks the VclTotal Idris2 proof corpus.
 #
 # vcl-ut is the doubly-trusted hypatia<->verisim interface. This gate
-# fails the build if the Phase-1 corpus (ABI.Types + Core.*) stops
-# typechecking under idris2 0.8.0, or if a proof-escape symbol is
-# introduced. Tracked: hyperpolymath/standards#124.
+# fails the build if the corpus (ABI.{Types, Layout, LayoutProofs} + Core.*
+# + Interface.Wire*, 12 modules) stops typechecking under idris2 0.8.0, or
+# if a proof-escape symbol is introduced. Tracked: hyperpolymath/standards#124.
 #
-# Scope note: VclTotal.ABI.Layout / .Foreign are intentionally NOT in
-# verification/proofs/vclut-core.ipkg (pre-existing, out-of-Phase-1
-# breakage — see verification/proofs/VERIFICATION-STANCE.adoc, OWED).
+# Scope note: VclTotal.ABI.Layout is now sound and IS in
+# verification/proofs/vclut-core.ipkg (LayoutProofs discharges its
+# theorems). Only the Foreign bindings (module Foreign, VclTotal.Legacy.
+# Foreign) remain excluded — see verification/proofs/VERIFICATION-STANCE.adoc.
 
 name: Proof Corpus
 
