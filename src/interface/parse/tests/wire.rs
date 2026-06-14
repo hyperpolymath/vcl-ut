@@ -129,6 +129,7 @@ fn leaf_stmt() -> impl Strategy<Value = Statement> {
             linear_annot: None,
             epistemic_clause: None,
             requested_level: SafetyLevel::ParseSafe,
+            verb: Verb::Select,
         })
 }
 
@@ -254,6 +255,7 @@ fn statement() -> impl Strategy<Value = Statement> {
         linear_annot: e.3,
         epistemic_clause: e.4,
         requested_level: e.5,
+        verb: Verb::Select,
     })
 }
 
@@ -307,6 +309,7 @@ fn golden_minimal() {
         linear_annot: None,
         epistemic_clause: None,
         requested_level: SafetyLevel::SchemaBound,
+        verb: Verb::Select,
     };
     let b = to_wire(&s);
     assert_eq!(&b[0..4], b"VCLW");
@@ -348,5 +351,6 @@ fn mk_float_stmt(f: f64) -> Statement {
         linear_annot: None,
         epistemic_clause: None,
         requested_level: SafetyLevel::ParseSafe,
+        verb: Verb::Select,
     }
 }

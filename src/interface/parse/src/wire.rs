@@ -845,6 +845,9 @@ fn dec_stmt(d: &mut D) -> Result<Statement, WireError> {
         linear_annot,
         epistemic_clause,
         requested_level,
+        // `verb` is not carried on the wire (S1): default to the read sense,
+        // matching `WireDecode.idr`, so the byte format stays stable.
+        verb: Verb::Select,
     })
 }
 

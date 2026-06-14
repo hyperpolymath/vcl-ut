@@ -207,6 +207,20 @@ pub enum SafetyLevel {
     EpistemicSafe = 10,
 }
 
+/// `Grammar.idr`: `data Verb`. Read verbs (`Select`/`Inspect`/`Verify`) carry
+/// the existing relational semantics; the mutating verbs (`Assert`/`Declare`/
+/// `Retract`) are parsed as tags over the same body (S1). `Merge`/`Split`/
+/// `Normalise` stay unmodelled (fail-closed in the parser).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Verb {
+    Select,
+    Inspect,
+    Verify,
+    Assert,
+    Declare,
+    Retract,
+}
+
 /// `Grammar.idr`: `record Statement` (`orderBy` is `(field, ascending?)`;
 /// Idris `Nat` limit/offset -> `u64`).
 #[derive(Debug, Clone, PartialEq)]
@@ -225,4 +239,6 @@ pub struct Statement {
     pub linear_annot: Option<LinearAnnotation>,
     pub epistemic_clause: Option<EpistemicClause>,
     pub requested_level: SafetyLevel,
+    /// VCL consonance verb (S1) — mirrors `Grammar.idr`'s additive `verb`.
+    pub verb: Verb,
 }

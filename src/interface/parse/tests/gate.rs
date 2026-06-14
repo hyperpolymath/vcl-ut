@@ -16,7 +16,7 @@
 )]
 
 use vcltotal_parse::{
-    ast::Modality,
+    ast::{Modality, Verb},
     certified_level, parse,
     schema::{FieldDef, ModalitySchema, OctadSchema, VqlType},
 };
@@ -49,13 +49,13 @@ fn schema_with_graph_fields(fields: Vec<FieldDef>) -> OctadSchema {
 
 // ── Fixture 1: Admitted ────────────────────────────────────────────────────
 //
-// Contract §"Worked examples" — Admitted:
-//   INSPECT GRAPH.knows FROM HEXAD 'e-1' WHERE depth < 3 LIMIT 10
+// Contract §"Worked examples" — Admitted (vclt-gate-contract.adoc:86):
+//   ASSERT GRAPH.knows FROM HEXAD 'e-1' WHERE depth < 3 LIMIT 10
 //   schema: graph.depth TInt non-null, graph.knows TOctad non-null
 //   expected: admissible=true, certified_level=6, levels 1-6 all pass, exit 0.
 
 #[test]
-fn fixture_admitted_inspect_with_limit() {
+fn fixture_admitted_assert_with_limit() {
     let schema = schema_with_graph_fields(vec![
         FieldDef {
             name: "depth".to_string(),
@@ -70,10 +70,14 @@ fn fixture_admitted_inspect_with_limit() {
             indexed: true,
         },
     ]);
-    // P5a parser uses SELECT/INSPECT; field refs need MODALITY.name qualification;
-    // bare `depth` is parsed as Expr::Param (schema-unresolved) — passes L1 vacuously.
-    let stmt = parse("INSPECT GRAPH.knows FROM HEXAD 'e-1' WHERE depth < 3 LIMIT 10")
+    // S1: the contract's worked example uses the ASSERT consonance verb, which
+    // now parses as a verb tag over the relational body (previously this fixture
+    // had to rewrite ASSERT->INSPECT because the parser could not parse ASSERT).
+    // Field refs need MODALITY.name qualification; bare `depth` parses as
+    // Expr::Param (schema-unresolved) — passes L1 vacuously.
+    let stmt = parse("ASSERT GRAPH.knows FROM HEXAD 'e-1' WHERE depth < 3 LIMIT 10")
         .expect("fixture 1 must parse");
+    assert_eq!(stmt.verb, Verb::Assert, "the ASSERT verb tag must be captured");
     let cert = certified_level(&stmt, &schema);
     assert_eq!(
         cert, 6,
@@ -159,4 +163,31 @@ fn parse_error_on_empty_input() {
 #[test]
 fn parse_error_on_garbage() {
     assert!(parse("'); DROP TABLE --").is_err());
+}
+
+// ── S1: consonance-verb discriminant ────────────────────────────────────────
+// The read verbs (SELECT/INSPECT/VERIFY) and the promoted mutating verbs
+// (ASSERT/DECLARE/RETRACT) parse as a verb tag over the same relational body;
+// MERGE/SPLIT/NORMALISE are deliberately fail-closed until their semantics (S2).
+#[test]
+fn s1_verb_tags_and_fail_closed() {
+    let body = "GRAPH.knows FROM STORE main";
+    for (kw, want) in [
+        ("SELECT", Verb::Select),
+        ("INSPECT", Verb::Inspect),
+        ("VERIFY", Verb::Verify),
+        ("ASSERT", Verb::Assert),
+        ("DECLARE", Verb::Declare),
+        ("RETRACT", Verb::Retract),
+    ] {
+        let stmt = parse(&format!("{kw} {body}"))
+            .unwrap_or_else(|e| panic!("{kw} should parse: {e:?}"));
+        assert_eq!(stmt.verb, want, "{kw} must carry the {want:?} tag");
+    }
+    for kw in ["MERGE", "SPLIT", "NORMALISE"] {
+        assert!(
+            parse(&format!("{kw} {body}")).is_err(),
+            "{kw} must fail-closed (S2, multi-subject / result-less semantics)"
+        );
+    }
 }

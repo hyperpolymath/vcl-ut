@@ -94,6 +94,7 @@ fn f1() -> Statement {
         linear_annot: None,
         epistemic_clause: None,
         requested_level: SafetyLevel::SchemaBound,
+        verb: Verb::Select,
     }
 }
 
@@ -138,6 +139,7 @@ fn f2() -> Statement {
             )],
         }),
         requested_level: SafetyLevel::EpistemicSafe,
+        verb: Verb::Select,
     }
 }
 
@@ -157,6 +159,7 @@ fn f3() -> Statement {
         linear_annot: None,
         epistemic_clause: None,
         requested_level: SafetyLevel::ParseSafe,
+        verb: Verb::Select,
     }
 }
 

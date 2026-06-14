@@ -172,7 +172,7 @@ mutual
   ||| payload — itself smaller than the enclosing `Expr`).
   public export
   statementFieldRefs : Statement -> List FieldRef
-  statementFieldRefs (MkStatement sel _ whr grp hav ord _ _ _ _ _ _ _ _) =
+  statementFieldRefs (MkStatement sel _ whr grp hav ord _ _ _ _ _ _ _ _ _) =
     let selRefs    : List FieldRef
         selRefs    = selItemsFieldRefs sel
         whereRefs  : List FieldRef
