@@ -50,7 +50,7 @@ expected1 =
   MkStatement [SelStar] (SrcStore "main")
     Nothing [] Nothing [] Nothing Nothing
     Nothing Nothing Nothing Nothing Nothing
-    SchemaBound
+    SchemaBound VSelect
 
 conform1 : fromWire WireConformance.golden1 = Right WireConformance.expected1
 conform1 = Refl
@@ -82,7 +82,7 @@ expected2 =
     (Just (EpClause
              [AgEngine, AgProver "lean4"]
              [EpReqKnows AgEngine (ELiteral (LitBool True) TAny)]))
-    EpistemicSafe
+    EpistemicSafe VSelect
 
 conform2 : fromWire WireConformance.golden2 = Right WireConformance.expected2
 conform2 = Refl
@@ -98,7 +98,7 @@ expected3 =
     (Just (ELiteral (LitFloat 2.5) TAny))
     [] Nothing [] Nothing Nothing
     Nothing Nothing Nothing Nothing Nothing
-    ParseSafe
+    ParseSafe VSelect
 
 conform3 : fromWire WireConformance.golden3 = Right WireConformance.expected3
 conform3 = Refl

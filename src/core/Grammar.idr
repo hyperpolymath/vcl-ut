@@ -298,6 +298,13 @@ mutual
   -- Statement (top-level query)
   -- ═══════════════════════════════════════════════════════════════════════
 
+  ||| The VCL statement verb (consonance surface, S1). The read verbs
+  ||| (VSelect/VInspect/VVerify) carry the existing relational semantics;
+  ||| the mutating verbs (VAssert/VDeclare/VRetract) are parsed as tags over
+  ||| the same body. MERGE/SPLIT/NORMALISE stay unmodelled (fail-closed).
+  public export
+  data Verb = VSelect | VInspect | VVerify | VAssert | VDeclare | VRetract
+
   ||| A complete VCL-total query statement.
   public export
   record Statement where
@@ -319,6 +326,9 @@ mutual
     epistemicClause : Maybe EpistemicClause  -- Level 10: epistemic safety
     -- Metadata
     requestedLevel : SafetyLevel
+    -- VCL consonance verb (S1). Every L0..L10 predicate accesses Statement
+    -- by named field and ignores `verb`, so adding it is proof-preserving.
+    verb            : Verb
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Injection-safety primitive (canonical single source of truth)
@@ -364,9 +374,9 @@ data HasSelectItems : Statement -> Type where
 ||| Proof that a statement has a valid source.
 public export
 data HasSource : Statement -> Type where
-  OctadSource : HasSource (MkStatement _ (SrcOctad _) _ _ _ _ _ _ _ _ _ _ _ _)
-  FederationSource : HasSource (MkStatement _ (SrcFederation _) _ _ _ _ _ _ _ _ _ _ _ _)
-  StoreSource : HasSource (MkStatement _ (SrcStore _) _ _ _ _ _ _ _ _ _ _ _ _)
+  OctadSource : HasSource (MkStatement _ (SrcOctad _) _ _ _ _ _ _ _ _ _ _ _ _ _)
+  FederationSource : HasSource (MkStatement _ (SrcFederation _) _ _ _ _ _ _ _ _ _ _ _ _ _)
+  StoreSource : HasSource (MkStatement _ (SrcStore _) _ _ _ _ _ _ _ _ _ _ _ _ _)
 
 ||| Proof that a statement requesting Level 6+ has a LIMIT clause.
 public export

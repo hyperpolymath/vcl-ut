@@ -110,12 +110,30 @@ pub fn parse(input: &str) -> Result<Statement, ParseError> {
 }
 
 fn parse_statement(p: &mut P) -> Result<Statement, ParseError> {
-    // Accept SELECT (legacy) and INSPECT (VCL epistemic read request) interchangeably.
-    if p.is_kw("INSPECT") || p.is_kw("VERIFY") {
+    // VCL consonance verb (S1). The read verbs (SELECT legacy / INSPECT /
+    // VERIFY) and the promoted mutating verbs (ASSERT / DECLARE / RETRACT) all
+    // parse as a tag over the same relational body. MERGE / SPLIT / NORMALISE
+    // are deliberately NOT accepted, so they fail-closed (their semantics are
+    // S2, multi-subject / result-less).
+    let verb = if p.is_kw("INSPECT") {
         p.bump();
+        Verb::Inspect
+    } else if p.is_kw("VERIFY") {
+        p.bump();
+        Verb::Verify
+    } else if p.is_kw("ASSERT") {
+        p.bump();
+        Verb::Assert
+    } else if p.is_kw("DECLARE") {
+        p.bump();
+        Verb::Declare
+    } else if p.is_kw("RETRACT") {
+        p.bump();
+        Verb::Retract
     } else {
         p.eat_kw("SELECT")?;
-    }
+        Verb::Select
+    };
     let select_items = parse_select_items(p)?;
     p.eat_kw("FROM")?;
     let source = parse_source(p)?;
@@ -179,6 +197,7 @@ fn parse_statement(p: &mut P) -> Result<Statement, ParseError> {
         linear_annot: None,
         epistemic_clause: None,
         requested_level: SafetyLevel::ParseSafe,
+        verb,
     };
     stmt.requested_level = infer_requested_level(&stmt);
     Ok(stmt)

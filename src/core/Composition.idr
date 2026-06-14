@@ -187,6 +187,7 @@ composeJoin q1 q2 = MkStatement
   (joinLinear (linearAnnot q1) (linearAnnot q2))
   (joinEpistemic (epistemicClause q1) (epistemicClause q2))
   (requestedLevel q1)
+  (verb q1)                                      -- join inherits the left verb
 
 ||| Two queries are composable if they target the same source octad.
 public export

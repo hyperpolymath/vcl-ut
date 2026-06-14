@@ -618,7 +618,9 @@ mutual
     (la,  r12) <- decOpt (\x => decLinear x) r11
     (ep,  r13) <- decOpt (decEpiClause k) r12
     (lvl, r14) <- decSafety r13
-    Right (MkStatement sel src wc gb hav ob lim off pf ef vc la ep lvl, r14)
+    -- `verb` is not carried on the wire (S1): decode defaults to VSelect, the
+    -- read sense, keeping the byte format and the WireConformance Refls stable.
+    Right (MkStatement sel src wc gb hav ob lim off pf ef vc la ep lvl VSelect, r14)
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Header + entry point
