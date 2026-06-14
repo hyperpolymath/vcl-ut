@@ -57,22 +57,22 @@ jobs:
           echo "$HOME/.idris2/bin" >> "$GITHUB_PATH"
           echo "IDRIS2_PREFIX=$HOME/.idris2" >> "$GITHUB_ENV"
 
-      - name: Proof-escape audit (no believe_me / postulate / assert_* / sorry)
+      - name: Proof-escape audit (honesty guard)
         run: |
           set -euo pipefail
-          # Strip line/block comments, then scan the corpus sources.
-          files="src/core/Grammar.idr src/core/Schema.idr src/core/Decide.idr \
-                 src/core/Levels.idr src/core/Checker.idr \
-                 src/core/Composition.idr src/core/Epistemic.idr \
-                 src/interface/abi/Types.idr src/interface/abi/Layout.idr \
-                 src/interface/abi/LayoutProofs.idr \
-                 src/interface/WireDecode.idr src/interface/WireConformance.idr"
-          if grep -nE '\b(believe_me|really_believe_me|assert_total|assert_smaller|idris_crash|postulate|sorry)\b' \
-               $files | grep -vE ':\s*(--|\|\|\|)' ; then
-            echo "::error::proof-escape symbol found in the Phase-1 corpus"
-            exit 1
-          fi
-          echo "OK: zero proof-escape symbols outside comments"
+          # Robust, comment-aware scan (line --, doc |||, nested {- -}, and
+          # string-literal-aware): scripts/honesty-guard.sh. Scoped to the
+          # Phase-1 corpus sources — the same module set vclut-core.ipkg builds
+          # below. Exits 1 on any believe_me / really_believe_me / postulate /
+          # assert_total / assert_smaller / idris_crash / sorry / ?hole /
+          # partial appearing outside a comment.
+          sh scripts/honesty-guard.sh \
+            src/core/Grammar.idr src/core/Schema.idr src/core/Decide.idr \
+            src/core/Levels.idr src/core/Checker.idr \
+            src/core/Composition.idr src/core/Epistemic.idr \
+            src/interface/abi/Types.idr src/interface/abi/Layout.idr \
+            src/interface/abi/LayoutProofs.idr \
+            src/interface/WireDecode.idr src/interface/WireConformance.idr
 
       - name: Build the proof corpus
         run: |

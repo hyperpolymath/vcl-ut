@@ -76,6 +76,11 @@ and a fully-qualified `hasStringLit` (a bare lowercase occurrence in a
 *type* signature is silently auto-bound by Idris 2 as a fresh implicit,
 which had decoupled the predicate from its definition).
 
+That same proof-escape scan runs locally (advisory-only) via `sh
+scripts/honesty-guard.sh [PATH…]` (default `src/`); it strips Idris line/doc/block
+comments before matching, so tokens merely *named* in prose are not flagged, and
+it exits non-zero on any escape symbol found outside a comment.
+
 *New finding (Phase 1):* `src/interface/abi/Layout.idr` and
 `src/interface/abi/Foreign.idr` (`VclTotal.ABI.Layout/.Foreign`) do *not*
 compile under idris2 0.8.0 and contain *unsound* scaffolding (`paddingFor`
