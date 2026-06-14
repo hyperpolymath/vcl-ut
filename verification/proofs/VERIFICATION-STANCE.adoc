@@ -414,12 +414,13 @@ OWED section.
   `vector.x` unresolved → Reject) is pinned Rust-side (decoded
   self-check) + by input-value conformance (`conform2`), not by Idris
   `Refl`; the find-free decision structure *is* `Refl`-pinned. (iii)
-  the additive↔ceil `alignUp` sliver
-  remains as previously scoped (Nat-arithmetic Euclidean-identity
-  infrastructure is the unwritten dependency; the practical
-  alignment-divides guarantee is already machine-checked via the
-  canonical-form `alignToDivides` theorem, so closing the additive
-  equivalence is a documentation tightening, not a safety upgrade).
+  the additive↔ceil `alignUp` equivalence
+  is now *closed* (2026-06-14): `alignUpAdditiveEquivAlignTo` proves
+  `s + paddingForLocal s a nz = alignTo s a` for every `NonZero a`, so
+  both the practical alignment-divides guarantee (`alignToDivides`) and
+  the additive↔ceil equivalence are machine-checked — the
+  Euclidean-identity infrastructure is now written, not an unwritten
+  dependency (see OWED above).
   *L9/L10 predicate depth (item iii in earlier revisions) is no
   longer a disclosed limit*: L9 was deepened in Phase 4b
   (`linearEnforcedStmt` rejects `LinUnlimited`); L10 acyclicity now
@@ -533,17 +534,19 @@ OWED section.
   (divisibility by construction for canonical ceil-multiple
   alignment), `queryPlanHeaderNoPadding` (Σ field sizes = cap, reduces
   under `Refl`), `fieldWithin` (membership-quantified bound via
-  `Vect.Elem` + `So.soAnd`). *Residual sliver:* additive↔ceil
-  `alignUp` equivalence for `a>0`, the documented `String` note
-  `alignUpAdditiveEquivOWED` — scoped, never faked.
+  `Vect.Elem` + `So.soAnd`). *Residual sliver at the time:* the
+  additive↔ceil `alignUp` equivalence for `a>0` (the documented `String`
+  note `alignUpAdditiveEquivOWED`) — scoped, never faked; since *closed*
+  by `alignUpAdditiveEquivAlignTo` (2026-06-14, see OWED above).
   *(4b)* L6–L10 genuinely closed under `composeJoin`
   (`l6/l7/l8/l9Compose`, `epiStructJoin` via real superset
   monotonicity); L10 acyclicity remains the explicit
   `JoinSideCondition` (provably non-closed, in the type). No
   `believe_me`/`postulate`/`assert_*`/`idris_crash`/`sorry`.
   *Residual (carried):* deepen the L9/L10 *predicates* to full
-  `checkLevelN` semantics; FFI transport; the additive↔ceil sliver;
-  the unchanged Phase-3 string→`Statement`/marshalling/Idris→C items.
+  `checkLevelN` semantics; FFI transport; the unchanged Phase-3
+  string→`Statement`/marshalling/Idris→C items. (The additive↔ceil
+  sliver once carried here was since *closed* — see OWED above.)
   This residual is *tracked, not forgotten*: the boundary-reinforcement
   workstream (typed-wasm PCC proof-transport + the missing
   `String -> Statement` parser, priority 1; the secondary items above)
@@ -581,7 +584,8 @@ OWED section.
   the exhaustive witness); the cross-module `Refl` non-reduction of
   `Data.List.find`/`elemBy` (schema-resolution-dependent verdicts
   pinned Rust-side + input-value conformance); the L9/L10 predicate
-  depth and additive↔ceil `alignUp` sliver. `affinescriptiser` is
+  depth; the additive↔ceil `alignUp` sliver formerly listed here is now
+  *closed* (see OWED above). `affinescriptiser` is
   *not* used for Tier-1 (resource-required + wasm-backend-pending;
   disclosed in `AFFINESCRIPTISER-NA.adoc`, not faked) and plain
   `wasm32` is sufficient because the wasm type system is not
