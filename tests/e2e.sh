@@ -73,7 +73,7 @@ echo ""
 # ── Category 3: VCL-total artefacts ───────────────────────────────────────
 echo "Category 3: VCL-total artefacts"
 
-check "arcvix paper (arXiv source) exists" "$([ -f arcvix-10-level-query-safety.tex ] && echo 0 || echo 1)"
+check "arcvix paper (arXiv source) exists" "$([ -f docs/whitepapers/arcvix-10-level-query-safety.tex ] && echo 0 || echo 1)"
 check "examples/ directory has content"    "$([ -d examples ] && ls examples/*.vcl 2>/dev/null | head -1 | grep -q . && echo 0 || echo 1)"
 check "features/ directory exists"        "$([ -d features ] && echo 0 || echo 1)"
 check "verification/ directory exists"    "$([ -d verification ] && echo 0 || echo 1)"
