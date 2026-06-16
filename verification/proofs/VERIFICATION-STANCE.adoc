@@ -8,7 +8,7 @@
 WARNING: vcl-ut is the interface between *hypatia* and *verisim*; both sides
 trust safety claims made here. This document states *precisely* what is and is
 not machine-verified, and takes precedence over any "verified" / "type-safe" /
-"formally proven" phrasing in `README.adoc`, `PROOF-NEEDS.md`, or module
+"formally proven" phrasing in `README.adoc`, `docs/status/PROOF-NEEDS.md`, or module
 doc-comments. It is the proof-backed companion to (and supersedes) the
 doc-only `docs/VERIFICATION-STANCE.adoc` (PR #19).
 
