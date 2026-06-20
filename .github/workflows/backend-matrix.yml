@@ -107,4 +107,10 @@ jobs:
         # path-dep breaks standalone CI), so `-p` cannot select it. It is its
         # own standalone workspace root; run it by manifest path now that the
         # echidna sibling has been cloned above.
-        run: cargo test --manifest-path src/interface/echidna-client/Cargo.toml --tests --locked
+        # NOTE: echidna-client is a standalone workspace with NO committed
+        # Cargo.lock — its transitive `echidna-core` path-dep only exists once
+        # the sibling is cloned (step above), so a lockfile cannot be committed
+        # and `--locked` can never be satisfied: it fails before the tests even
+        # build ("cannot create the lock file ... because --locked was passed").
+        # Resolve fresh against the just-cloned sibling instead (omit --locked).
+        run: cargo test --manifest-path src/interface/echidna-client/Cargo.toml --tests

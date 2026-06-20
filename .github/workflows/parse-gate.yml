@@ -55,6 +55,15 @@ jobs:
             --all-targets --locked -- -D warnings
 
       - name: Tests + panic-free proptest invariant
+        env:
+          # proptest's recursive `expr()` / `statement()` strategies can, for
+          # some RNG seeds, recurse far enough during value GENERATION to
+          # overflow the default 2 MiB test-thread stack, intermittently
+          # aborting the whole run (SIGABRT). The generated values are shallow
+          # (depth ~6) and the codec itself is bounded — this is proptest
+          # harness overhead, not a deep AST — so a larger thread stack makes
+          # the property tests robust without weakening the invariant.
+          RUST_MIN_STACK: "33554432"
         run: |
           set -euo pipefail
           cargo test --manifest-path src/interface/parse/Cargo.toml --locked
