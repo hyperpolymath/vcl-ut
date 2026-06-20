@@ -15,7 +15,7 @@
 
 use proptest::prelude::*;
 use vcltotal_parse::ast::*;
-use vcltotal_parse::{from_wire, from_wire_op, to_wire, to_wire_op};
+use vcltotal_parse::{from_wire, from_wire_op, from_wire_schema, to_wire, to_wire_op, WireError};
 
 fn modality() -> impl Strategy<Value = Modality> {
     prop_oneof![
@@ -360,6 +360,63 @@ proptest! {
         v.extend_from_slice(&tail);
         let _ = from_wire(&v);
     }
+}
+
+#[test]
+fn decoder_rejects_deep_nesting_without_overflow() {
+    // Trusted-boundary totality (#25): a deeply-nested *valid-prefix* stream
+    // must be rejected with a typed error, never recurse until the native
+    // stack overflows (a stack overflow aborts the process — a crash, not a
+    // total `Ok`/`Err`). Streams are built by hand, so no encoder recursion is
+    // involved. `MAX_DEPTH` is 128; these go far past it on a normal stack.
+
+    // ── Expr path (from_wire): where = N-deep Aggregate(Count, ...) ──
+    let stmt_with_deep_where = |n: usize| -> Vec<u8> {
+        let mut v = Vec::new();
+        v.extend_from_slice(b"VCLW");
+        v.extend_from_slice(&1u16.to_le_bytes());
+        v.extend_from_slice(&0u32.to_le_bytes()); // select_items: 0
+        v.push(2); // Source::Store
+        v.extend_from_slice(&0u32.to_le_bytes()); // store name ""
+        v.push(1); // where = Some(..)
+        for _ in 0..n {
+            v.push(4); // Expr::Aggregate
+            v.push(0); // AggFunc::Count
+        }
+        v.push(6); // Expr::Star (leaf)
+        v.extend_from_slice(&0u32.to_le_bytes()); // group_by: 0
+        v.push(0); // having: None
+        v.extend_from_slice(&0u32.to_le_bytes()); // order_by: 0
+        v.push(0); // limit: None
+        v.push(0); // offset: None
+        v.push(0); // proof_clause: None
+        v.push(0); // effect_decl: None
+        v.push(0); // version_const: None
+        v.push(0); // linear_annot: None
+        v.push(0); // epistemic_clause: None
+        v.push(0); // requested_level: ParseSafe
+        v
+    };
+    // Far past the cap: typed rejection, NOT a stack overflow.
+    assert_eq!(
+        from_wire(&stmt_with_deep_where(200_000)),
+        Err(WireError::TooDeep)
+    );
+    // Comfortably within the cap: still a faithful round-trip.
+    let ok = from_wire(&stmt_with_deep_where(16)).expect("nesting within cap decodes");
+    assert!(matches!(ok.where_clause, Some(Expr::Aggregate(..))));
+
+    // ── Schema path (from_wire_schema): N-deep TList in the first field ──
+    let mut schema = Vec::new();
+    schema.extend_from_slice(b"VCLS");
+    schema.extend_from_slice(&1u16.to_le_bytes());
+    schema.push(0); // graph modality = Graph
+    schema.extend_from_slice(&1u32.to_le_bytes()); // one field
+    schema.extend_from_slice(&0u32.to_le_bytes()); // field name ""
+    // 200k nested TList tags (VqlType::TList == 8).
+    schema.extend(std::iter::repeat_n(8u8, 200_000));
+    // Hits the depth cap long before consuming the rest of the stream.
+    assert_eq!(from_wire_schema(&schema), Err(WireError::TooDeep));
 }
 
 #[test]

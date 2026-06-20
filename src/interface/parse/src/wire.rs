@@ -25,6 +25,17 @@ const SCHEMA_MAGIC: [u8; 4] = *b"VCLS";
 const OP_MAGIC: [u8; 4] = *b"VCLT";
 const VERSION: u16 = 1;
 
+/// Maximum decode recursion depth. The same anti-DoS stance the module
+/// already takes on untrusted *counts* (never pre-allocated) must also apply
+/// to untrusted *nesting*: a deeply-nested adversarial stream (e.g. thousands
+/// of nested `Compare`/`Aggregate` tags, or `TList` in the schema codec) must
+/// not exhaust the native stack and abort the process — a stack overflow is a
+/// crash, which would violate the decoder's total / never-panic contract.
+/// Beyond this depth the decoder returns [`WireError::TooDeep`]. Real queries
+/// and the Idris-mirrored AST nest only a handful deep; 128 matches the
+/// recursion cap serde_json uses for the same reason.
+const MAX_DEPTH: usize = 128;
+
 /// Total decode failure (never a panic).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WireError {
@@ -42,6 +53,11 @@ pub enum WireError {
     /// pre-allocated against).
     LengthOverflow,
     TrailingBytes,
+    /// Decode recursion exceeded [`MAX_DEPTH`]: the stream nests deeper than
+    /// the decoder will descend. Rejected as a typed error rather than
+    /// recursing until the native stack overflows (anti-DoS; preserves the
+    /// total / never-panic contract).
+    TooDeep,
 }
 
 impl core::fmt::Display for WireError {
@@ -57,6 +73,7 @@ impl core::fmt::Display for WireError {
             WireError::BadUtf8 => write!(f, "invalid UTF-8 in string"),
             WireError::LengthOverflow => write!(f, "length/count overflow"),
             WireError::TrailingBytes => write!(f, "trailing bytes after statement"),
+            WireError::TooDeep => write!(f, "decode recursion depth exceeded"),
         }
     }
 }
@@ -500,6 +517,36 @@ fn enc_stmt(s: &Statement, o: &mut Vec<u8>) {
 struct D<'a> {
     b: &'a [u8],
     pos: usize,
+    /// Current decode recursion depth, bounded by [`MAX_DEPTH`]. Balanced by
+    /// [`DepthGuard`]: incremented on entry to each recursive decoder, restored
+    /// on scope exit (including the `?` error path).
+    depth: usize,
+}
+
+/// RAII guard that bounds decoder recursion. Constructed at the top of each
+/// recursive decoder; increments `D::depth` and rejects with
+/// [`WireError::TooDeep`] past [`MAX_DEPTH`], then restores the previous depth
+/// on drop so sibling (non-nested) reads are unaffected.
+struct DepthGuard<'g, 'a> {
+    d: &'g mut D<'a>,
+}
+
+impl<'g, 'a> DepthGuard<'g, 'a> {
+    fn enter(d: &'g mut D<'a>) -> Result<Self, WireError> {
+        d.depth = d.depth.saturating_add(1);
+        if d.depth > MAX_DEPTH {
+            // Restore before bailing so a caught error leaves depth balanced.
+            d.depth = d.depth.saturating_sub(1);
+            return Err(WireError::TooDeep);
+        }
+        Ok(DepthGuard { d })
+    }
+}
+
+impl Drop for DepthGuard<'_, '_> {
+    fn drop(&mut self) {
+        self.d.depth = self.d.depth.saturating_sub(1);
+    }
 }
 
 impl<'a> D<'a> {
@@ -588,7 +635,11 @@ impl<'a> D<'a> {
 
 /// Decode a v1 wire stream into a `Statement`. Total.
 pub fn from_wire(input: &[u8]) -> Result<Statement, WireError> {
-    let mut d = D { b: input, pos: 0 };
+    let mut d = D {
+        b: input,
+        pos: 0,
+        depth: 0,
+    };
     if d.take(4)? != MAGIC {
         return Err(WireError::BadMagic);
     }
@@ -711,6 +762,8 @@ fn dec_epi_op(d: &mut D) -> Result<EpistemicOp, WireError> {
 }
 
 fn dec_expr(d: &mut D) -> Result<Expr, WireError> {
+    let g = DepthGuard::enter(d)?;
+    let d = &mut *g.d;
     match d.u8()? {
         0 => Ok(Expr::Field(dec_fieldref(d)?)),
         1 => Ok(Expr::Literal(dec_literal(d)?)),
@@ -985,7 +1038,11 @@ fn dec_op(d: &mut D) -> Result<VclOp, WireError> {
 /// Decode a v1 `VCLT` wire stream into a `VclOp`. Total: every input
 /// yields `Ok`/`Err`, never a panic (same contract as [`from_wire`]).
 pub fn from_wire_op(input: &[u8]) -> Result<VclOp, WireError> {
-    let mut d = D { b: input, pos: 0 };
+    let mut d = D {
+        b: input,
+        pos: 0,
+        depth: 0,
+    };
     if d.take(4)? != OP_MAGIC {
         return Err(WireError::BadMagic);
     }
@@ -1082,6 +1139,8 @@ pub fn to_wire_schema(s: &OctadSchema) -> Vec<u8> {
 }
 
 fn dec_vqltype(d: &mut D) -> Result<VqlType, WireError> {
+    let g = DepthGuard::enter(d)?;
+    let d = &mut *g.d;
     match d.u8()? {
         0 => Ok(VqlType::TString),
         1 => Ok(VqlType::TInt),
@@ -1142,7 +1201,11 @@ fn dec_modschema(d: &mut D) -> Result<ModalitySchema, WireError> {
 /// input yields `Ok`/`Err`, never a panic (same contract as
 /// [`from_wire`]).
 pub fn from_wire_schema(input: &[u8]) -> Result<OctadSchema, WireError> {
-    let mut d = D { b: input, pos: 0 };
+    let mut d = D {
+        b: input,
+        pos: 0,
+        depth: 0,
+    };
     if d.take(4)? != SCHEMA_MAGIC {
         return Err(WireError::BadMagic);
     }
