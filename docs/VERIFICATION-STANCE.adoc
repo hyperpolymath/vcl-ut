@@ -2,7 +2,7 @@
 :toc:
 :sectnums:
 
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 
 NOTE: This file is a pointer only. The canonical, current verification stance

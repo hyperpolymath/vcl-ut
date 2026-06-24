@@ -1,5 +1,5 @@
 = Architecture Decision Record: 0002-ffi-attestation-trust-boundary
-<!-- SPDX-License-Identifier: MPL-2.0 -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 <!-- Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk> -->
 
 # 2. FFI trust boundary: recompute-PCC over wasm32 (Tier-1), C-ABI attestation (Tier-2)
