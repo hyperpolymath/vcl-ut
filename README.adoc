@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
-= VCL-ut (VeriSim Consonance Language)
+= VCL-UT (VeriSim Consonance Language, Usage-Tracked)
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 :spdx: MPL-2.0
 :status: Pre-Alpha
@@ -8,27 +8,50 @@ Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 
 image:https://zenodo.org/badge/DOI/10.5281/zenodo.19329501.svg[DOI,link="https://doi.org/10.5281/zenodo.19329501"]
 image:https://img.shields.io/badge/believe__me-0-brightgreen[believe_me: 0]
-image:https://img.shields.io/badge/tests-102_pass-brightgreen[tests: 102 pass]
+image:https://img.shields.io/badge/tests-150_pass-brightgreen[tests: 150 pass]
 image:https://img.shields.io/badge/OpenSSF-Best_Practices-green?logo=opensourcesecurity[OpenSSF Best Practices,link="https://www.bestpractices.dev/en/projects/new?repo_url=https://github.com/hyperpolymath/vcl-ut"]
 
 IMPORTANT: This project was renamed on 2026-04-05. Its former name used
 the letter sequence "V-Q-L-hyphen-U-T" (read: "vee-queue-ell-you-tee") and
-stood for "Ultimate Type-safe". The canonical name is now **VCL-total**
-(VeriSim Consonance Language — Ubiquitous Type-safe). See CHANGELOG.md for
-the full rename scope. The GitHub repository URL is unchanged.
+stood for "Ultimate Type-safe". The canonical name is now **VCL-UT** —
+*VeriSim Consonance Language, Usage-Tracked*. See CHANGELOG.md for the full
+rename scope. The GitHub repository URL is unchanged.
+
+NOTE: Two superseded expansions of "UT" are still in circulation and should
+not be used: "Ubiquitous Type-safe" (which appeared in this README) and
+"-total". *Usage-Tracked* is canon, and it is the accurate one: the
+distinguishing feature of this tier is that resource usage is tracked in the
+type system (L9 `LinearSafe`, via QTT). "-total" survives in the crate name
+`vcl-total` and the Idris namespace `VclTotal`; renaming those is a separate,
+invasive change and is deliberately not bundled here.
 
 [.lead]
-**VeriSimDB does not merely store records. It maintains identity consonance across modal witnesses and federation boundaries. VCL expresses propositions and epistemic requests over that consonance state. VCL-total validates whether proposed identity transitions are admissible.**
+**VeriSimDB does not merely store records. It maintains identity consonance across modal witnesses and federation boundaries. VCL expresses propositions and epistemic requests over that consonance state. VCL-UT validates whether proposed identity transitions are admissible.**
 
 == Overview
 
-VCL-total is the next-generation interaction language for
+VCL-UT is the next-generation interaction language for
 https://github.com/hyperpolymath/verisimdb[Verisim] (engine formerly known
-in discussion as VeriSimDB), designed to satisfy **all 10 levels of type
-safety** — the 6 established IO-covered forms and the 4 additional forms
-identified through our research. The `-total` suffix denotes totality in
-the dependent-type sense: no partial functions, no undefined behaviour at
-type level.
+in discussion as VeriSimDB), designed to satisfy **eleven levels of type
+safety, L0–L10** — the 6 established IO-covered forms, the 4 additional forms
+identified through our research, and L10 `EpistemicSafe`, the consonance
+level, which is not a query-safety property at all but a *warrant* property.
+See link:docs/THE-10-LEVELS-EXPLAINED.adoc[the level walkthrough].
+
+[IMPORTANT]
+====
+Two honest qualifications, both measured on 2026-07-21:
+
+* The ladder is *eleven* levels (L0–L10), not ten. Older prose says ten and
+  numbers them 1–10; the code numbers them 0–10 and the code is canonical,
+  because those numbers are wire tags.
+* Eleven levels are specified and proved; **six are expressible**. The parser
+  cannot yet populate the clauses that L7–L10 are inferred from, so the
+  highest level reachable from VCL source text is L6 `CardinalitySafe`. The
+  gap is fail-closed and disclosed (issue #25) — unsupported clauses are
+  rejected, never silently ignored — but it is a gap, and closing it is the
+  top outstanding item on the language surface.
+====
 
 The goal is production-worthy VCL that is provably correct at every layer,
 from parse to execution. At minimum, this repo serves as a research
@@ -41,9 +64,9 @@ queries against a passive store. Operations split into propositional
 "Query language" is therefore a misnomer; "consonance language" names
 the actual thing.
 
-== VCL-total in One Sentence
+== VCL-UT in One Sentence
 
-VCL-total is the proof-bearing safety pipeline for VCL, the VeriSim Consonance
+VCL-UT is the proof-bearing safety pipeline for VCL, the VeriSim Consonance
 Language. It checks whether identity transitions proposed to VeriSimDB are
 well-formed, type-safe, authorised, resource-safe, proof-supported, and
 _admissible_ before they affect live consonance state.
@@ -72,9 +95,9 @@ The surface language may look query-like in places, but the semantics are not
 "read rows from a passive store": VCL statements propose or inspect changes in
 an actively maintained identity-consonance system.
 
-== What VCL-total Proves
+== What VCL-UT Proves
 
-VCL-total does not prove the entire database is globally correct. It checks
+VCL-UT does not prove the entire database is globally correct. It checks
 whether a particular VCL statement or transition is _admissible_. A transition
 may require obligations such as:
 
@@ -104,7 +127,7 @@ IdentityState_before
 VeriSimDB maintains continuously-maintained identity claims across an octad of
 modal witnesses: graph, vector, tensor, semantic, document, temporal,
 provenance, and spatial. VCL is the production language for interacting with
-that consonance engine; VCL-total is the fully-typed validation layer behind
+that consonance engine; VCL-UT is the fully-typed validation layer behind
 it. Simple statements short-circuit at the early safety levels; proof-bearing
 statements and high-risk lifecycle transitions go through the deeper proof,
 effect, resource, and cross-cutting checks (L9-L10).
@@ -117,7 +140,7 @@ User / system writes VCL
 VCL parser and binder
         |
         v
-VCL-total safety pipeline   (10 progressive levels)
+VCL-UT safety pipeline    (11 levels, L0-L10)
         |
         v
 verified transition plan
@@ -138,8 +161,8 @@ provenance event, or a federated conflict does not destroy the subject identity.
 It creates a _typed condition_ requiring inspection, repair, quarantine,
 retraction, or arbitration.
 
-*VCL-total is not the expert-facing product.* The ordinary production language is
-VCL; VCL-total is the proof-bearing substrate that validates VCL statements. It
+*VCL-UT is not the expert-facing product.* The ordinary production language is
+VCL; VCL-UT is the proof-bearing substrate that validates VCL statements. It
 may expose expert syntax for proof attachment, but its main role is to make
 routine VCL safe.
 
@@ -157,7 +180,7 @@ consonance state_.
 
 The 10 type safety levels originate in **TypeLL** (the core type theory),
 flow into **PanLL** (panel framework type safety), and are now applied to
-consonance statements as **VCL-total**.
+consonance statements as **VCL-UT**.
 
 [source]
 ----
@@ -165,7 +188,7 @@ TypeLL (type theory core — defines the 10 levels)
    │
    ├──→ PanLL (panel framework type safety)
    │
-   └──→ VCL-total (consonance-statement type safety)
+   └──→ VCL-UT (consonance-statement type safety)
              │
              └──→ Verisim (8-modal octad consonance engine)
 ----
@@ -180,7 +203,7 @@ TypeLL (type theory core — defines the 10 levels)
 | The consonance language
 | Parser (ReScript) → AST → execution. What users write to propose, inspect, or verify.
 
-| **VCL-total**
+| **VCL-UT**
 | The safety pipeline
 | 10 progressive levels. Sits behind VCL, applies automatically. Simple statements
   short-circuit at L1-L2. Proof-carrying statements (with `PROOF` clause) go
@@ -190,19 +213,19 @@ TypeLL (type theory core — defines the 10 levels)
 NOTE: The dependent-types variant was originally labelled with the suffix
 "-DT" (Dependent Types) as the proof-bearing execution mode (statements
 with `PROOF` clauses). It is not a separate product — it is folded into
-VCL-total's L9 (Proof Attachment) and L10 (Cross-Cutting) levels.
+VCL-UT's L9 (Proof Attachment) and L10 (Cross-Cutting) levels.
 
 The 6 proof types (EXISTENCE, INTEGRITY, CONSISTENCY, PROVENANCE,
 FRESHNESS, AUTHORIZATION) remain — they are activated by VCL's `PROOF`
-clause and validated by VCL-total levels L9-L10.
+clause and validated by VCL-UT levels L9-L10.
 
 === Adoption Strategy
 
 The type safety story unfolds in three phases:
 
 1. **ReScript evangeliser** proves the concept first — demonstrate the value of these type safety levels in ReScript itself, where the developer community can experience them firsthand
-2. Once proven, **VCL-total** and **AffineScript** become the two showcase languages for teaching people the 10 levels of type safety
-3. VCL-total handles the database-interaction domain; AffineScript handles general-purpose programming
+2. Once proven, **VCL-UT** and **AffineScript** become the two showcase languages for teaching people the 10 levels of type safety
+3. VCL-UT handles the database-interaction domain; AffineScript handles general-purpose programming
 
 == The 10 Levels of Type Safety
 
@@ -228,7 +251,7 @@ levels 7-10:
 
 [cols="1,2,2"]
 |===
-| Mechanism | VCL-total Syntax | Idris2 Encoding
+| Mechanism | VCL-UT Syntax | Idris2 Encoding
 
 | Linear types | `CONSUME AFTER N USE` | QTT quantity `1` on `Connection`
 | Session types | `WITH SESSION protocol` | `Session : SessionState -> Type` indexed type
@@ -288,7 +311,7 @@ levels 7-10:
 == Roadmap
 
 === Phase 1 — Foundation (Levels 1-3)
-- [ ] VCL-total grammar specification (EBNF, extending VCL v3.0)
+- [ ] VCL-UT grammar specification (EBNF, extending VCL v3.0)
 - [ ] Idris2 parser with totality proof
 - [ ] Schema representation as dependent types
 - [ ] Type-compatible operation checker

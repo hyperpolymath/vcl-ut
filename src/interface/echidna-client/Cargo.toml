@@ -17,7 +17,7 @@ version = "0.1.0"
 edition = "2021"
 license = "MPL-2.0"
 authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
-repository = "https://github.com/hyperpolymath/vql-ut"
+repository = "https://github.com/hyperpolymath/vcl-ut"
 description = "Async REST client for echidna proof engine (localhost:8000 by default)"
 
 [lib]

@@ -1,59 +1,146 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
-= VCL-total Roadmap
+= VCL-UT Roadmap
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 
 == Current Status
 
-Pre-Alpha. ABI/FFI skeleton created. 10 type safety levels documented.
-Parser work not yet started.
+Pre-Alpha, but substantially further along than this file previously claimed.
+Everything below was measured on 2026-07-21 rather than asserted.
+
+[NOTE]
+====
+The previous version of this file said *"Parser work not yet started"* and
+planned an *Idris2* parser. Both statements were false. A parser exists, is
+written in *Rust*, and has 36 green tests; it is gated in CI by
+`parse-gate.yml` under a SPARK-grade clippy set (no `unsafe`, `unwrap`,
+`expect`, `panic`, indexing or unchecked arithmetic). Level numbering has also
+been corrected throughout from 1-10 to the canonical L0-L10 — see
+link:docs/THE-10-LEVELS-EXPLAINED.adoc[].
+====
+
+What exists, measured:
+
+[cols="2,3"]
+|===
+| Component | State
+
+| Idris2 proof corpus (`src/core`)
+| ~12.4k LOC, `%default total`, zero escape hatches (no `believe_me`,
+  `postulate`, `assert_total`, `sorry`). Proves subsumption, soundness,
+  totality and monotonicity over L0-L10.
+
+| Rust parser (`src/interface/parse`)
+| Lexer, parser, wire codec, decider, `vclt-gate` binary. 36 tests green.
+  Consonance verbs SELECT / INSPECT / VERIFY / ASSERT / DECLARE / RETRACT and
+  the S2 transitions MERGE / SPLIT / NORMALISE all parse.
+
+| Root workspace
+| Re-export facade over `fmt` + `lint`. 102 tests green.
+
+| `attest`, `recompute-wasm`
+| 9 + 3 tests green. Both had silently stopped compiling before 2026-07-21
+  and are now gated by `satellite-crates-gate.yml`.
+
+| `vclt-gate` seam
+| Producer side implemented; Contract v1 frozen
+  (link:docs/vclt-gate-contract.adoc[]). *Not yet wired on the VeriSimDB
+  consumer side* — see "Nearest Work" below.
+
+| Test total
+| 150 across all workspace roots.
+|===
+
+The single most important qualification: *eleven levels are specified and
+proved; six are expressible.* `parse_statement` fixes `proof_clause`,
+`effect_decl`, `version_const`, `linear_annot` and `epistemic_clause` at
+`None`, and `infer_requested_level` awards L7-L10 on exactly those fields, so
+the highest level reachable from VCL source text is *L6 `CardinalitySafe`*.
+The gap is fail-closed and disclosed (unsupported clauses are rejected with an
+explicit message, never silently ignored) — but it is the gap that matters
+most.
+
+== Nearest Work
+
+These are ordered by value, not by version number.
+
+. *Surface syntax for L7-L10.* Close the gap above. Without it the upper
+  ladder — including the entire consonance level — is reachable only by
+  constructing a `Statement` programmatically or decoding one off the wire.
+  Tracked in #25.
+. *Wire `vclt-gate` into VeriSimDB.* Contract v1 is frozen and the producer
+  works; the consumer (`rust-core/verisim-api/src/vcl.rs`) does not invoke it.
+  Until it does, VCL-UT proves things about statements VeriSimDB never asks
+  about.
+. *Discharge the two disclosed L10 residuals.* Transitive `ENTAILS`-cycle
+  detection and proposition well-typedness, both recorded as owed in
+  `verification/proofs/VERIFICATION-STANCE.adoc`.
+. *Retire the `HEXAD` keyword* once VeriSimDB's default modality context
+  carries all eight witnesses. The parser accepts both `OCTAD` and `HEXAD`
+  today for compatibility.
 
 == Milestones
 
-=== v0.1.0 — Foundation (Levels 1-3)
-* [ ] VCL-total grammar specification (EBNF extending VCL v3.0)
-* [ ] Idris2 parser with totality proof
-* [ ] Schema representation as dependent types
-* [ ] Type-compatible operation checker
-* [ ] Zig FFI for query plan emission
-* [ ] Basic test suite against VeriSimDB
+=== v0.1.0 — Foundation (L0-L2)
+* [x] VCL-UT grammar specification (`src/core/Grammar.idr`)
+* [x] Total parser with panic-freedom gated in CI (Rust, not Idris2 as
+  originally planned — the Idris corpus proves, the Rust port re-establishes
+  independently)
+* [x] Schema representation as dependent types (`src/core/Schema.idr`,
+  `OctadSchema`)
+* [x] Type-compatible operation checker
+* [ ] Zig FFI for transition-plan emission
+* [x] Test suite (150 tests)
 
-=== v0.2.0 — Safety Core (Levels 4-6)
-* [ ] Null-tracking through join algebra
-* [ ] Injection-proof parameterisation (type-level enforcement)
-* [ ] Result-type inference with compile-time guarantees
-* [ ] Property-based tests
+=== v0.2.0 — Safety Core (L3-L5)
+* [x] Null-tracking through join algebra
+* [x] Injection-proof parameterisation (type-level enforcement)
+* [x] Result-type inference with compile-time guarantees
+* [x] Property-based tests (`tests/property_test.rs`, `tests/fuzz_test.rs`)
 
-=== v0.3.0 — Research Levels (Levels 7-10)
-* [ ] Cardinality annotations and inference
-* [ ] Effect system (Read/Write/DDL)
-* [ ] Temporal type annotations for bi-temporal queries
-* [ ] Linear types for connections/transactions (Idris2 QTT)
+=== v0.3.0 — Research Levels (L6-L9)
+* [x] Cardinality annotations and inference (reachable: `LIMIT` ⇒ L6)
+* [ ] Effect system (Read/Write/DDL) — proved; *no surface syntax*
+* [ ] Temporal type annotations — proved; *no surface syntax*
+* [ ] Linear types via Idris2 QTT — proved; *no surface syntax*
 * [ ] Integrate TypeQL-Experimental mechanisms
 
-=== v0.4.0 — VCL-DT Supersession
-* [ ] All 6 VCL-DT PROOF types expressible in VCL-total
-* [ ] Migration guide from VCL-DT to VCL-total
-* [ ] Benchmark: VCL-total overhead vs VCL-DT overhead
+=== v0.4.0 — Consonance Level (L10)
+* [x] `L10_EpistemicSafe` certificate and shared decider
+* [x] S2 transitions MERGE / SPLIT / NORMALISE, with NORMALISE fail-closed
+  without an explicit justification
+* [ ] Surface syntax for epistemic clauses
+* [ ] Transitive `ENTAILS`-cycle detection
+* [ ] Proposition well-typedness against the schema
+
+=== v0.5.0 — VCL-DT Supersession
+* [ ] All 6 VCL-DT PROOF types expressible in VCL-UT
+* [ ] Migration guide from VCL-DT to VCL-UT
+* [ ] Benchmark: VCL-UT overhead vs VCL-DT overhead
 
 === v1.0.0 — Production Release
 * [ ] Performance benchmarks against raw SQL
-* [ ] VeriSimDB 6-modal query planner integration
+* [ ] VeriSimDB octad transition planner integration
 * [ ] ReScript client SDK with type generation
 * [ ] Documentation and specification publishing
 
 == Dependencies
 
-* **ReScript evangeliser** must prove concept first — VCL-total and AffineScript
-  are the two showcase languages that follow
-* **TypeLL** type theory must stabilise for levels 7-10
-* **VeriSimDB** query router must support VCL-total as a third path alongside
-  Slipstream (VCL) and VCL-DT
+* **TypeLL** type theory must stabilise for L6-L9. Note that L10 does *not*
+  depend on TypeLL: `EpistemicSafe` originates here, in the shift from
+  querying a store to addressing a consonance engine.
+* **VeriSimDB** statement router must support VCL-UT as a third path alongside
+  Slipstream (VCL) and VCL-DT.
+* **ReScript evangeliser** must prove concept first — VCL-UT and AffineScript
+  are the two showcase languages that follow.
 
 == Future Directions
 
 Once v1.0.0 ships:
 
-* Federation support (VCL-total queries across federated VeriSimDB instances)
-* VCL-total as LSP language server for IDE integration
-* Formal security audit of injection-proof guarantees (level 5)
-* Academic publication of the 10-level type safety framework
+* Federation support (VCL-UT statements across federated VeriSimDB instances)
+* VCL-UT LSP language server for IDE integration
+* Formal security audit of the injection-proof guarantee (L4)
+* Academic publication — reframed around *consonance languages as a class*
+  rather than a decalogue of query safety. The eleventh level is the reason:
+  `EpistemicSafe` is not a query-safety property, and a paper titled after ten
+  of them cannot house it.
