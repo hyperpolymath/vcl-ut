@@ -22,7 +22,19 @@ jobs:
     name: Dependency audit
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    if: hashFiles('Cargo.lock') != ''
+
+    # NOTE: this job previously carried `if: hashFiles('Cargo.lock') != ''`.
+    # That guard was wrong in two ways. `hashFiles` resolves against
+    # GITHUB_WORKSPACE, which does not exist at job-evaluation time — before
+    # any checkout — so at job level it could never report a file that is in
+    # the repository. And the run did not skip, it FAILED, with zero jobs and
+    # no annotation: the expression was rejected outright rather than
+    # evaluating false. Measured on main as well as on this branch, failing
+    # since at least 2026-07-03.
+    #
+    # The guard is also unnecessary here: vcl-ut has a committed root
+    # Cargo.lock. A repository that genuinely needs the guard should place it
+    # on the steps AFTER checkout, where hashFiles can actually see the tree.
 
     steps:
       - name: Checkout repository
