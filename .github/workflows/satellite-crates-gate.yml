@@ -1,0 +1,85 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+#
+# satellite-crates-gate.yml — Gates the self-contained satellite workspaces.
+#
+# vcl-ut has FIVE cargo workspace roots, not one. Before this workflow, CI
+# covered only three of them:
+#
+#   /                              e2e.yml
+#   /src/interface/parse           parse-gate.yml
+#   /src/interface/echidna-client  backend-matrix.yml (needs echidna sibling)
+#   /src/interface/attest          NOTHING   <- gated here
+#   /src/interface/recompute-wasm  NOTHING   <- gated here
+#
+# The cost of that gap was measured on 2026-07-21: both ungated crates had
+# stopped compiling. `ast::Statement` gained the S1 consonance field `verb`
+# (DECLARE / ASSERT / RETRACT / MERGE / ...), and neither crate's test module
+# was updated, so both failed with E0063 `missing field 'verb'`. Their
+# libraries still built, so nothing downstream noticed; 12 tests had simply
+# stopped running. Silent rot in exactly the crates that carry the
+# attestation and recompute boundaries.
+#
+# Both crates are self-contained (in-repo path deps only), so unlike
+# echidna-client they need no sibling checkout and can be gated cheaply.
+#
+# Tracked: vcl-ut#25.
+
+name: Satellite Crates Gate
+
+on:
+  pull_request:
+    branches: ['**']
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  satellite-gate:
+    name: ${{ matrix.crate }} — clippy / tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        crate: [attest, recompute-wasm]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # rustup is preinstalled on ubuntu-latest; no third-party action
+      # (avoids the action-pinning / deprecated-cache hazards). Mirrors
+      # parse-gate.yml deliberately.
+      - name: Pin toolchain + components
+        run: |
+          set -euo pipefail
+          rustup show active-toolchain || rustup default stable
+          rustup component add clippy
+          cargo --version && cargo clippy --version
+
+      # Operate via the manifest path so CI never traverses the parent
+      # virtual workspace, whose `src/interface` member carries an external
+      # path-dep that does not resolve in a standalone checkout.
+      #
+      # `--locked` is deliberately NOT used: these two lockfiles drifted while
+      # the crates were ungated. They are regenerated and committed as part of
+      # the repair; once a Dependabot cycle has run against them, `--locked`
+      # should be restored here to make lockfile drift itself a gate.
+      - name: Clippy — warnings are errors
+        run: |
+          set -euo pipefail
+          cargo clippy --manifest-path src/interface/${{ matrix.crate }}/Cargo.toml \
+            --all-targets -- -D warnings
+
+      - name: Tests
+        run: |
+          set -euo pipefail
+          cargo test --manifest-path src/interface/${{ matrix.crate }}/Cargo.toml

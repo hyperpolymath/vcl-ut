@@ -1,4 +1,30 @@
 # SPDX-License-Identifier: MPL-2.0
+#
+# e2e.yml — Root-workspace test gate.
+#
+# The root workspace has four members (vcl-total, vcltotal-fmt, vcltotal-lint,
+# vcltotal-core) and its whole test surface lives in `tests/`, because the root
+# crate is a re-export facade over fmt + lint. Per-crate UNIT counts are
+# therefore all zero, which makes a truncated `cargo test` log look like an
+# empty gate; it is not. Measured 2026-07-21: 102 tests.
+#
+#   tests/e2e_test.rs          20
+#   tests/fuzz_test.rs         13
+#   tests/integration_test.rs  59
+#   tests/property_test.rs     10
+#
+# This job previously ran only property_test + integration_test, so 33 of the
+# 102 — every e2e and fuzz test — never ran in CI. It now runs the whole
+# workspace.
+#
+# The former "Provide echidna sibling" steps have been removed. They cloned a
+# whole repository on every run for nothing: `src/interface` (the member that
+# carries the external `echidna-core` path-dep) is deliberately NOT a root
+# workspace member, so neither `cargo test --workspace` nor `tests/e2e.sh`
+# ever resolves it. Verified 2026-07-21 by running both with no sibling
+# present: 102 tests pass, e2e.sh reports 19/19. echidna-client is gated
+# separately in backend-matrix.yml, which does need the sibling.
+
 name: E2E, Property and Aspect Tests
 on:
   push: { branches: [main] }
@@ -15,13 +41,10 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
-      # echidna-core path-dependency (src/interface/Cargo.toml) — provide as sibling.
-      - name: Provide echidna sibling
-        run: git clone --depth 1 https://github.com/hyperpolymath/echidna ../echidna
       - name: Run E2E validation
         run: bash tests/e2e.sh
   property:
-    name: Property and integration tests
+    name: Root workspace tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -29,13 +52,11 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
-      # echidna-core path-dependency (src/interface/Cargo.toml) — provide as sibling.
-      - name: Provide echidna sibling
-        run: git clone --depth 1 https://github.com/hyperpolymath/echidna ../echidna
-      - name: Run property tests
-        run: cargo test --test property_test
-      - name: Run integration tests
-        run: cargo test --test integration_test
+      # Whole workspace, all targets — not a hand-picked subset. Previously
+      # `--test property_test` + `--test integration_test` only, which silently
+      # skipped tests/e2e_test.rs and tests/fuzz_test.rs.
+      - name: Run root workspace tests (expect 102)
+        run: cargo test --workspace --all-targets --locked
   aspect:
     name: Aspect tests
     runs-on: ubuntu-latest
