@@ -5,7 +5,7 @@ version = "0.1.0"
 edition = "2021"
 license = "MPL-2.0"
 authors = ["Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"]
-repository = "https://github.com/hyperpolymath/vql-ut"
+repository = "https://github.com/hyperpolymath/vcl-ut"
 description = "VCL-total Core: Idris-based type checker and grammar"
 
 [lib]

@@ -1,10 +1,34 @@
 # SPDX-License-Identifier: MPL-2.0
-# Dependabot configuration for RSR-compliant repositories
-# Covers common ecosystems - remove unused ones for your project
+# Dependabot configuration for vcl-ut.
+#
+# Trimmed from the RSR template on 2026-07-21. Only ecosystems with an actual
+# manifest in this repository are declared. Declaring an ecosystem with no
+# manifest makes the corresponding Dependabot job fail on EVERY run — this
+# repository was failing `hex`, `pip`, `nix` and `npm_and_yarn` weekly for
+# exactly that reason (measured: 5 consecutive red runs from 2026-07-13).
+#
+# vcl-ut is Rust-only. Verified absent at the root: mix.exs, package.json,
+# requirements.txt, pyproject.toml, flake.nix.
+#
+# Cargo note: this repository has FIVE cargo workspace roots, not one. A single
+# `directory: "/"` entry covers the root workspace only, so the crates holding
+# most of the actual code were invisible to Dependabot. Each self-contained
+# workspace root is now declared explicitly:
+#
+#   /                              root workspace (vcl-ut, fmt, lint, core)
+#   /src/interface/parse           parser + decider + vclt-gate  <- the real spine
+#   /src/interface/attest          depends on ../parse (in-repo)
+#   /src/interface/recompute-wasm  depends on ../parse (in-repo)
+#
+# DELIBERATELY EXCLUDED: /src/interface/echidna-client. It depends on
+# ../../interface, which in turn carries an out-of-tree path dependency
+# (`echidna-core = { path = "../../../echidna/..." }`). Dependabot cannot
+# resolve a path dependency outside the repository, so declaring it would
+# reintroduce exactly the always-red job this trim removes.
 
 version: 2
 updates:
-  # GitHub Actions - always include
+  # GitHub Actions — always include.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -14,38 +38,33 @@ updates:
         patterns:
           - "*"
 
-  # Rust/Cargo
+  # Rust/Cargo — one entry per self-contained workspace root.
+  #
+  # `open-pull-requests-limit: 0` suppresses routine version-update PRs while
+  # leaving Dependabot SECURITY PRs flowing. The previous `ignore: "*" patch`
+  # rule also silenced security PRs under GitHub's current Dependabot
+  # behaviour. See rsr-template-repo commit 78b050e and
+  # 007-lang/audits/audit-dependabot-automation-gap-2026-04-17.md.
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
       interval: "weekly"
-    # `open-pull-requests-limit: 0` suppresses routine version-update PRs
-    # while leaving Dependabot SECURITY PRs flowing. The previous
-    # `ignore: "*" patch` rule also silenced security PRs under GitHub\'s
-    # current Dependabot behaviour. See rsr-template-repo commit 78b050e
-    # and 007-lang/audits/audit-dependabot-automation-gap-2026-04-17.md.
     open-pull-requests-limit: 0
 
-  # Elixir/Mix
-  - package-ecosystem: "mix"
-    directory: "/"
+  - package-ecosystem: "cargo"
+    directory: "/src/interface/parse"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 0
 
-  # Node.js/npm
-  - package-ecosystem: "npm"
-    directory: "/"
+  - package-ecosystem: "cargo"
+    directory: "/src/interface/attest"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 0
 
-  # Python/pip
-  - package-ecosystem: "pip"
-    directory: "/"
+  - package-ecosystem: "cargo"
+    directory: "/src/interface/recompute-wasm"
     schedule:
       interval: "weekly"
-
-  # Nix flakes
-  - package-ecosystem: "nix"
-    directory: "/"
-    schedule:
-      interval: "weekly"
+    open-pull-requests-limit: 0

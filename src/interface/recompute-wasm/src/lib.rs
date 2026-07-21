@@ -181,6 +181,9 @@ mod tests {
             linear_annot: None,
             epistemic_clause: None,
             requested_level: SafetyLevel::ParseSafe,
+            // S1 consonance verb — see the comment above: this is the plain
+            // `SELECT` read, the neutral case for the recompute boundary.
+            verb: Verb::Select,
         };
         let m = |modality, fields| ModalitySchema { modality, fields };
         let sc = OctadSchema {

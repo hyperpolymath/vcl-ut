@@ -1,0 +1,507 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+= VCL-UT Work-Up: The Consonance Claim, and the VeriSimDB Application
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+2026-07-21
+:toc: preamble
+:icons: font
+:sectnums:
+
+This document does two separate jobs and keeps them separate on purpose.
+
+*Strand A* is about VCL-UT as a contribution to the world: what a _consonance
+language_ is, why it is a distinct class rather than a query language with
+extra types, and what gap it fills that nothing currently fills.
+
+*Strand B* is about VCL-UT as infrastructure for VeriSimDB specifically: what
+concrete, tethered value it delivers to one working database, and what has to
+be built for that value to be realised.
+
+They are separated because they have different success conditions. Strand A
+succeeds if the claim is novel and defensible. Strand B succeeds if VeriSimDB
+is measurably safer. Neither implies the other, and conflating them is how a
+research vehicle ends up serving nobody.
+
+Everything factual here was measured on 2026-07-21 against the working tree.
+Where something is owed rather than done, it says so.
+
+== Executive Summary
+
+. *The strongest evidence for the consonance reframe came from the code, not
+  from taste.* The ladder has eleven levels, not ten. The eleventh,
+  `EpistemicSafe`, is not a query-safety property — it is a property about
+  whether the engine is _entitled to believe_ an answer. The whitepaper is
+  titled "A Decalogue of Database Query Safety". Its own title cannot house
+  its own eleventh level. That is a structural argument for reframing, not an
+  aesthetic one.
+
+. *The gap in the world is not "safer queries".* That field is crowded and
+  well served. The gap is that every existing type-safe query language
+  assumes _one witness_. When a system maintains several modal witnesses that
+  can disagree, well-typedness stops being sufficient: a result can be
+  perfectly typed and still unwarranted. No language in the field types that
+  distinction. VCL-UT does, at L10.
+
+. *The most valuable single piece of work outstanding is surface syntax for
+  L7-L10.* Eleven levels are specified and proved; six are expressible.
+  Measured: the highest level reachable from VCL source text is L6.
+
+. *The second most valuable is wiring the `vclt-gate` seam.* Contract v1 is
+  frozen and the producer works. VeriSimDB does not call it. Until it does,
+  VCL-UT proves things about statements VeriSimDB never asks about.
+
+. *There is a small, precisely-located bug worth fixing immediately in
+  VeriSimDB:* `src/vcl/VCLTypeChecker.res:60` builds the default type context
+  with six modalities. The type admits eight. Provenance and Spatial are
+  silently absent from every default type-check.
+
+== Ground Truth, Measured
+
+Recorded so that later strategy arguments rest on facts rather than memory.
+
+[cols="3,2"]
+|===
+| Claim | Status 2026-07-21
+
+| Idris2 corpus, `%default total`, zero escape hatches
+| TRUE. No `believe_me` / `postulate` / `assert_total` / `sorry`.
+
+| Level ladder is L0-L10, eleven levels
+| TRUE in `ast.rs` and `Levels.idr`. All prose said ten, numbered 1-10, until
+  corrected today.
+
+| L10 `EpistemicSafe` documented anywhere
+| WAS FALSE. Appeared in no document in the repository. Now documented.
+
+| Consonance verbs parse
+| TRUE. SELECT / INSPECT / VERIFY / ASSERT / DECLARE / RETRACT, plus the S2
+  transitions MERGE / SPLIT / NORMALISE.
+
+| Documented verbs `FETCH` / `REMOVE` parse
+| FALSE. Rejected outright: "expected keyword SELECT". 22 occurrences, now
+  corrected.
+
+| L7-L10 reachable from source text
+| FALSE. Ceiling is L6. `parse_statement` fixes the five clause fields at
+  `None`; `infer_requested_level` awards L7-L10 on exactly those fields.
+
+| `vclt-gate` invoked by VeriSimDB
+| FALSE. Zero references in `rust-core/verisim-api/src/vcl.rs`.
+
+| VeriSimDB default type context carries the octad
+| FALSE. Six of eight. `VCLTypeChecker.res:60`.
+
+| Test count
+| 150 across five workspace roots (102 + 36 + 9 + 3).
+
+| Two crates compiled
+| WAS FALSE. `attest` and `recompute-wasm` had silently stopped compiling.
+  Fixed and gated today.
+|===
+
+// ============================================================================
+= Strand A — The Theoretical Claim
+// ============================================================================
+
+== What a Consonance Language Is
+
+A query language addresses a store. The store is passive: it holds what was
+put in it, and a query is a request to read some of it back. The store has one
+witness — itself — and it cannot disagree with itself. Correctness of a query
+is therefore exhausted by well-formedness plus faithfulness of execution.
+
+A consonance language addresses an _engine_ that maintains identity claims
+across several modal witnesses simultaneously — in VeriSimDB's case eight:
+graph, vector, tensor, semantic, document, temporal, provenance, spatial.
+Those witnesses are independently maintained and can drift apart. The engine's
+job is not storage; it is keeping them _consonant_.
+
+Three consequences follow, and together they are what make this a class rather
+than a dialect.
+
+*1. Statements are propositions, not requests.* `DECLARE`, `ASSERT`, `RETRACT`
+propose changes to identity state. `INSPECT` and `VERIFY` are epistemic
+requests — they ask what the engine knows and on what warrant. `MERGE`,
+`SPLIT`, `NORMALISE` are consonance transitions: they do not return a result
+set at all, which is precisely why the implementation could not model them as
+statements and introduced a separate `Transition` type summed into `VclOp`.
+That structural split in the AST is the class distinction showing up in code.
+
+*2. Retraction is not deletion, and drift is not death.* A retracted claim
+usually remains visible to provenance, audit and federation. A drifted witness
+creates a _typed condition_ requiring inspection, repair, quarantine or
+arbitration — not an error. A query language has no vocabulary for either,
+because a passive store has nothing to be inconsistent with.
+
+*3. Well-typedness stops being sufficient.* This is the load-bearing one, and
+it is developed next.
+
+== The Gap in the World
+
+The honest version of the competitive picture:
+
+Type-safe query languages are a *crowded and mature* field. LINQ, Quill, Slick,
+Diesel, jOOQ, sqlx, TypeQL, EdgeQL and PostgREST between them cover schema
+binding, type-compatible operations, null tracking, injection resistance and
+result typing. Effect systems, temporal types, linear/session types and
+cardinality inference all have substantial literature. A paper claiming
+"ten levels of query safety" enters that field as an unusually thorough
+_synthesis_ — genuinely useful, genuinely not novel. Reviewers will say so.
+
+Here is what none of them do.
+
+Every one of those systems assumes a single source of truth. Their type
+systems answer *"is this query well-formed against the schema?"* They cannot
+answer *"is the system entitled to this answer?"* because in their world the
+question does not arise: there is one witness, and it cannot disagree with
+itself.
+
+The moment a system maintains multiple modal witnesses that can drift, a new
+failure mode appears that is invisible to all ten of the safety levels:
+
+[quote]
+____
+Every step was well-typed. The schema bound. The types were compatible. Nulls
+were handled. Nothing was injected. The result type was known, the cardinality
+right, the effects declared, the freshness bounded, the resources balanced.
+
+And the answer is still unwarranted — because the graph witness and the
+document witness disagreed, and the engine silently preferred one.
+____
+
+That is not a safety bug. It is a *warrant* bug. Safety properties rule out
+executions that go wrong. Warrant properties rule out answers a system is not
+entitled to give, even when every step was correct.
+
+*The gap: there is no type system for warrant in data systems.* Epistemic and
+doxastic logics have modelled knowledge and belief formally since Hintikka.
+Multi-agent epistemic logic has `Knows`, `Believes`, common knowledge and
+entailment between agents. Provenance research (PROV-O, why/where/how
+provenance) tracks derivation. Truth-maintenance systems and belief revision
+(AGM) handle retraction. But these live in reasoners, audit layers and
+metadata — *beside* the query path, consulted after the fact, if at all. None
+of them is a type in the language you write your statement in. None can refuse
+your statement at compile time.
+
+VCL-UT's L10 puts that structure into the type system of the statement
+language itself, where it can fail closed before execution.
+
+== Why the Eleventh Level Is the Argument
+
+L10's certificate `L10_EpistemicSafe` is witnessed by
+`Decide.epistemicConsistentStmt`, which requires: an epistemic clause; at
+least one declared agent; every requirement-referenced agent declared; and *no
+direct `ENTAILS` cycle*.
+
+The fourth condition is the interesting one. A mutual entailment — `a ⊨ b` and
+`b ⊨ a` — is a citation loop: two witnesses each grounding their warrant in
+the other, with nothing outside the pair supporting either. It is exactly how
+a federation manufactures false confidence, and it is invisible to every lower
+level, because each individual statement is impeccably typed.
+
+Note also the asymmetry with TypeLL. Levels L0-L9 are inherited from TypeLL,
+the shared core type theory, and PanLL applies the same ten to UI panels. L10
+is *not* inherited. A UI panel has no federation of disagreeing witnesses and
+therefore no warrant question to answer. L10 originates in this domain — the
+first level the application contributed back to the theory rather than
+receiving from it. A framework whose eleventh member does not fit its own
+name is telling you the name is wrong.
+
+=== Disclosed residuals
+
+Stated plainly, because a level that overstates itself is worse than no level:
+
+* Only the *direct* two-party `ENTAILS` cycle is detected. A three-party loop
+  (`a ⊨ b`, `b ⊨ c`, `c ⊨ a`) passes today.
+* The proposition carried by a requirement is not checked against the schema.
+
+Both are recorded as owed in `verification/proofs/VERIFICATION-STANCE.adoc`.
+The Idris checker and the Rust decider agree exactly
+(`Checker.checkLevel10Sound`); what they agree on is a partial condition.
+
+== Proposal: Reframing the Whitepaper
+
+NOTE: This section is a *proposal*, not an executed rewrite. The direction —
+reframe to consonance — is settled. How a paper argues its claim is the
+author's call, and it is the least testable, highest-blast-radius change in
+this work-up. The structure below is offered for approval before the 1,909-line
+`.tex` is restructured.
+
+Current: `docs/whitepapers/arcvix-10-level-query-safety.tex`, "A Decalogue of
+Database Query Safety", cs.PL / cs.DB.
+
+Three problems with the present framing:
+
+. *"Decalogue" is now false.* There are eleven levels.
+. *"Query safety" is a crowded field.* The decalogue is a synthesis, and will
+  be read as one.
+. *The eleventh level does not fit the title*, and it is the novel one.
+
+=== Proposed structure
+
+[cols="1,4"]
+|===
+| Section | Content
+
+| 1. Introduction
+| Lead with the warrant failure, not the level count. Open on a concrete
+  scenario: a well-typed statement returning an unwarranted answer because two
+  modal witnesses disagreed. Establish that no existing type system can refuse
+  it.
+
+| 2. Consonance Languages
+| Define the class. Statements as propositions and epistemic requests;
+  transitions that return nothing; retraction ≠ deletion; drift as a typed
+  condition. The `Statement` / `Transition` / `VclOp` split as evidence that
+  the distinction is structural, not stylistic.
+
+| 3. Related Work — honest positioning
+| Concede the crowded field explicitly. LINQ / Quill / Diesel / jOOQ / TypeQL
+  / EdgeQL for L0-L5; effect, temporal, linear and session type literature for
+  L6-L9. Then the gap: epistemic logic, provenance, truth maintenance all
+  exist, but *beside* the query path, never as a type that can refuse a
+  statement.
+
+| 4. The Safety Ladder L0-L9
+| The technical core, retained essentially as-is. Reframed as *the
+  well-formedness ladder* — necessary, not sufficient, and explicitly not the
+  paper's novelty claim.
+
+| 5. Warrant: the Epistemic Level
+| The contribution. Agents, the four `EpistemicRequirement` forms, the
+  consistency decider, the cycle condition. Why warrant is not safety. The
+  TypeLL asymmetry as evidence.
+
+| 6. Formal Properties
+| Subsumption, soundness, totality, monotonicity — as now. Plus the honest
+  statement of the two disclosed residuals.
+
+| 7. Implementation
+| Idris2 corpus with zero escape hatches; independent Rust re-establishment;
+  the `vclt-gate` seam. Include the *measured* expressibility gap. A paper
+  that discloses that eleven levels are proved and six expressible is more
+  credible, not less.
+
+| 8. Evaluation / Conclusion
+| The claim to defend: consonance languages are a distinct class, and warrant
+  is a type-level property that class requires.
+|===
+
+=== Draft abstract, for approval
+
+[quote]
+____
+Type-safe query languages have made large gains against a well-understood
+family of defects: malformed syntax, unbound schema references, incompatible
+operations, unhandled nulls, injection, untyped results, and more recently
+cardinality, effects, time and resource usage. Every such system, however,
+shares an assumption so basic it is rarely stated: that there is one source of
+truth, and it cannot disagree with itself.
+
+Systems that maintain identity across multiple modal witnesses violate that
+assumption by construction. In such systems a statement can satisfy every
+safety property in the literature and still yield an answer the system is not
+entitled to give, because independently-maintained witnesses disagreed and the
+disagreement was resolved silently. This is not a safety failure — no
+execution went wrong — but a failure of _warrant_.
+
+We introduce *consonance languages*: languages whose statements are
+propositions and epistemic requests addressed to an engine that maintains
+consonance, rather than queries addressed to a passive store. We present
+VCL-UT, a consonance language with a cumulative eleven-level type-safety
+ladder, mechanised in Idris2 with no escape hatches. The first ten levels
+formalise the well-formedness properties above. The eleventh, *epistemic
+safety*, is of a different kind: it types the conditions under which an answer
+is warranted — that consulted agents are declared, that requirements reference
+only declared agents, and that no agent's warrant is circular.
+
+We show that epistemic safety is not derivable from the other ten, that it
+does not arise in single-witness systems, and that it is not inherited from
+the shared core type theory the other ten come from but originates in the
+consonance domain. We report an implementation, an independently-re-established
+decision procedure, and — because a safety claim should not exceed what is
+proved — the specific obligations that remain owed.
+____
+
+// ============================================================================
+= Strand B — The VeriSimDB Application
+// ============================================================================
+
+Strand A argues the class is worth defining. This strand is narrower and more
+demanding: what does VCL-UT do for *this* database, concretely, and what has
+to exist for that to be true?
+
+== The Honest Current Position
+
+VCL-UT delivers, today, *nothing* to VeriSimDB at runtime.
+
+Not because the work is bad — the proof corpus is real, the parser is real and
+gated, the gate binary exists and Contract v1 is frozen — but because the seam
+is only built on one side. `rust-core/verisim-api/src/vcl.rs` contains zero
+references to `vclt-gate`. VeriSimDB has its own ReScript checker and uses it.
+
+That is the whole applied problem in one sentence: *the producer is finished
+and the consumer was never written.*
+
+== The Architecture That Was Chosen, and Why It Is Right
+
+`docs/vclt-gate-contract.adoc` freezes Contract v1: `vclt-gate` is a CLI
+subprocess speaking a JSON-line protocol. Producer is this repository;
+consumer is VeriSimDB.
+
+This deserves defending because it looks unfashionable. It was chosen over FFI
+to avoid coupling VeriSimDB's build to this repository's workspace — and the
+evidence that this was correct is in this very repository: `src/interface`
+carries an external path-dependency on a sibling `echidna` checkout, which is
+exactly why it is excluded from the root workspace and why `echidna-client`
+cannot be covered by Dependabot. A subprocess seam has none of that. It also
+means a VeriSimDB deployment can upgrade its gate independently, and that gate
+failures are isolated rather than in-process.
+
+The gate is also correctly scoped: it computes `decider::certified_level(stmt,
+schema)` and explicitly does *not* verify PROOF clauses or touch live state. It
+is a static admissibility check, not an execution path.
+
+== What VeriSimDB Actually Gets
+
+Four things, in descending order of concreteness.
+
+=== 1. A fail-closed admissibility check before statements touch consonance state
+
+The immediate value. Every VCL statement gets a certified level *before*
+execution, computed by a decision procedure that was proved sound in Idris2 and
+re-established independently in Rust. VeriSimDB can then set a floor — refuse
+anything below L4 `InjectionProof` on a public endpoint, require L6
+`CardinalitySafe` for anything that feeds a UI list — and enforce it uniformly.
+
+Today that policy cannot be expressed at all, because nothing computes the
+level.
+
+=== 2. One level ladder instead of two divergent ones
+
+Right now there are two independent implementations of VCL type checking: the
+Idris/Rust corpus here, and ~4,974 LOC of ReScript in VeriSimDB
+(`VCLBidir.res`, `VCLSubtyping.res`, `VCLProofObligation.res`, `VCLTypes.res`,
+`VCLTypeChecker.res`). Two implementations of the same semantics will drift;
+the divergences already found are evidence that they have.
+
+Per the settled decision, *vcl-ut is the source of truth*. The migration path
+that preserves VeriSimDB's genuinely good UX work:
+
+* *Keep* the ReScript surface parser, error rendering and editor integration.
+  These are user-facing and better done close to the client.
+* *Replace* the ReScript checker's verdict with the gate's. `VCLTypeChecker.res`
+  is already a thin facade, which makes it the right seam.
+* *Retain* `VCLSubtyping.res` rule 6 (refinement subsumption, deferred pending
+  SMT) as a VeriSimDB-local extension until the corpus covers it.
+
+=== 3. Attestation
+
+`src/interface/attest` mints a signed attestation over `(statement, schema)`
+carrying the certified level, verifiable independently. For a database whose
+selling point is maintained identity consonance, being able to prove *after
+the fact* that a transition was admitted at a stated level — and have a third
+party verify it without trusting the engine — is a distinguishing capability,
+not a nicety. This crate is 9 tests and was, until today, not compiling.
+
+=== 4. Vocabulary discipline
+
+`README.adoc`'s terminology guidance ("prefer consonance language, statement,
+transition, modal witness, octad; avoid query, record, CRUD, delete, 6-modal
+engine, passive store") is the class distinction made operational. The cost of
+letting it slip is visible right now, in the next section.
+
+== Concrete Defects Found in VeriSimDB
+
+Both located precisely, both small.
+
+=== The default type context carries six modalities, not eight
+
+`src/vcl/VCLTypeChecker.res:60`:
+
+[source]
+----
+availableModalities: [Graph, Vector, Tensor, Semantic, Document, Temporal],
+----
+
+`VCLTypes.res` defines all eight modality variants, up to `SpatialModality`.
+The type admits the octad; the default context omits *Provenance* and
+*Spatial*. Every type-check performed against a default context therefore
+treats two of the eight witnesses as unavailable.
+
+This is a partial migration, not an oversight in isolation: the type is still
+named `HexadType` throughout (`VCLTypes.res:50`, `:206`, `:270`,
+`VCLSubtyping.res:101`). The hexad-to-octad migration reached the variants and
+stopped before the defaults and the names.
+
+Note the same legacy is visible here: the parser still accepts `HEXAD`
+alongside `OCTAD`. That is deliberate compatibility, and it should be retired
+once VeriSimDB's default context carries all eight — not before.
+
+=== The seam is unwired
+
+Covered above. It is the single highest-value applied change.
+
+== Sequenced Plan
+
+Ordered by value delivered per unit of risk. Items 1-2 are in this repository;
+3-5 are in VeriSimDB and cannot be committed from here.
+
+[cols="1,3,2"]
+|===
+| # | Work | Where
+
+| 1
+| *Surface syntax for L7-L10.* Extend the parser to populate `effect_decl`,
+  `version_const`, `linear_annot`, `proof_clause` and `epistemic_clause`.
+  Until this lands, four rungs including the entire consonance level are
+  unreachable from source text and the ladder's top half is theoretical.
+  Tracked in #25.
+| vcl-ut
+
+| 2
+| *Discharge the two L10 residuals* — transitive `ENTAILS`-cycle detection and
+  proposition well-typedness. These are what stand between "L10 exists" and
+  "L10 means what it says".
+| vcl-ut
+
+| 3
+| *Fix the six-modality default context* (`VCLTypeChecker.res:60`). One line,
+  and it silently weakens every default type-check today.
+| verisimdb
+
+| 4
+| *Wire `vclt-gate` into the execute path.* Invoke the gate from
+  `rust-core/verisim-api/src/vcl.rs`, adopt its verdict, enforce a configurable
+  minimum level. Contract v1 is frozen, so this is integration, not design.
+| verisimdb
+
+| 5
+| *Converge the checkers.* Once (4) is live, retire the ReScript checker's
+  independent verdict in favour of the gate's, keeping the ReScript surface
+  parser and diagnostics. Then rename `HexadType` and retire the `HEXAD`
+  keyword together.
+| both
+
+| 6
+| *Restructure the whitepaper* per the Strand A proposal — after approval.
+| vcl-ut
+|===
+
+== What Would Falsify This
+
+Recorded so the plan can be argued with rather than assumed.
+
+* *If VeriSimDB's ReScript checker is materially more capable than the
+  corpus*, then "vcl-ut is source of truth" costs capability. The known
+  candidate is `VCLSubtyping.res` rule 6 (refinement subsumption). The
+  mitigation above — retain it as a local extension — assumes it is the only
+  one. That assumption has not been exhaustively checked.
+* *If subprocess latency per statement is material* on VeriSimDB's hot path,
+  the CLI seam is wrong and the FFI coupling cost has to be paid after all.
+  This has not been measured. It should be, before item 4 rather than after.
+* *If the consonance-language claim has prior art* under another name —
+  belief-revision query languages, epistemic database logics — Strand A
+  weakens to a synthesis claim and the paper should be positioned accordingly.
+  The search behind Section "The Gap in the World" was not exhaustive.

@@ -226,6 +226,10 @@ mod tests {
             linear_annot: None,
             epistemic_clause: None,
             requested_level: SafetyLevel::ParseSafe,
+            // S1 consonance verb. A bare `SELECT * FROM STORE "s"` is the
+            // epistemically-neutral read, so `Select` is the right witness
+            // here; the attestation path is verb-agnostic.
+            verb: Verb::Select,
         }
     }
 
