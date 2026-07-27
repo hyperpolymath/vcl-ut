@@ -35,6 +35,14 @@ jobs:
     # The guard is also unnecessary here: vcl-ut has a committed root
     # Cargo.lock. A repository that genuinely needs the guard should place it
     # on the steps AFTER checkout, where hashFiles can actually see the tree.
+    #
+    # MEASURED CORRECTION, same day, after the above was pushed: removing the
+    # guard did NOT clear the failure. The run still completes with
+    # conclusion=failure, zero jobs and no annotation. The guard was genuinely
+    # invalid and removing it remains correct, but it was NOT the cause.
+    # The root cause is still UNDIAGNOSED and is pre-existing on main
+    # (failing since at least 2026-07-03). Do not cite this file as a solved
+    # example, and do not copy the "fix" across the estate expecting results.
 
     steps:
       - name: Checkout repository
