@@ -1,0 +1,169 @@
+== Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on https://keepachangelog.com/en/1.1.0/[Keep a
+Changelog], and this project adheres to
+https://semver.org/spec/v2.0.0.html[Semantic Versioning].
+
+=== [Unreleased]
+
+=== [0.2.0] — 2026-06-13
+
+==== Added
+
+*vclt-gate — VeriSimDB admissibility gate producer* (B1–B3).
+`+vclt-gate+` is a standalone binary
+(`+src/interface/parse/src/bin/vclt-gate.rs+`) that wraps the existing
+trusted parser to act as an out-of-process admissibility gate for
+VeriSimDB’s VCL executor:
+
+* *Binary protocol*: reads a single-line JSON payload
+`+{"schema_version":1,"statement":"...","schema":{}}+` from stdin; exits
+0 (admit, `+admissible:true+`, `+certified_level+` ≥ 0), 1 (reject,
+`+admissible:false+`, `+reasons:[...]+`), or 2 (gate_failed, unexpected
+error).
+* *`+certified_level+` surface*
+(`+src/interface/parse/src/decider.rs+`): the `+Decider+` now exposes
+`+certified_level_for+` — the integer level the corpus would certify for
+a parsed statement — directly to the gate output, so consumers see the
+same grade the proof corpus assigns.
+* *Gate test suite* (`+src/interface/parse/tests/gate.rs+`): 6 tests
+covering admit / reject / injection / level-plumbing; added to
+`+src/interface/parse/Cargo.toml+` as an integration test target.
+* *Workspace cleanup* (`+Cargo.toml+`): removed `+src/interface/lsp+`,
+`+src/interface/dap+`, `+src/interface/echidna-client+`, and
+`+src/interface+` (all have external path-deps that break standalone
+CI); updated comment explaining the `+src/interface/parse+`
+separate-workspace-root design.
+
+==== Verified
+
+*VclTotal proof corpus — Phase 0→4 remediation + Phase 5 boundary
+reinforcement* (2026-05-18/19, hyperpolymath/standards#124,
+hyperpolymath/vcl-ut#25). The `+src/core/**+` Idris2 corpus, which at
+Phase 0 did not compile and had never been machine-checked, is now
+CI-gated and green:
+
+* `+verification/proofs/vclut-core.ipkg+` builds clean under idris2
+0.8.0 (`+idris2 --build+`, exit 0, `+%default total+`) as *12 modules*,
+with *zero proof-escape symbols* (no
+`+believe_me+`/`+postulate+`/`+assert_*+`/ `+idris_crash+`/`+sorry+`),
+enforced by `+.github/workflows/proof-corpus.yml+`.
+* Phase 1 (#21): corpus resurrection — `+ABI.Types+`/`+Grammar+`
+repaired, `+.ipkg+`/CI added, L4 verified in situ.
+* Phase 2 (#22): L2/L3/L5 de-vacuized over the shared `+Core.Decide+`
+deciders + `+checkLevel2/3/5Sound+` + genuine `+composeJoin+` closure.
+* Phase 3 (#23): L1 + L6–L10 soundness; `+Checker.certifyAt+`/
+`+certifyRequested+` assemble a genuine dependent `+SafetyCertificate+`;
+`+ABI.Layout+` made sound; Phase 3d removed the fabricating Zig FFI (now
+fail-closed) and added the proof-gated `+Checker.certifiedLevel+`.
+* Phase 4 (PR #24): `+ABI.LayoutProofs+` (genuine alignment/no-padding/
+bounds) + L6–L10 `+composeJoin+` closure (`+l6..l9Compose+`,
+`+epiStructJoin+`); L10 acyclicity carried by the explicit
+`+JoinSideCondition+` (provably non-closed, not faked).
+* Phase 5 / vcl-ut#25 (boundary reinforcement): trusted Rust/SPARK-grade
+parser (P5a, #26) + deterministic versioned wire codec (P5b step 1,
+#28); *P5b step 2 (this change)* — `+VclTotal.Interface.WireDecode+`, a
+total (`+%default total+`, zero proof-escape) decoder of the v1 wire
+format into the certified `+Statement+`, recursion bounded by an
+input-length fuel `+Nat+`; `+VclTotal.Interface.WireConformance+` proves
+it byte-for-byte conformant with the Rust `+to_wire+` encoder by
+`+Refl+` on golden fixtures (regeneration oracle:
+`+src/interface/parse/tests/conformance_emit.rs+`). The C-ABI
+`+Statement+` marshalling _decode_ side is certified. Disclosed: the NaN
+_payload_ is not preserved across the Idris `+Double+` boundary (finite
++ infinite values bit-exact; Rust proptest remains the exhaustive float
+witness).
+* Phase 5 / vcl-ut#25 — *Tier-1 recompute-PCC RESOLVED*: P5c-1 (#30)
+certified `+OctadSchema+` codec (closes schema-marshalling OWED);
+P5c-2/3/4 (#31) `+vcltotal_parse::decider+` — a faithful Rust port of
+the corpus decision core (`+Schema+`/`+Decide+`/`+Checker+`
+`+checkLevel0..10+`/`+certifiedLevel+`), machine-pinned to the corpus’s
+public deciders via `+WireConformance+` on shared golden bytes
+(find-dependent verdicts pinned Rust-side + input-value conformance,
+disclosed); P5c-5 (#32) the recompute *`+wasm32+`* artefact
+`+src/interface/recompute-wasm+` (`+vcl_recompute+`, fail-closed, one
+audited host/guest `+unsafe+` block; all logic in the forbid-unsafe
+crate); P5c-6 (this change) the `+OWED→RESOLVED+` stance flip + ADR
+`+docs/decisions/0002-ffi-attestation-trust-boundary.adoc+`. The
+consumer *re-runs* the certified decision and compares — PCC by
+recomputation, not proof transport. Plain `+wasm32+` suffices (type
+system not load-bearing under recompute); `+affinescriptiser+` N/A
+(resource-required + wasm-backend-pending; disclosed in
+`+AFFINESCRIPTISER-NA.adoc+`, not faked).
+* Phase 5 / vcl-ut#25 — *Tier-2 (P5d) RESOLVED*:
+`+src/interface/attest+` (`+vcltotal-attest+`) mints/verifies an Ed25519
+attestation over
+`+DOMAIN ‖ sha256(stmt_wire) ‖ sha256(schema_wire) ‖ level+` (level =
+the conformance-pinned `+certified_level+`, signed iff `+0..=10+`,
+fail-closed); the previously-OWED `+vclut_rs_verify+` backend is this
+crate, linked into `+ffi/zig/src/lib.zig+` (`+vclut_verify_wire+`) by
+`+build.zig+` (`+zig build test+` 4/4, end-to-end). Unforgeable + bound
+(roundtrip + 5 tamper variants + fail-closed + C-ABI tests).
+`+ed25519-dalek+`/`+sha2+` contained to the Tier-2 crate; zero-dep
+forbid-unsafe core untouched; one audited host/guest `+unsafe+` block.
+Spec `+src/interface/attest/ATTESTATION-FORMAT.adoc+`; ADR-0002 → both
+tiers RESOLVED. *The vcl-ut#25 boundary-reinforcement workstream is
+complete* (only the precisely-scoped disclosed limits remain — not
+gaps). A re-checkable proof is impossible _only_ over the C-ABI fallback
+tier; Tier-2 is honestly its weaker trusted-certifier ceiling (canonical
+two-tier model: `+verification/proofs/VERIFICATION-STANCE.adoc+`).
+
+`+verification/proofs/VERIFICATION-STANCE.adoc+` is the authoritative,
+precisely-scoped catalogue (residual OWED items disclosed, not masked).
+
+==== Renamed
+
+*V\{Q→C}L-\{UT→total}* (2026-04-05). Full repo-wide migration of the
+project identity, carried out as part of the ecosystem-wide
+query-language → consonance-language reframing:
+
+* *Q → C*: _VeriSim Query Language_ → _VeriSim Consonance Language_.
+Verisim operations are *propositions to a consonance engine*, not
+queries against a passive store. Operations split into propositional
+(`+DECLARE+`, `+ASSERT+`, `+RETRACT+`) and epistemic (`+INSPECT+`,
+`+VERIFY+`).
+* *UT → total*: the "`Ultimate Type-safe`" suffix becomes "`Total
+Type-safe`", denoting totality in the dependent-type sense (no partial
+functions, no undefined behaviour at type level).
+* *VeriSimDB → Verisim*: the underlying engine’s name shortens in
+discussion (the GitHub repository stays `+verisimdb+` to avoid rename
+damage).
+
+==== Scope of this rename pass
+
+Changed in this commit:
+
+* Crate names in Cargo.toml manifests (core, interface, fmt, lint, lsp,
+dap)
+* Rust module and file names (src/**, benches/, tests/)
+* ReScript bridge modules (src/bridges/, src/definitions/, src/errors/)
+* Idris2 sources and module declarations
+* File extension `+.vqlut+` → `+.vcltotal+`
+* Documentation prose in `+docs/+`, `+QUICKSTART-*.adoc+`,
+`+EXPLAINME.adoc+`, `+ROADMAP.adoc+`, `+CONTRIBUTING.adoc+`,
+`+SECURITY.md+`
+* CI workflow job names and README badges
+* Contractile K9 guard file
+* Container and dev-container configuration
+* Machine-readable manifests (`+.machine_readable/+`,
+`+0-AI-MANIFEST.a2ml+`)
+* Zenodo metadata file (.zenodo.json)
+* LaTeX paper (arcvix-10-level-query-safety.tex)
+
+==== NOT changed (deliberately)
+
+* *GitHub repository name*: still `+hyperpolymath/vql-ut+`. A repository
+rename would ripple to clone URLs, mirror paths, CI tokens, and issue/PR
+continuity via GitHub redirects — tracked as a separate decision.
+* *GitLab mirror path* at `+gitlab.com/hyperpolymath/vql-ut+`.
+* *Zenodo DOI* 10.5281/zenodo.19329501 — registered under the original
+name. A new DOI under the updated name can be minted at the next
+release.
+* *External citations* — published references still resolve through the
+historical record (git history, Zenodo, preprints).
+
+The ecosystem-level migration landed 2026-04-05 in `+verisimdb+`,
+`+hypatia+`, `+gitbot-fleet+`, and `+echidna+` repositories. This repo
+now joins that naming scheme.
