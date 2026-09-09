@@ -37,6 +37,7 @@ updates:
       actions:
         patterns:
           - "*"
+    open-pull-requests-limit: 2
 
   # Rust/Cargo — one entry per self-contained workspace root.
   #
