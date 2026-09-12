@@ -1,16 +1,9 @@
-<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<!-- SPDX-License-Identifier: MPL-2.0 -->
 # Security Policy
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability, please report it responsibly.
-
 **Email:** j.d.a.jewell@open.ac.uk
-
-**Please include:**
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
 
 **Response timeline:**
 - Acknowledgement within 48 hours
