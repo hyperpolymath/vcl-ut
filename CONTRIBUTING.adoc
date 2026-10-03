@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+// SPDX-License-Identifier: CC-BY-SA-4.0
+
 == Contributing
 
 Thank you for your interest in contributing! We follow a "`Dual-Track`"
@@ -65,7 +68,15 @@ actual behaviour
 All contributors are expected to adhere to our
 link:CODE_OF_CONDUCT.md[Code of Conduct].
 
-=== License
+=== License and checks
 
-By contributing, you agree that your contributions will be licensed
-under the same license as the project (see LICENSE).
+The software and source code are licensed under MPL-2.0 (`LICENSE`).
+Documentation is generally licensed under CC-BY-SA-4.0; per-file SPDX headers
+and `REUSE.toml` are authoritative. Do not change a file's license or add a
+new license identifier without maintainer approval.
+
+Install the pinned checker with `pipx install 'reuse[charset-normalizer]==6.2.0'`,
+then run `just license-check` before submitting. The check runs `reuse lint` and
+enforces the repository's closed SPDX/package
+policy from `.machine_readable/compliance/license-policy.toml`. The same check
+runs in pre-commit and CI.

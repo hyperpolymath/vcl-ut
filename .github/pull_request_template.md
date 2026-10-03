@@ -21,7 +21,7 @@
 - [ ] No banned language patterns (no TypeScript, no npm/bun, no Go/Python)
 - [ ] No `unsafe` blocks without `// SAFETY:` comments
 - [ ] No banned functions (`believe_me`, `unsafeCoerce`, `Obj.magic`, `Admitted`, `sorry`)
-- [ ] SPDX license headers present on all new/modified source files
+- [ ] REUSE and repository license policy pass (`just license-check`)
 - [ ] No secrets, credentials, or `.env` files included
 
 ### As Applicable
@@ -32,7 +32,7 @@
 - [ ] Documentation updated for user-facing changes
 - [ ] `TOPOLOGY.md` updated (if architecture changed)
 - [ ] `CHANGELOG` or release notes updated
-- [ ] New dependencies reviewed for license compatibility (MPL-2.0 / MPL-2.0)
+- [ ] New dependencies reviewed for license compatibility (MPL-2.0 code; CC-BY-SA-4.0 documentation)
 - [ ] ABI/FFI changes validated (`src/interface/abi/` and `src/interface/ffi/` consistent)
 
 ## Testing

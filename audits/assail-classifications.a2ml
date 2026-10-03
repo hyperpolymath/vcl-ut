@@ -15,6 +15,9 @@
 ;; residuals that cannot reasonably be removed.
 
 (assail-classifications
+  (project "vcl-ut")
+  (version "1.0.0")
+
   ;; ── FFI boundary unsafe: required by the C ABI, reviewed ─────────
   ;; Mirrors the reference pattern in hyperpolymath/007
   ;; audits/assail-classifications.a2ml (zig_bridge.rs UnsafeCode).

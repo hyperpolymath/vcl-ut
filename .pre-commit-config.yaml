@@ -50,3 +50,14 @@ repos:
     rev: v8.24.3
     hooks:
       - id: gitleaks
+
+  # --- REUSE + repository-specific closed license policy ---
+  - repo: local
+    hooks:
+      - id: license-policy
+        name: REUSE and license policy
+        entry: bash scripts/check-license-policy.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]

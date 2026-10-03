@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: MPL-2.0
-# REUSE-compliant global licensing metadata (REUSE Specification 3.3, REUSE.toml v1).
-# Covers files that legitimately cannot carry inline SPDX headers.
-# Files with inline SPDX headers take precedence; "aggregate" adds
-# copyright notices where the licence is already declared inline.
+# REUSE Specification 3.3 file/path map. This is the closed-world annotation
+# allow-list for files without usable inline tags. Inline SPDX headers remain
+# authoritative, but must use one of the IDs declared in
+# .machine_readable/compliance/license-policy.toml. Every tracked file must be
+# covered either here or by one inline SPDX license header; CI runs reuse lint
+# and the stricter one-header/package policy checker.
 
 version = 1
 
@@ -91,6 +93,7 @@ path = [
   ".github/**",
   ".machine_readable/**",
   ".well-known/**",
+  "www/.well-known/**",
   "container/**",
   "contractiles/**",
   "examples/**",

@@ -1,1 +1,45 @@
-= .machine_readable Pillar
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= .machine_readable — Authority and File Map
+
+This directory contains the repository's machine-readable project state and
+operational policy. The distinction between the similarly named contractile
+directories is intentional; they are not interchangeable copies.
+
+== Canonical project state
+
+* `STATE.a2ml` is the *single canonical project checkpoint*.
+* `.machine_readable/6a2/STATE.a2ml` was a byte-identical stale mirror and has
+  been removed. Do not recreate it; update only `STATE.a2ml`.
+* `.machine_readable/6a2/` holds the related 6a2 agent, metadata, and playbook
+  files, not a second project-state database.
+
+== Contractile locations
+
+[cols="1,3"]
+|===
+|Path |Role
+
+|`.machine_readable/*.contractile`
+|Legacy-format invariant, intent, and trust declarations. They are retained
+as source documents; do not treat them as generated Nickel runner files.
+
+|`.machine_readable/contractiles/`
+|Operational contractile data and Nickel runner/schema files, organized by
+verb. This is the working repository policy set and the example source used
+by the docs templates.
+
+|`contractiles/`
+|Input directory for the generated top-level `contractile.just` recipes
+(`contractile gen-just --dir contractiles`). Keep that generator relationship
+explicit; this tree is not a byte-for-byte mirror of the operational set.
+
+|`docs/templates/contractiles/`
+|Documentation-only starter templates. The README and each template direct
+contributors to copy an explicitly selected template into
+`.machine_readable/contractiles/`; they are not live policy.
+|===
+
+When changing a rule, update its authoritative source above and any generated
+output through the documented generator. Never copy an entire tree over
+another merely because the directory names match.

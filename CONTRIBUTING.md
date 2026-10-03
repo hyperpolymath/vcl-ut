@@ -1,9 +1,9 @@
-<!-- SPDX-License-Identifier: MPL-2.0 -->
+<!-- SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk> -->
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 # Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Ensure SPDX headers on all files
-4. Submit a pull request
+See [CONTRIBUTING.adoc](CONTRIBUTING.adoc) for the full contributor guide.
 
-**Author:** Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+Before submitting, run `just license-check` to validate the per-file licensing
+metadata and REUSE compliance. Project code is MPL-2.0; documentation is
+CC-BY-SA-4.0 as marked by its SPDX header.

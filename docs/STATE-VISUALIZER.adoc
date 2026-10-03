@@ -87,7 +87,7 @@ CONTAINER ECOSYSTEM (Phase 2)
 
 REPO INFRASTRUCTURE
   .machine_readable/                ██████████ 100%    STATE/META/ECOSYSTEM active
-  Governance & License              ██████████ 100%    PMPL & Ethical use verified
+  Governance & License              ██████████ 100%    MPL-2.0 / CC-BY-SA-4.0 declared
   Development Shells (Nix/Guix)     ██████████ 100%    Reproducible env stable
 
 ─────────────────────────────────────────────────────────────────────────────

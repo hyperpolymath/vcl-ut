@@ -323,7 +323,7 @@ test-smoke:
     cargo test e2e_full_pipeline_simple_select_clean -- --nocapture
 
 # Run all quality checks
-quality: fmt-check lint test
+quality: fmt-check lint test license-check
     @echo "All quality checks passed!"
 
 # Fix all auto-fixable issues [reversible: git checkout]
@@ -626,6 +626,7 @@ install-hooks:
     #!/bin/bash
     just fmt-check || exit 1
     just lint || exit 1
+    just license-check || exit 1
     HOOKEOF
     @chmod +x .git/hooks/pre-commit
     @echo "Git hooks installed"
@@ -649,6 +650,10 @@ sbom:
 # ═══════════════════════════════════════════════════════════════════════════════
 # VALIDATION & COMPLIANCE
 # ═══════════════════════════════════════════════════════════════════════════════
+
+# REUSE lint + closed project-specific SPDX/package/license policy
+license-check:
+    bash scripts/check-license-policy.sh
 
 # Validate RSR compliance
 validate-rsr:
