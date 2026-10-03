@@ -1,15 +1,19 @@
-SPDX-License-Identifier: MPL-2.0
+SPDX-License-Identifier: CC-BY-SA-4.0
 
 ================================================================================
-EXHIBIT B — QUANTUM-SAFE PROVENANCE SPECIFICATION
-Palimpsest-MPL License Version 1.0
+EXHIBIT B — QUANTUM-SAFE PROVENANCE GUIDANCE
+VCL-UT Project Guidance Version 1.0
+
+This document is CC-BY-SA-4.0 licensed documentation. It is optional project
+guidance, not an additional software license or a modification of the
+repository's MPL-2.0 license.
 ================================================================================
 
 1. PURPOSE
 
-   This exhibit specifies the cryptographic algorithms and procedures for
-   quantum-safe provenance in software distributed under the Palimpsest-MPL
-   License.
+   This exhibit provides optional project guidance on cryptographic
+   algorithms and procedures for quantum-safe provenance metadata. It does
+   not change the software license or impose compliance requirements.
 
 2. APPROVED ALGORITHMS
 
@@ -91,11 +95,12 @@ Palimpsest-MPL License Version 1.0
    6.3. Pure PQ signatures are preferred for new contributions
    6.4. Classical-only signatures will be deprecated in a future version
 
-7. COMPLIANCE
+7. STATUS
 
-   Quantum-safe provenance is OPTIONAL under PMPL-1.0. When present,
-   it must follow this specification. Stripping quantum-safe signatures
-   from distributions is prohibited per Section 4.1 of the License.
+   Adoption of this guidance is optional. This document is not part of
+   MPL-2.0 and creates no additional legal conditions. A project that adopts
+   these recommendations should document the specific requirements for its
+   own releases separately.
 
 ================================================================================
 END OF EXHIBIT B

@@ -1,16 +1,19 @@
+# SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+# SPDX-License-Identifier: MPL-2.0
 
 # AI Assistant Instructions
 
 ## Repository Focus
-- `rsr-template-repo` is treated as a Rhodium Standard Repository; obey the Rhodium policies and keep `.machine_readable/` authoritative.
-- All machine-readable content lives under `.machine_readable/` — state files (a2ml), bot directives, and contractiles.
+- This repository is VCL-UT, the VeriSim Consonance Language, Usage-Tracked project; follow its actual product scope and the governance files under `.machine_readable/`.
+- `.machine_readable/STATE.a2ml` is the single canonical project checkpoint.
+- Machine-readable state and policy live under `.machine_readable/`; documentation templates are not live project state.
 - Prefer to keep generated files out of source control, and regenerate them with the documented commands before committing.
 
 ## Workflow
-1. Inspect `.machine_readable/STATE.a2ml` for blockers and next actions.
-2. Respect any constraints listed inside `.machine_readable/AGENTIC.a2ml` when tooling changes are requested.
-3. After finishing edits, update STATE with your outcomes and commit with a concise, imperative message.
+1. Inspect `.machine_readable/STATE.a2ml` for current status, known limitations, and next actions.
+2. Respect constraints in `.machine_readable/6a2/AGENTIC.a2ml` when tooling changes are requested.
+3. After finishing edits, update STATE with outcomes and commit with a concise, imperative message.
 
 ## Delivery Promises
 - Mention in summaries whether STATE, `.machine_readable/contractiles/`, or `.machine_readable/bot_directives/` changed.
-- Keep this file in sync with the repository's status; update it if the governance changes.
+- Keep this file in sync with the repository's status; update it if governance changes.

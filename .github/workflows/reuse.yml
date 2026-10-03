@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
-# Fail-closed REUSE compliance gate.
-# Blocks merge if any file is missing SPDX copyright/licence information.
+# Fail-closed project licensing gate: REUSE compliance plus the repository policy contract.
 ---
 name: REUSE compliance
 
@@ -12,13 +11,15 @@ permissions:
   contents: read
 
 jobs:
-  reuse-lint:
+  license-policy:
+    name: license-policy
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install reuse
-        run: pip install reuse
+      - name: Install pinned REUSE checker
+        run: python -m pip install 'reuse[charset-normalizer]==6.2.0'
 
-      - name: Check REUSE compliance
-        run: reuse lint
+      - name: Check REUSE and project license policy
+        run: bash scripts/check-license-policy.sh

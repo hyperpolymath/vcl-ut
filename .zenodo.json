@@ -6,7 +6,7 @@
   "creators": [{"name": "Jewell, Jonathan D.A.", "affiliation": "The Open University", "orcid": "0000-0002-3078-6652"}],
   "keywords": ["type safety", "database queries", "dependent types", "quantitative type theory", "formal verification"],
   "subjects": [{"term": "Programming Languages", "identifier": "cs.PL", "scheme": "arxiv"}, {"term": "Databases", "identifier": "cs.DB", "scheme": "arxiv"}],
-  "license": {"id": "other-open"},
+  "license": {"id": "MPL-2.0"},
   "language": "eng",
   "access_right": "open",
   "related_identifiers": [{"identifier": "https://github.com/hyperpolymath/vql-ut", "relation": "isSupplementTo", "scheme": "url"}]

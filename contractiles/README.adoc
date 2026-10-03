@@ -1,0 +1,18 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= Contractile Recipe Sources
+
+This directory is the source directory used by the top-level
+`contractile.just` file (`contractile gen-just --dir contractiles`). Changes
+here affect generated Just recipes; regenerate `contractile.just` with the
+contractile tool when the generated recipe set changes.
+
+This is distinct from `.machine_readable/contractiles/`, which contains the
+operational per-verb A2ML policy files and Nickel runner/schema definitions.
+The older `.machine_readable/*.contractile` files use a separate legacy
+format. `docs/templates/contractiles/` is documentation-only starter material.
+
+These trees serve different interfaces. Do not synchronize them by blind
+copying. When semantics intentionally span more than one interface, update the
+relevant source and its generated or explanatory representation in the same
+change, then verify the generator output.

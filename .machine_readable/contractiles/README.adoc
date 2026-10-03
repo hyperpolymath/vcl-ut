@@ -1,19 +1,31 @@
-= Contractiles Template Set
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+= Operational Contractile Set
 :toc:
 :sectnums:
 
-This directory contains the generalized contractiles templates. Copy the `.machine_readable/contractiles/` directory into a new repo to establish a consistent operational, validation, trust, recovery, and intent framework.
+This is the repository's working set of per-verb A2ML policy files and Nickel
+runner/schema definitions. It also provides examples for the templates under
+`docs/templates/contractiles/`.
 
-== Fill-In Instructions
-
-1. Update the Mustfile to reflect your real invariants (paths, schema versions, ports).
-2. Replace Trustfile.hs placeholders with your actual key paths and verification commands.
-3. Adjust Dustfile handlers to match your rollback and recovery tooling.
-4. Update Intentfile to mirror the roadmap you want the system to evolve toward.
+It is separate from the root `contractiles/` input used to generate
+`contractile.just`, and from the legacy `.machine_readable/*.contractile`
+format. The four locations have different consumers; see
+`.machine_readable/README.adoc` for the authority map.
 
 == Contents
 
-* `must/Mustfile` - required invariants and validations.
-* `trust/Trustfile.hs` - cryptographic verification steps.
-* `dust/Dustfile` - rollback and recovery semantics.
-* `lust/Intentfile` - future intent and roadmap direction.
+* `must/`, `trust/`, `intend/`, `adjust/`, `bust/`, `dust/` — paired A2ML
+  policy files and Nickel runners.
+* `_base.ncl` — shared Nickel schemas and defaults.
+* `INDEX.a2ml` — registry describing the contractile set.
+
+== Maintenance
+
+1. Change the relevant operational A2ML/Nickel pair together.
+2. Run the repository's A2ML and Nickel/K9 validation before relying on an
+   edited contract.
+3. Update `INDEX.a2ml` when the registry or verb set changes.
+4. Update `docs/templates/contractiles/` only when the contributor-facing
+   starter templates themselves change; they are not copied wholesale over
+   this working policy set.

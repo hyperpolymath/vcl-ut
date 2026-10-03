@@ -1,6 +1,9 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+// SPDX-License-Identifier: CC-BY-SA-4.0
+
 = RSR Template Repository
 
-image:[Palimpsest-MPL-1.0,link="https://github.com/hyperpolymath/palimpsest-license"] image:[Palimpsest,link="https://github.com/hyperpolymath/palimpsest-license"]
+image:https://img.shields.io/badge/License-MPL--2.0-blue.svg[License: MPL-2.0,link="https://www.mozilla.org/en-US/MPL/2.0/"]
 :toc:
 :sectnums:
 
@@ -78,7 +81,7 @@ just validate-rsr
 |Container build (Wolfi base, Podman)
 
 |`LICENSE`
-|MPL-2.0 (Palimpsest MPL)
+|MPL-2.0
 
 |`EXHIBIT-A-ETHICAL-USE.txt`
 |Ethical use guidelines (LICENSE Exhibit A)

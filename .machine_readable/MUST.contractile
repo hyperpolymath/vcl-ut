@@ -59,7 +59,9 @@
 
     ; License
     (must "SPDX-License-Identifier header on every source file")
-    (must "no removal or modification of LICENSE file")
+    (must "software is MPL-2.0 and human-readable documentation is CC-BY-SA-4.0")
+    (must "REUSE lint and scripts/check-license-policy.sh pass")
+    (must "no removal or modification of root LICENSE file")
 
     ; Structure
     (must ".machine_readable/ directory preserved")

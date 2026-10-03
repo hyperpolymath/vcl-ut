@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+# VCL-UT licensing policy contract, enforced by scripts/check-license-policy.sh
+# and the REUSE 3.3 file/path map in REUSE.toml.
+
+[policy]
+version = 1
+canonical_code = "MPL-2.0"
+canonical_documentation = "CC-BY-SA-4.0"
+allowed_spdx = ["MPL-2.0", "CC-BY-SA-4.0"]
+forbidden_spdx = ["PMPL-1.0-or-later", "AGPL-3.0-only", "AGPL-3.0-or-later"]
+max_inline_spdx_headers = 1
+header_scan_lines = 10
+documentation_globs = ["*.adoc", "*.md", "docs/**/*.bib", "docs/**/*.tex", "docs/**/*.ebnf", "docs/**/*.txt"]
+software_globs = ["*.rs", "*.idr", "*.zig", "*.sh", "*.ncl", "*.a2ml", "*.affine", "*.ipkg", "*.toml", "*.yml", "*.yaml", "*.just", "Justfile", "Containerfile"]
+
+[metadata]
+root_license_file = "LICENSE"
+reuse_license_directory = "LICENSES"
+path_licensing_map = "REUSE.toml"
+rust_package_license = "MPL-2.0"
+zenodo_license = "MPL-2.0"
+
+[enforcement]
+reuse_version = "6.2.0"
+pre_commit_hook = "license-policy"
+ci_workflow = ".github/workflows/reuse.yml"
+required_check = "license-policy"

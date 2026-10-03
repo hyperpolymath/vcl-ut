@@ -1,15 +1,19 @@
-SPDX-License-Identifier: MPL-2.0
+SPDX-License-Identifier: CC-BY-SA-4.0
 
 ================================================================================
-EXHIBIT A — ETHICAL USE GUIDELINES
-Palimpsest-MPL License Version 1.0
+EXHIBIT A — NON-BINDING ETHICAL USE GUIDELINES
+VCL-UT Project Guidance Version 1.0
+
+This document is CC-BY-SA-4.0 licensed documentation. It is community guidance,
+not an additional software license or a modification of the repository's
+MPL-2.0 license.
 ================================================================================
 
 1. PURPOSE
 
-   These guidelines define ethical use expectations for software distributed
-   under the Palimpsest-MPL License. They are not legally binding restrictions
-   but represent the community's shared values and expectations.
+   These guidelines describe the community's ethical-use expectations for
+   VCL-UT. They are not legally binding restrictions and do not add terms to
+   the MPL-2.0 license; they represent shared values and expectations.
 
 2. PRINCIPLES
 

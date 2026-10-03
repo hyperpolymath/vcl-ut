@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+// SPDX-License-Identifier: CC-BY-SA-4.0
+
 == Changelog
 
 All notable changes to this project will be documented in this file.
@@ -7,6 +10,19 @@ Changelog], and this project adheres to
 https://semver.org/spec/v2.0.0.html[Semantic Versioning].
 
 === [Unreleased]
+
+==== Changed
+
+* *Licensing and REUSE policy normalized*: software and package metadata use
+  MPL-2.0; human-readable documentation uses CC-BY-SA-4.0. Removed the unused
+  AGPL license text, corrected invalid PMPL SPDX declarations, and clarified
+  the legacy ethical-use exhibits as non-binding guidance. REUSE 6.2.0 plus the closed project policy
+  now run through `just license-check`, pre-commit, and CI.
+* *Project state reconciled*: rewrote `.machine_readable/STATE.a2ml` around
+  VCL-UT's actual implementation, proof corpus, known limitations, and next
+  integration work; removed its byte-identical `6a2` mirror. Documented the
+  distinct roles of the four contractile locations. Issues #51 and #52 are
+  recorded as closed in the current repository checkpoint.
 
 === [0.2.0] — 2026-06-13
 
