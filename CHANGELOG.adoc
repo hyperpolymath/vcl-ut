@@ -24,6 +24,23 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
   distinct roles of the four contractile locations. Issues #51 and #52 are
   recorded as closed in the current repository checkpoint.
 
+==== Fixed
+
+* *Aspect gate #49 — LSP server no longer panics on malformed requests*
+  (`+src/interface/lsp/src/main.rs+`): a request whose method matched but
+  whose params failed JSON deserialization used to crash the server with
+  `+panic!+`. The dispatcher now answers JSON-RPC `Invalid params`
+  (-32602) naming the method and the error, and the binary carries
+  `+#![deny(clippy::unwrap_used, clippy::expect_used)]+`, mirroring
+  `+vclt-gate+`.
+* *Aspect gate check 3 extended to the panic family*:
+  `+tests/aspect_tests.sh+` now also rejects `+panic!+`,
+  `+unreachable!+`, `+todo!+`, and `+unimplemented!+` in production `+src/+`,
+  matching the documented `vcltotal-parse` SPARK-grade lint set. Remaining
+  `unsafe` in `+src/+` is confined to `+// SAFETY:+-justified FFI trust
+  boundaries and remaining `+unwrap+`/`+expect+` to test code; the gate
+  passes 6/6.
+
 === [0.2.0] — 2026-06-13
 
 ==== Added

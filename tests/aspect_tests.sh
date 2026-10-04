@@ -15,7 +15,9 @@
 #      `#[no_mangle] extern "C"` entry *cannot* be written without it),
 #      but every `unsafe {` must carry a contiguous `// SAFETY:`
 #      justification — mirroring `clippy::undocumented_unsafe_blocks`.
-#   3. No .unwrap()/.expect() in production (non-test) Rust src/
+#   3. No .unwrap()/.expect()/panic!/unreachable!/todo!/unimplemented!
+#      in production (non-test) Rust src/ — the SPARK-grade fail-closed
+#      posture (cf. vcltotal-parse's deny lint-set, the estate pattern).
 #   4. HTTPS-only URLs
 #   5. No hardcoded secrets
 #   6. Totality marker: Cargo.lock committed (reproducible builds)
@@ -92,14 +94,17 @@ done < <(prod_rs_files)
 check "No undocumented unsafe in production src/ (// SAFETY: required)" \
     "$([ "$undoc_unsafe" -eq 0 ] && echo 0 || echo 1)"
 
-# 3. No .unwrap()/.expect() in production (non-test) Rust src/.
-unwrap_hits=0
+# 3. No fail-open helpers in production (non-test) Rust src/: neither
+#    .unwrap()/.expect() nor the panic family (`panic!`, `unreachable!`,
+#    `todo!`, `unimplemented!`). Mirrors the vcltotal-parse deny
+#    lint-set (the estate's SPARK-grade pattern).
+failopen_hits=0
 while IFS= read -r f; do
-    n=$(strip_cfg_test < "$f" | grep -c '\.unwrap()\|\.expect(' || true)
-    unwrap_hits=$((unwrap_hits + n))
+    n=$(strip_cfg_test < "$f" | grep -c '\.unwrap()\|\.expect(\|panic!\|unreachable!\|todo!\|unimplemented!' || true)
+    failopen_hits=$((failopen_hits + n))
 done < <(prod_rs_files)
-check "No .unwrap()/.expect() in production src/" \
-    "$([ "$unwrap_hits" -eq 0 ] && echo 0 || echo 1)"
+check "No .unwrap()/.expect()/panic! in production src/" \
+    "$([ "$failopen_hits" -eq 0 ] && echo 0 || echo 1)"
 
 # 4. HTTPS-only URLs
 http_hits=$(grep -rn 'http://[^l]' src/ 2>/dev/null | grep -v '#\|//' | wc -l || true)
