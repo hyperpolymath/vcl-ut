@@ -41,7 +41,7 @@ use crate::lexer::{Spanned, Tok};
 /// sub-queries, and `parse_not → parse_not` for `NOT` chains), so an
 /// adversarial input of thousands of nested `(` or `NOT` would otherwise
 /// exhaust the native stack — a process abort (SIGABRT), which is NOT a
-/// `panic!` (so the crate's `deny(clippy::panic)` cannot see it) and NOT a
+/// `panic` (so the crate's `deny(clippy::panic)` cannot see it) and NOT a
 /// typed `ParseError`, violating the total / fail-closed contract. Past
 /// this bound the parser returns a typed error instead. 256 levels is far
 /// beyond any real query yet leaves the stack comfortably bounded.
