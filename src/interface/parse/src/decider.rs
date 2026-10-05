@@ -611,6 +611,10 @@ fn evidence_injection_safe(t: &Transition) -> bool {
 /// `Transition.evidenceTypeCompat` — reuses the single-source-of-truth
 /// `whereComparisonsCompatible` decider on the evidence `Expr`. `None`
 /// evidence is vacuously compatible.
+///
+/// Returns whether every comparison in the evidence has compatible operand
+/// types resolved against `schema`; unresolved (`TAny`) types are compatible.
+/// Subquery contents are not checked. Evidence without comparisons returns `true`.
 fn evidence_type_compat(t: &Transition, schema: &OctadSchema) -> bool {
     match transition_evidence(t) {
         None => true,

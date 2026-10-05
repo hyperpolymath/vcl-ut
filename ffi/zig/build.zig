@@ -17,6 +17,9 @@
 
 const std = @import("std");
 
+/// Configure installation of the shared and static FFI libraries and the `test`
+/// step. Each artefact links the Rust attestation backend, built by Cargo in
+/// release mode; the standard target and optimisation options apply to Zig.
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
