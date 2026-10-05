@@ -222,7 +222,7 @@ mutual
   ||| FROM clause source.
   public export
   data Source
-    = SrcOctad String             -- HEXAD <uuid>
+    = SrcOctad String             -- OCTAD <uuid>; HEXAD is a legacy spelling
     | SrcFederation String        -- FEDERATION <pattern>
     | SrcStore String             -- STORE <id>
 

@@ -8,6 +8,10 @@
 ||| their types, and nullability — enabling Level 1 (schema binding) and
 ||| Level 3 (null safety) checking at compile time.
 |||
+||| `OctadSchema` is the fixed eight-slot schema, not a modality profile.
+||| Empty fields in a slot do not encode deployment support or per-subject
+||| witness presence. See `docs/standards/MODALITY-PROFILES.adoc`.
+|||
 ||| Key properties proved:
 |||   - Field lookup is total (every reference resolves or fails explicitly)
 |||   - Type assignment is unique (no field has two types)

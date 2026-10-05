@@ -56,7 +56,10 @@ pub struct ModalitySchema {
 }
 
 /// `Schema.idr`: `record OctadSchema` — the 8 modality schemas, in
-/// record order (fixed arity; no length prefix on the wire).
+/// record order (fixed arity; no length prefix on the wire). This is a static
+/// schema, not a deployment's modality profile or a per-subject presence map;
+/// an empty field list does not mean that the modality is unsupported or
+/// unpopulated. See `docs/standards/MODALITY-PROFILES.adoc`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct OctadSchema {
     pub graph: ModalitySchema,

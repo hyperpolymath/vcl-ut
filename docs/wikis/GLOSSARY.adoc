@@ -106,9 +106,22 @@ transaction handles.
 == M
 
 Modality (VeriSimDB)::
-One of the 8 views of an entity in VeriSimDB's octad: graph, vector, tensor,
-semantic, document, temporal, provenance, spatial. Each modality stores a
-different representation of the same data.
+A named kind of modal witness. VCL-UT's current Octad catalog has exactly
+eight: graph, vector, tensor, semantic, document, temporal, provenance, and
+spatial. A catalog entry does not by itself say whether a deployment supports
+it or a subject currently has data in it.
+
+Modality profile::
+A versioned, implementation-specific selection of supported or enabled
+modalities at a declared scope. Its own contract must define versioning,
+membership/cardinality, and what omission means. VCL-UT currently has no
+runtime profile type or profile wire format; this term is distinct from
+`OctadSchema`.
+
+Modality set::
+A collection that states modality membership only. The term carries no fixed
+cardinality, version, or capability policy; use *modality profile* when those
+implementation-specific semantics are intended.
 
 Modal type::
 A type that carries information about its context -- for example, whether data
@@ -125,9 +138,15 @@ to prevent silent failures.
 == O
 
 Octad::
-The core data structure in VeriSimDB: a single entity with up to 8 simultaneous
-representations (the 8 modalities). Every entity exists across all populated
-modalities, and VeriSimDB keeps them in sync.
+VeriSimDB's specific fixed model of eight named modality slots. A subject may
+have witness data in only a subset of the slots; sparse runtime population
+does not make the Octad structure variable-arity.
+
+`OctadSchema`::
+VCL-UT's fixed-arity schema value with one `ModalitySchema` for each of the
+eight Octad modalities. It declares fields and their types; it does not encode
+a deployment's modality profile or per-subject witness presence. An empty
+field list is not an unsupported/absent-modality marker.
 
 == P
 
@@ -210,9 +229,10 @@ VCL with all 10 levels of type safety. The subject of this project. If
 successful, it replaces VCL-DT as THE type-safe query path for VeriSimDB.
 
 VeriSimDB::
-A multi-modal database engine where every entity exists across up to 8
-simultaneous representations (the octad), with automatic drift detection and
-self-normalisation.
+A multi-modal database engine whose Octad model names eight modality slots.
+Which slots are supported/enabled and which have witness data for a particular
+subject are distinct implementation and runtime questions; neither changes
+the fixed arity of VCL-UT's `OctadSchema`.
 
 == Z
 

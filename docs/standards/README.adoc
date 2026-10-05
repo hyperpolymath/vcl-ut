@@ -2,3 +2,17 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
 
 = Standards Unit
+:toc: preamble
+
+This unit contains the repository's normative technical and terminology
+contracts.
+
+[cols="2,4"]
+|===
+|Document |Contract
+
+|link:MODALITY-PROFILES.adoc[Modality profiles and the fixed Octad contract]
+|Defines the distinction between implementation-specific modality profiles,
+  runtime witness population, and VCL-UT's fixed eight-slot `OctadSchema` and
+  `VCLS` v1 wire contract.
+|===

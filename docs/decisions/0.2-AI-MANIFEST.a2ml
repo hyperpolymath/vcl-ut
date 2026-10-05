@@ -9,3 +9,7 @@ parent: "../0.1-AI-MANIFEST.a2ml"
 ### [AI_MANIFEST]
 description: |
   Sub-unit of the docs pillar focusing on decisions.
+
+canonical_locations:
+  index: "README.adoc"
+  modality_profiles_octad: "0007-modality-profiles-vs-octad-schema.adoc"

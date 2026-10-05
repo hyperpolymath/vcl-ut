@@ -83,7 +83,7 @@ The gate explicitly does **NOT**:
 ----
 {
   "schema_version": 1,
-  "statement": "ASSERT GRAPH.knows FROM HEXAD 'e-1' WHERE depth < 3 LIMIT 10",
+  "statement": "ASSERT GRAPH.knows FROM OCTAD 'e-1' WHERE depth < 3 LIMIT 10",
   "schema": { "...": "OctadSchema JSON, optional — see §Schema payload" }
 }
 ----
@@ -191,7 +191,20 @@ corpus soundness proof carries through to the gate.
 
 The optional `schema` object mirrors `src/interface/parse/src/schema.rs`
 `OctadSchema` (itself a 1:1 mirror of `src/core/Schema.idr`): the eight
-modality schemas in record order, each a list of field definitions.
+modality schemas in record order, each a list of field definitions. This is a
+fixed eight-slot schema payload, not a modality profile or a variable-length
+selection of modalities.
+
+In this JSON form, individual modality keys are optional. A missing key is
+normalized by the current gate parser to that modality's fixed slot with an
+empty `fields` list. Omitting the entire top-level `schema` constructs an
+empty schema with all eight slots. Empty fields mean “no field declarations
+were supplied here”; they do not mean unsupported, disabled, or unpopulated.
+The request's `schema_version` versions this gate JSON contract, not a
+modality profile. For the fixed `VCLS` v1 binary contract and the profile
+terminology, see
+link:../src/interface/parse/WIRE-FORMAT.adoc[WIRE-FORMAT.adoc] and
+link:standards/MODALITY-PROFILES.adoc[MODALITY-PROFILES.adoc].
 
 [source,json]
 ----
@@ -307,7 +320,7 @@ Request:
 [source,json]
 ----
 { "schema_version": 1,
-  "statement": "INSPECT GRAPH.knows FROM HEXAD 'e-1' WHERE depth < 3 LIMIT 10",
+  "statement": "INSPECT GRAPH.knows FROM OCTAD 'e-1' WHERE depth < 3 LIMIT 10",
   "schema": { "graph": { "fields": [ { "name": "depth", "ty": "TInt", "nullable": false, "indexed": true } ] },
               "vector": {"fields":[]}, "tensor": {"fields":[]}, "semantic": {"fields":[]},
               "document": {"fields":[]}, "temporal": {"fields":[]}, "provenance": {"fields":[]}, "spatial": {"fields":[]} } }

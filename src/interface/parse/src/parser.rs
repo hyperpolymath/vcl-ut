@@ -453,10 +453,13 @@ fn parse_select_item(p: &mut P) -> Result<SelectItem, ParseError> {
     p.err("expected a SELECT item (`*`, MODALITY[.field], or AGG(expr))")
 }
 
+/// Parses a FROM source: `OCTAD <id>`, `HEXAD <id>`,
+/// `FEDERATION <pattern>`, or `STORE <id>`.
+///
+/// `OCTAD` (preferred) and `HEXAD` (legacy alias) name the same
+/// `Source::Octad`; neither spelling selects a modality profile.
+/// Returns a parse error for an unknown source kind or missing identifier.
 fn parse_source(p: &mut P) -> Result<Source, ParseError> {
-    // `OCTAD`/`HEXAD <id>`, `FEDERATION <pattern>`, `STORE <id>`.
-    // OCTAD/HEXAD both accepted (grammar comment vs constructor name
-    // disagree); reconciled with the ReScript bridge in a later slice.
     if p.is_kw("OCTAD") || p.is_kw("HEXAD") {
         p.bump();
         return Ok(Source::Octad(parse_source_arg(p)?));

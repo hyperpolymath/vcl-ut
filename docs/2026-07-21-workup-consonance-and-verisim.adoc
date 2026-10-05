@@ -435,9 +435,15 @@ named `HexadType` throughout (`VCLTypes.res:50`, `:206`, `:270`,
 `VCLSubtyping.res:101`). The hexad-to-octad migration reached the variants and
 stopped before the defaults and the names.
 
-Note the same legacy is visible here: the parser still accepts `HEXAD`
-alongside `OCTAD`. That is deliberate compatibility, and it should be retired
-once VeriSimDB's default context carries all eight — not before.
+Terminology correction (2026-10-05): the six-entry `availableModalities`
+value is an implementation-specific modality set; if a versioned profile is
+introduced, it can describe that selection. It does not change the fixed
+eight-slot Octad model or VCL-UT's `OctadSchema`. In this repository's current
+Rust parser, `OCTAD` and `HEXAD` both map to the same `Source::Octad`, with
+`HEXAD` retained as a legacy source spelling. Alias removal is a separate
+cross-frontend compatibility decision; it is not gated on the default context
+listing all eight modalities. Other frontends must be checked independently.
+See link:standards/MODALITY-PROFILES.adoc[the profile/Octad contract].
 
 === The seam is unwired
 
@@ -480,8 +486,9 @@ Ordered by value delivered per unit of risk. Items 1-2 are in this repository;
 | 5
 | *Converge the checkers.* Once (4) is live, retire the ReScript checker's
   independent verdict in favour of the gate's, keeping the ReScript surface
-  parser and diagnostics. Then rename `HexadType` and retire the `HEXAD`
-  keyword together.
+  parser and diagnostics. Treat `HexadType` renaming and `HEXAD` alias removal
+  as separate compatibility cleanups; neither is implied by changing the
+  default modality set.
 | both
 
 | 6

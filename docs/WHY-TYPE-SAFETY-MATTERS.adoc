@@ -168,10 +168,13 @@ FETCH orders.order_total WHERE orders.status = "completed"
 
 ==== Why It Matters for Databases
 
-In VeriSimDB, data exists across 8 modalities simultaneously (the octad). A
-typo in a modality reference could silently query the wrong view of your data.
-Schema binding ensures that every reference is checked against the live schema
-before the query runs.
+VeriSimDB's Octad names eight fixed modality slots, although a subject may
+have witness data in only a subset. A deployment's modality profile (which
+modalities it supports or enables) is a separate concept from both that fixed
+Octad and VCL-UT's `OctadSchema`. A typo in a modality reference could silently
+query the wrong view of your data; schema binding checks field references
+against the supplied schema. See
+link:standards/MODALITY-PROFILES.adoc[the profile/Octad contract].
 
 ---
 
@@ -436,10 +439,12 @@ FETCH OPTIONAL users WHERE users.email = ?email
 
 ==== Why It Matters for Databases
 
-In VeriSimDB, an entity's octad has exactly 8 modality slots but any subset
-might be populated. Cardinality safety ensures you know at compile time whether
-a modality query will return data or might be empty, eliminating an entire
-class of "expected data that was not there" bugs.
+In VeriSimDB, the Octad has exactly eight named modality slots, but any subset
+may have witness data for a particular entity. A modality profile can describe
+what an implementation supports; it does not prove that a subject has data in
+a supported modality. Cardinality safety concerns the possible result count,
+not the profile's modality count, and helps catch assumptions that a modality
+will necessarily return data when it might be empty.
 
 ---
 

@@ -1,0 +1,190 @@
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+// SPDX-License-Identifier: CC-BY-SA-4.0
+
+= Modality Profiles and the Fixed Octad Contract
+Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+:revdate: 2026-10-05
+:toc: preamble
+:icons: font
+
+[.lead]
+This specification separates implementation-specific *modality profiles* from
+VCL-UT's fixed, eight-slot `OctadSchema`. It defines vocabulary and records the
+current contract; it does not add a profile API or change any wire format.
+
+== Status and Scope
+
+This is the accepted terminology clarification for
+https://github.com/hyperpolymath/vcl-ut/issues/118[vcl-ut#118], aligned with
+the related https://github.com/hyperpolymath/verisimdb/issues/299[VeriSimDB
+proposal]. It describes the VCL-UT contract present on 2026-10-05. The
+`OctadSchema` type, gate JSON contract, `VCLS` v1 codec, and accepted statement
+syntax are unchanged.
+
+This document does *not* claim that VCL-UT or VeriSimDB currently negotiates,
+serializes, or validates a modality profile. The profile terms below are
+available for architecture and documentation; a runtime profile contract
+would need its own implementation and versioned interface.
+
+== Terms
+
+Modality::
+A named kind of modal witness. VCL-UT's current Octad catalog is exactly
+Graph, Vector, Tensor, Semantic, Document, Temporal, Provenance, and Spatial.
+
+Modality set::
+A collection whose meaning is only membership: which modality names are in
+that set. The generic term does not impose a fixed cardinality, version, or
+policy. A modality set is not, by itself, a schema or a capability contract.
+
+Modality profile::
+A versioned, implementation-specific selection of modalities that are
+supported or enabled at an explicitly stated scope (for example, an
+implementation, deployment, tenant, or subject). The profile's own contract
+must define its scope, versioning, cardinality/membership representation, and
+the meaning of omitted members (including any required/optional/unsupported
+semantics). The word *profile* alone defines none of those wire-level details.
+
+Octad::
+VCL-UT's specific fixed model with eight named modality slots. An individual
+subject may have witness data in only some of those slots; sparse runtime
+population does not make the Octad structure variable-arity.
+
+`OctadSchema`::
+VCL-UT's static schema value: eight named slot members (graph, vector,
+tensor, semantic, document, temporal, provenance, and spatial), each carrying
+a `ModalitySchema`. It describes declared fields and their types/nullability;
+it is not a modality profile, a per-subject population bitmap, or a record of
+which modalities a deployment supports.
+
+Populated/present modality::
+A statement about whether a subject has actual witness data in a modality at a
+particular point in time. This runtime fact is distinct from profile support,
+from a schema's field declarations, and from the fixed arity of `OctadSchema`.
+
+== Keep Four Questions Separate
+
+[cols="1,2,3"]
+|===
+|Question |Term |What it says
+
+|Which modality names exist in this language's model?
+|Modality catalog
+|VCL-UT's current catalog contains the eight named Octad modalities.
+
+|Which modalities can or will an implementation use?
+|Modality profile / modality set
+|An implementation-specific capability or configuration choice. VCL-UT has
+  no profile object or profile transport today.
+
+|Which fields and field types can the checker resolve?
+|`OctadSchema`
+|The static schema passed to the checker, with a fixed slot for each Octad
+  modality. An empty field list declares no fields for that slot; it does not
+  declare the modality unsupported or physically absent.
+
+|Which witnesses have data for this subject now?
+|Population / presence
+|Runtime state. It is not represented by `OctadSchema` or inferred from an
+  empty field list.
+|===
+
+In particular, *supported*, *enabled*, *schema-described*, and *populated* are
+not synonyms. If an implementation wants to make those states interchangeable,
+its own profile/runtime contract must state and validate that rule.
+
+== VCL-UT Contract Today
+
+=== The schema is exactly eight slots
+
+`src/core/Schema.idr` defines `OctadSchema` as eight named fields, in this
+order: Graph, Vector, Tensor, Semantic, Document, Temporal, Provenance, and
+Spatial. The Rust mirror is `src/interface/parse/src/schema.rs`. There is no
+variable-length modality collection and no profile field in either type.
+
+The binary `VCLS` v1 schema stream carries exactly eight `ModalitySchema`
+payloads in canonical record order, with no modality-count prefix. Its v1
+codec version is not a modality-profile version; it is not a variable-arity
+profile transport. The decoder reads those eight payloads and rejects trailing
+bytes. See
+link:../../src/interface/parse/WIRE-FORMAT.adoc[the wire-format contract].
+
+=== JSON omission does not change the arity
+
+The `vclt-gate` request may omit the top-level `schema`; that path constructs
+an empty `OctadSchema` containing all eight slots. In the JSON `schema` object,
+a modality key may also be omitted; the current parser fills that fixed slot
+with an empty field list. The resulting value is still an eight-slot
+`OctadSchema`.
+
+An omitted key or an empty `fields` array therefore means only that no field
+definitions were supplied for that slot to this checker input. It does *not*
+mean “this deployment does not support the modality,” “this subject has no
+witness here,” or “the profile has fewer modalities.” The gate request's
+`schema_version: 1` versions the gate request contract; it does not identify a
+modality profile. See
+link:../vclt-gate-contract.adoc[the gate contract].
+
+=== `OCTAD` and `HEXAD` are source spellings, not profiles
+
+The current Rust parser accepts `OCTAD` and `HEXAD` in a direct `FROM` source
+and maps both to the same `Source::Octad` value. `HEXAD` is the legacy spelling
+in that parser; it does not mean “select six modalities.” This terminology
+decision does not remove either spelling or define alias support in other
+frontends. Any eventual syntax cleanup is independent of a deployment's
+modality profile and requires its own compatibility decision.
+
+=== Wildcard projection is not a profile
+
+The EBNF describes `SELECT *` as selecting all modalities exposed in the target
+context. That is a statement-projection rule whose available set must be
+defined by the execution context; it does not encode a profile in the
+statement, add/remove `OctadSchema` slots, or change `VCLS` arity.
+
+== Examples
+
+[cols="1,3"]
+|===
+|Situation |Correct reading
+
+|A subject currently has Graph and Document witnesses.
+|Those are two populated modalities in a fixed eight-slot Octad. The statement
+  says nothing by itself about the deployment's profile or the schema arity.
+
+|A deployment-specific profile lists Graph, Vector, and Document.
+|That is a three-member modality set *if and when* a separately specified
+  profile contract defines it. VCL-UT does not currently encode this object in
+  `OctadSchema` or `VCLS` v1.
+
+|The gate input supplies `"graph": {"fields": [...]}` and omits `"spatial"`.
+|The JSON parser materializes both fixed slots; the Spatial slot has an empty
+  field list. This is not a claim that Spatial is unsupported or unpopulated.
+
+|A statement uses `FROM HEXAD id`.
+|In the current Rust parser this is a legacy spelling for the same Octad source
+  as `FROM OCTAD id`; it is not a request for a six-modality profile.
+|===
+
+== Compatibility and Future Profile Work
+
+Keep `OctadSchema` and `VCLS` v1 fixed-arity and unchanged. Do not overload the
+current schema type, gate `schema_version`, or `VCLS` version with profile
+selection or profile versioning.
+
+If a future integration needs profiles on the wire, define a separate,
+explicitly versioned profile type and transport. At minimum, that contract must
+name its scope, identify its supported modality catalog, state membership and
+cardinality unambiguously, define what omission means, and distinguish
+capability from per-subject witness presence. It must not imply that an
+`OctadSchema` decoder accepts arbitrary modality counts. Keep such API/schema
+work separate from this terminology decision and version it according to the
+consumer contract.
+
+== References
+
+* `src/core/Schema.idr` — the dependent `OctadSchema` definition.
+* `src/interface/parse/src/schema.rs` — the Rust mirror.
+* `src/interface/parse/WIRE-FORMAT.adoc` — the exact `VCLS` v1 codec.
+* `docs/vclt-gate-contract.adoc` — the JSON gate input contract.
+* `docs/decisions/0007-modality-profiles-vs-octad-schema.adoc` — the
+  architecture decision that adopts this distinction.

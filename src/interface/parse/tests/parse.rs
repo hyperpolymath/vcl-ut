@@ -9,7 +9,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use proptest::prelude::*;
-use vcltotal_parse::{parse, parse_op};
+use vcltotal_parse::{ast::Source, parse, parse_op};
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(4096))]
@@ -60,6 +60,16 @@ fn known_good_queries_parse() {
     for q in oks {
         assert!(parse(q).is_ok(), "should parse: {q}");
     }
+}
+
+/// Verifies that legacy `HEXAD` and preferred `OCTAD` produce the same source.
+#[test]
+fn legacy_hexad_spelling_is_the_same_octad_source() {
+    let preferred = parse("SELECT * FROM OCTAD 'subject-1'").expect("OCTAD source parses");
+    let legacy = parse("SELECT * FROM HEXAD 'subject-1'").expect("legacy HEXAD parses");
+
+    assert_eq!(preferred.source, Source::Octad("subject-1".to_string()));
+    assert_eq!(legacy.source, preferred.source);
 }
 
 // ── Deep nesting must fail-closed (typed error), NOT overflow the stack ──

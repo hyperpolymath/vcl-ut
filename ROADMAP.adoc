@@ -74,9 +74,12 @@ These are ordered by value, not by version number.
 . *Discharge the two disclosed L10 residuals.* Transitive `ENTAILS`-cycle
   detection and proposition well-typedness, both recorded as owed in
   `verification/proofs/VERIFICATION-STANCE.adoc`.
-. *Retire the `HEXAD` keyword* once VeriSimDB's default modality context
-  carries all eight witnesses. The parser accepts both `OCTAD` and `HEXAD`
-  today for compatibility.
+. *Optional syntax cleanup: retire the legacy `HEXAD` spelling* when all
+  supported frontends can do so compatibly. The current Rust parser accepts
+  both `OCTAD` and `HEXAD` as the same `Source::Octad`; this is a source-name
+  alias, not a six-modality profile. Its deprecation is independent of which
+  modalities a deployment enables or which witnesses a subject populates.
+  See link:docs/standards/MODALITY-PROFILES.adoc[the profile/Octad contract].
 
 == Milestones
 

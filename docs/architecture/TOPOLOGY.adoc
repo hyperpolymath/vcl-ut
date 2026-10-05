@@ -64,7 +64,7 @@ query language.
                           │  │  Tensor, Semantic, Document,     │    │
                           │  │  Temporal, Provenance, Spatial)  │    │
                           │  │                                  │    │
-                          │  │  HEXAD addressing                │    │
+                          │  │  OCTAD source (HEXAD alias)      │    │
                           │  └──────────────────────────────────┘    │
                           └─────────────────────────────────────────┘
 ----
@@ -147,7 +147,7 @@ The dependency chain from theory to execution:
   ┌──────────────────────────────────────────────────────────────┐
   │                       VeriSimDB                               │
   │                                                               │
-  │  The database engine. 8 modalities, HEXAD addressing,         │
+  │  Fixed eight-slot Octad; OCTAD source, HEXAD legacy alias.    │
   │  Rust core, Elixir orchestration.                             │
   │                                                               │
   │  Receives: compiled query plans with proof certificates.      │
@@ -314,7 +314,7 @@ performance-critical type checking in the hot path.
   │  ┌──────────────────────────────────────────────────┐   │
   │  │ VeriSimDB Cluster                                │   │
   │  │   ↳ Rust core engine                             │   │
-  │  │   ↳ 8-modality HEXAD storage                     │   │
+  │  │   ↳ Fixed Octad slots; HEXAD is a source alias   │   │
   │  │   ↳ Receives compiled query plans + certificates  │   │
   │  └──────────────────────────────────────────────────┘   │
   └─────────────────────────────────────────────────────────┘

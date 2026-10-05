@@ -68,8 +68,12 @@ them in one system, with _automatic consistency guarantees_.
 
 === The Octad: One Entity, Eight Views
 
-Every piece of data in VeriSimDB is stored as an **octad** -- a single entity
-with up to eight simultaneous representations:
+VeriSimDB's **Octad** is a single-entity model with exactly eight named
+modality slots. A particular subject may have actual witness data in only a
+subset of those slots; “up to eight populated representations” describes
+runtime population, not a variable-length Octad schema. A deployment's
+modality profile, when defined by that implementation, is a separate statement
+about supported or enabled modalities:
 
 ----
 ┌─────────────────────────────────────────────────────────────┐
@@ -114,6 +118,15 @@ with up to eight simultaneous representations:
 | Geospatial coordinates and geometries -- where this entity is in the world
 |===
 
+These are the eight named Octad slots, not a promise that every subject has
+data in all eight. Keep four questions distinct: which modalities the model
+names, which a deployment supports (its *modality profile*), which fields the
+safety schema declares, and which witnesses are populated for a particular
+subject. VCL-UT's `OctadSchema` has a fixed slot for every modality; an empty
+slot in the schema input does not encode a deployment profile or runtime
+absence. See
+link:standards/MODALITY-PROFILES.adoc[the VCL-UT profile/Octad contract].
+
 === Why This Matters
 
 Suppose you have a customer record. In a traditional setup:
@@ -129,13 +142,15 @@ That is six copies of the same customer, in six different systems, with six
 different update mechanisms. When the customer changes their address, you have
 to update _all six_ -- and if any update fails or is delayed, your data drifts.
 
-In VeriSimDB, there is one octad for that customer. All eight views are
-maintained automatically. When the document modality updates, VeriSimDB detects
-that the vector embedding, graph relationships, and search index may have
-drifted, and triggers automatic re-normalisation.
+In VeriSimDB, that customer is modeled by one Octad with eight named slots.
+Which witnesses are supported by a deployment and which are populated for
+that subject are implementation/runtime matters; the fixed eight-slot model
+is independent of those choices. When document and vector witnesses are both
+present, for example, the engine can detect that the vector embedding may have
+drifted from the document and trigger re-normalisation.
 
-**You do not have to choose between MongoDB and Neo4j and Redis. You get all
-of them, and they stay in sync.**
+**The Octad supplies one identity model across modalities; it is not a promise
+that every deployment or subject has every witness populated.**
 
 === Drift Detection
 
@@ -150,7 +165,7 @@ When drift exceeds a configurable threshold, VeriSimDB:
 
 1. Identifies the most authoritative modality
 2. Regenerates the drifted modalities from it
-3. Validates consistency across all eight views
+3. Validates consistency across the applicable, populated witnesses (within the fixed Octad model)
 4. Updates everything atomically (all at once, or not at all)
 
 == The Three Query Paths
@@ -313,12 +328,13 @@ A proof technique discovered for VCL-total can be applied to PanLL, and vice ver
 | Concept | One-Sentence Summary
 
 | **VeriSimDB**
-| A database where every entity exists in 8 views simultaneously, with automatic
-  drift detection and repair.
+| A multi-modal engine whose Octad model has eight fixed modality slots; which
+  witnesses are supported or populated can vary by implementation and subject.
 
 | **Octad**
-| The 8 simultaneous representations of a single entity (graph, vector, tensor,
-  semantic, document, temporal, provenance, spatial).
+| The fixed eight-slot model for graph, vector, tensor, semantic, document,
+  temporal, provenance, and spatial witnesses; a subject need not populate all
+  eight slots.
 
 | **VCL**
 | The fast, unverified query language for VeriSimDB.
