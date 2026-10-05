@@ -5,6 +5,8 @@
 //! This top-level crate re-exports the formatter and linter libraries
 //! for use in integration tests and downstream consumers.
 
+#![forbid(unsafe_code)]
+
 /// Re-export the VCL-total formatter.
 pub use vcltotal_fmt as fmt;
 

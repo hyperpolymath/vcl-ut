@@ -3,6 +3,8 @@
 //!
 //! This tool lints VCL-total query files for syntax and style issues.
 
+#![forbid(unsafe_code)]
+
 use clap::Parser;
 use std::fs;
 use std::path::PathBuf;

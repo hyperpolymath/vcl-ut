@@ -115,7 +115,7 @@ conformant with the Rust encoder by `+Refl+` in
 `+VclTotal.Interface.WireConformance+`. The marshalling seam’s _decode_
 side is machine-verified. *P5c — RESOLVED (Tier-1 recompute-PCC):* the
 consumer re-runs the certified decision itself from the fail-closed
-`+wasm32+` module `+src/interface/recompute-wasm+` (`+vcl_recompute+`);
+`+wasm32+` module `+ffi/rust/recompute-wasm+` (`+vcl_recompute+`);
 the decision core is a faithful Rust port of the corpus
 (`+Schema+`/`+Decide+`/`+Checker+`) machine-pinned via
 `+WireConformance+`. TCB = conformance-pinned decider image + wasm
@@ -123,7 +123,7 @@ runtime + the once-proved corpus (offline-re-checkable) — _not_ a
 trusted tag, _not_ a transported proof object. Plain `+wasm32+` suffices
 (type system not load-bearing under recompute); `+affinescriptiser+` N/A
 (disclosed). *P5d — RESOLVED (Tier-2 fallback):*
-`+src/interface/attest+` mints/verifies an Ed25519 attestation bound to
+`+ffi/rust/attest+` mints/verifies an Ed25519 attestation bound to
 `+(sha256(stmt_wire), sha256(schema_wire),   level)+` (fail-closed); the
 `+vclut_rs_verify+` backend is linked into `+ffi/zig+`
 (`+vclut_verify_wire+`, `+zig build test+` green end-to-end).

@@ -398,7 +398,7 @@ that preserves VeriSimDB's genuinely good UX work:
 
 === 3. Attestation
 
-`src/interface/attest` mints a signed attestation over `(statement, schema)`
+`ffi/rust/attest` mints a signed attestation over `(statement, schema)`
 carrying the certified level, verifiable independently. For a database whose
 selling point is maintained identity consonance, being able to prove *after
 the fact* that a transition was admitted at a stated level — and have a third

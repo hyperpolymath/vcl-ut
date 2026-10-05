@@ -1,0 +1,40 @@
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= Rust FFI Boundary Crates
+:toc:
+
+This directory is the Rust host/guest and C-ABI boundary layer, and the
+*only* place in the repository where Rust `unsafe` is allowed (vcl-ut#49).
+Rust code under `src/` is safe Rust: every crate root there carries
+`#![forbid(unsafe_code)]`, and `tests/aspect_tests.sh` rejects any unsafe
+construct under `src/`, test code included.
+
+Each crate here keeps its unsafe surface to one audited block with a
+`// SAFETY:` justification (`#![deny(clippy::undocumented_unsafe_blocks)]`)
+and delegates all decoding and decision logic to the safe
+`src/interface/parse` (`vcltotal-parse`) crate.
+
+== Crates
+
+* `attest/` (`vcltotal-attest`): Tier-2 C-ABI Ed25519 trusted-certifier
+  attestation backend (`vclut_rs_verify`), linked into the Zig shim
+  `ffi/zig` by `ffi/zig/build.zig`. Spec: `attest/ATTESTATION-FORMAT.adoc`.
+* `recompute-wasm/` (`vcltotal-recompute-wasm`): Tier-1 `wasm32`
+  recompute-PCC entry point (`vcl_recompute`).
+
+Each crate is an independent Cargo workspace root with its own committed
+lockfile, so it builds without the repository's other workspace roots
+(one of which carries an external path dependency).
+
+== Validation
+
+[source,sh]
+----
+cargo clippy --manifest-path ffi/rust/attest/Cargo.toml --all-targets -- -D warnings
+cargo test   --manifest-path ffi/rust/attest/Cargo.toml --locked
+cargo clippy --manifest-path ffi/rust/recompute-wasm/Cargo.toml --all-targets -- -D warnings
+cargo test   --manifest-path ffi/rust/recompute-wasm/Cargo.toml --locked
+(cd ffi/zig && zig build test)   # links attest/ end to end
+----
+
+CI: `.github/workflows/satellite-crates-gate.yml`.

@@ -22,12 +22,12 @@
   ;; Mirrors the reference pattern in hyperpolymath/007
   ;; audits/assail-classifications.a2ml (zig_bridge.rs UnsafeCode).
   (classification
-    (file "src/interface/recompute-wasm/src/lib.rs")
+    (file "ffi/rust/recompute-wasm/src/lib.rs")
     (category "UnsafeCode")
     (audit "in-file UNSAFE POLICY (lib.rs:40-46) + deny(clippy::undocumented_unsafe_blocks)")
     (rationale "only unsafe is the documented host/guest memory-ABI block (alloc/dealloc pair); all decision logic lives in the forbid(unsafe_code) vcltotal-parse crate"))
   (classification
-    (file "src/interface/attest/src/lib.rs")
+    (file "ffi/rust/attest/src/lib.rs")
     (category "UnsafeCode")
     (audit "in-file UNSAFE POLICY (lib.rs:38-42) + deny(clippy::undocumented_unsafe_blocks)")
     (rationale "single documented C-ABI block in vclut_rs_verify with null/len checks and fail-closed -1 returns; decode logic in forbid(unsafe_code) crate"))

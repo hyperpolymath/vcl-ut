@@ -13,7 +13,7 @@ attestation (the FALLBACK tier).** Authoritative model:
 == Role
 
 For consumers that **cannot run the Tier-1 recompute `wasm32` module**
-(`src/interface/recompute-wasm`). A C ABI cannot carry a re-checkable
+(`ffi/rust/recompute-wasm`). A C ABI cannot carry a re-checkable
 proof, so this mints an Ed25519 attestation binding
 `(sha256(stmt_wire), sha256(schema_wire), level)` — unforgeable and
 bound, but *trusted* (the consumer trusts the certifier that signed

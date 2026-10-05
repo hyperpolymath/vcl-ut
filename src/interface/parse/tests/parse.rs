@@ -111,7 +111,10 @@ fn deep_parens_are_typed_error_not_overflow() {
 #[test]
 fn deep_not_chain_is_typed_error_not_overflow() {
     let msg = parse_on_gate_stack(|| {
-        let q = format!("SELECT * FROM STORE s WHERE {}GRAPH.x", "NOT ".repeat(100_000));
+        let q = format!(
+            "SELECT * FROM STORE s WHERE {}GRAPH.x",
+            "NOT ".repeat(100_000)
+        );
         parse(&q).err().map(|e| e.msg)
     });
     assert_eq!(

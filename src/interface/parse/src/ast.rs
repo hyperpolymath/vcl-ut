@@ -290,10 +290,22 @@ pub enum RepairJustification {
 pub enum Transition {
     /// `TMerge left right into evidence level`: two DISTINCT inputs → one
     /// identity.
-    Merge(SubjectRef, SubjectRef, SubjectRef, Option<Expr>, SafetyLevel),
+    Merge(
+        SubjectRef,
+        SubjectRef,
+        SubjectRef,
+        Option<Expr>,
+        SafetyLevel,
+    ),
     /// `TSplit from outL outR evidence level`: one identity → two DISTINCT
     /// outputs.
-    Split(SubjectRef, SubjectRef, SubjectRef, Option<Expr>, SafetyLevel),
+    Split(
+        SubjectRef,
+        SubjectRef,
+        SubjectRef,
+        Option<Expr>,
+        SafetyLevel,
+    ),
     /// `TNormalise subject justification level`: repair transition, NO result
     /// set, justified.
     Normalise(SubjectRef, RepairJustification, SafetyLevel),

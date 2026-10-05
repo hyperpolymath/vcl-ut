@@ -413,6 +413,7 @@ fn decoder_rejects_deep_nesting_without_overflow() {
     schema.push(0); // graph modality = Graph
     schema.extend_from_slice(&1u32.to_le_bytes()); // one field
     schema.extend_from_slice(&0u32.to_le_bytes()); // field name ""
+
     // 200k nested TList tags (VqlType::TList == 8).
     schema.extend(std::iter::repeat_n(8u8, 200_000));
     // Hits the depth cap long before consuming the rest of the stream.

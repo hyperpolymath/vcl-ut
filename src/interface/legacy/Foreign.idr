@@ -20,7 +20,7 @@
 ||| Use the new honest paths instead:
 |||
 |||   * **Tier-1 (recompute-PCC over `wasm32`)** — consumer re-runs
-|||     the certified decision via `src/interface/recompute-wasm`
+|||     the certified decision via `ffi/rust/recompute-wasm`
 |||     (`vcl_recompute`), comparing its verdict against the
 |||     producer's claim. No trusted certifier. See
 |||     `verification/proofs/VERIFICATION-STANCE.adoc` §"Boundary
@@ -28,7 +28,7 @@
 |||
 |||   * **Tier-2 (C-ABI Ed25519 signed attestation, FALLBACK)** —
 |||     producer signs `(sha256(stmt_wire), sha256(schema_wire),
-|||     level)`; consumer Ed25519-verifies. See `src/interface/attest`
+|||     level)`; consumer Ed25519-verifies. See `ffi/rust/attest`
 |||     (`vclut_rs_verify`) and the Idris bindings in
 |||     `VclTotal.ABI.Tier2` (`src/interface/abi/Tier2.idr`).
 |||

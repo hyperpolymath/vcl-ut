@@ -17,8 +17,8 @@
 #
 #   /                              root workspace (vcl-ut, fmt, lint, core)
 #   /src/interface/parse           parser + decider + vclt-gate  <- the real spine
-#   /src/interface/attest          depends on ../parse (in-repo)
-#   /src/interface/recompute-wasm  depends on ../parse (in-repo)
+#   /ffi/rust/attest               depends on src/interface/parse (in-repo)
+#   /ffi/rust/recompute-wasm       depends on src/interface/parse (in-repo)
 #
 # DELIBERATELY EXCLUDED: /src/interface/echidna-client. It depends on
 # ../../interface, which in turn carries an out-of-tree path dependency
@@ -66,13 +66,13 @@ updates:
     open-pull-requests-limit: 0
 
   - package-ecosystem: "cargo"
-    directory: "/src/interface/attest"
+    directory: "/ffi/rust/attest"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 0
 
   - package-ecosystem: "cargo"
-    directory: "/src/interface/recompute-wasm"
+    directory: "/ffi/rust/recompute-wasm"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 0

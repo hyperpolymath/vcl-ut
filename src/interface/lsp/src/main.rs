@@ -6,6 +6,9 @@
 
 // Binary-side mirror of the `vclt-gate` posture: the server must report
 // failures to the client, never crash on them.
+
+#![forbid(unsafe_code)]
+
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
 use lsp_server::{Connection, Message, RequestId, Response};

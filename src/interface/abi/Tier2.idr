@@ -5,8 +5,8 @@
 |||
 ||| Idris-side bindings to the *honest* C ABI exposed by the Zig shim
 ||| `ffi/zig/src/lib.zig` (`vclut_verify_wire`), which calls into the
-||| Rust crate `src/interface/attest` (`vclut_rs_verify`) — see
-||| `src/interface/attest/ATTESTATION-FORMAT.adoc` for the wire
+||| Rust crate `ffi/rust/attest` (`vclut_rs_verify`) — see
+||| `ffi/rust/attest/ATTESTATION-FORMAT.adoc` for the wire
 ||| contract and `docs/decisions/0002-ffi-attestation-trust-boundary.adoc`
 ||| for the trust model rationale.
 |||
@@ -35,13 +35,13 @@
 |||   (3) the Ed25519-dalek + sha2 implementation in the Tier-2 crate.
 |||
 ||| **Strictly weaker than Tier-1** (recompute-PCC over `wasm32`,
-||| `src/interface/recompute-wasm`), which trusts neither (1) nor (2)
+||| `ffi/rust/recompute-wasm`), which trusts neither (1) nor (2)
 ||| because the consumer re-runs the decision itself. Prefer Tier-1
 ||| where wasm hosting is available; Tier-2 is the C-ABI fallback.
 |||
 ||| **No proofs.** Like all FFI plumbing, this module contains no
 ||| theorems — its safety properties live in the Tier-2 Rust crate's
-||| tests (`src/interface/attest/src/lib.rs::tests` — roundtrip + 5
+||| tests (`ffi/rust/attest/src/lib.rs::tests` — roundtrip + 5
 ||| tamper variants + fail-closed + C-ABI). It is *not* in the
 ||| Idris2 proof corpus (`vclut-core.ipkg`); see
 ||| `verification/proofs/VERIFICATION-STANCE.adoc` §"Boundary model"
@@ -88,7 +88,7 @@ ed25519SeedSize = 32
 
 ||| The honest Tier-2 entry point. Bound to the Zig shim
 ||| `vclut_verify_wire` in `ffi/zig/src/lib.zig`, which calls
-||| `vclut_rs_verify` (`src/interface/attest/src/lib.rs`).
+||| `vclut_rs_verify` (`ffi/rust/attest/src/lib.rs`).
 |||
 ||| ABI:
 |||

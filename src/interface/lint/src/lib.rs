@@ -1,10 +1,11 @@
-#![forbid(unsafe_code)]
 // SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 //! VCL-total Linting Library
 //!
 //! Provides linting capabilities for VCL-total query files.
 //! Checks for missing semicolons, lowercase keywords, SELECT *, and OFFSET without LIMIT.
+
+#![forbid(unsafe_code)]
 
 /// A single lint issue found in VCL-total content.
 #[derive(Debug)]

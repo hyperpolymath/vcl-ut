@@ -77,7 +77,11 @@ fn fixture_admitted_assert_with_limit() {
     // Expr::Param (schema-unresolved) — passes L1 vacuously.
     let stmt = parse("ASSERT GRAPH.knows FROM HEXAD 'e-1' WHERE depth < 3 LIMIT 10")
         .expect("fixture 1 must parse");
-    assert_eq!(stmt.verb, Verb::Assert, "the ASSERT verb tag must be captured");
+    assert_eq!(
+        stmt.verb,
+        Verb::Assert,
+        "the ASSERT verb tag must be captured"
+    );
     let cert = certified_level(&stmt, &schema);
     assert_eq!(
         cert, 6,
@@ -183,8 +187,8 @@ fn s1_verb_tags_and_query_only_parse() {
         ("DECLARE", Verb::Declare),
         ("RETRACT", Verb::Retract),
     ] {
-        let stmt = parse(&format!("{kw} {body}"))
-            .unwrap_or_else(|e| panic!("{kw} should parse: {e:?}"));
+        let stmt =
+            parse(&format!("{kw} {body}")).unwrap_or_else(|e| panic!("{kw} should parse: {e:?}"));
         assert_eq!(stmt.verb, want, "{kw} must carry the {want:?} tag");
     }
     for kw in ["MERGE", "SPLIT", "NORMALISE"] {

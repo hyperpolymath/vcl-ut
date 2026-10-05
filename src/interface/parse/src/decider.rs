@@ -617,8 +617,9 @@ fn evidence_type_compat(t: &Transition, schema: &OctadSchema) -> bool {
         Some(e) => {
             let mut cs = Vec::new();
             extract_comparisons(e, &mut cs);
-            cs.iter()
-                .all(|(l, r)| types_compatible(&resolve_expr_type(l, schema), &resolve_expr_type(r, schema)))
+            cs.iter().all(|(l, r)| {
+                types_compatible(&resolve_expr_type(l, schema), &resolve_expr_type(r, schema))
+            })
         }
     }
 }

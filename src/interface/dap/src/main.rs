@@ -3,6 +3,8 @@
 //!
 //! This server provides DAP support for debugging VCL-total queries.
 
+#![forbid(unsafe_code)]
+
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use vcltotal_dap::{dispatch_request, DapRequest};

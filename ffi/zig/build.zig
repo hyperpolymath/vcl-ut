@@ -10,7 +10,7 @@
 //
 // P5d (vcl-ut#25): the Tier-2 attestation backend `vclut_rs_verify`
 // (previously declared-but-unlinked, NAMED OWED) is now the Rust
-// `vcltotal-attest` crate (`src/interface/attest`). build.zig compiles
+// `vcltotal-attest` crate (`ffi/rust/attest`). build.zig compiles
 // that staticlib via cargo and links it into every artefact (incl. the
 // test runner), so the shim's `vclut_verify_wire` calls a real,
 // conformance-pinned, fail-closed backend — not a stub.
@@ -25,10 +25,10 @@ pub fn build(b: *std.Build) void {
     const cargo = b.addSystemCommand(&.{
         "cargo",                "build",
         "--release",            "--manifest-path",
-        "../../src/interface/attest/Cargo.toml",
+        "../../ffi/rust/attest/Cargo.toml",
     });
 
-    const attest_a = b.path("../../src/interface/attest/target/release/libvcltotal_attest.a");
+    const attest_a = b.path("../../ffi/rust/attest/target/release/libvcltotal_attest.a");
 
     const lib_mod = b.createModule(.{
         .root_source_file = b.path("src/lib.zig"),

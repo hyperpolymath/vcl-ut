@@ -68,13 +68,16 @@ vcl_total/
 │   │   ├── legacy/             # Pre-Phase-5 plumbing (DEPRECATED)
 │   │   │   └── Foreign.idr     # Legacy libvqlut bindings (Zig
 │   │   │                       # asserts level; no Idris certificate)
-│   │   ├── attest/             # Tier-2 Rust: signed attestation
-│   │   ├── recompute-wasm/     # Tier-1 Rust: consumer-side recompute
+│   │   ├── parse/              # Safe Rust parser + decider (forbid-unsafe)
 │   │   └── ffi/                # Legacy Zig multi-stage pipeline
 │   └── core/                   # Idris2 corpus (the certifier itself)
+│                               # No unsafe Rust anywhere under src/ (#49)
 │
 ├── ffi/
-│   └── zig/                    # FFI implementation (Zig)
+│   ├── rust/                   # Rust unsafe-boundary crates (only here)
+│   │   ├── attest/             # Tier-2 Rust: signed C-ABI attestation
+│   │   └── recompute-wasm/     # Tier-1 Rust: consumer-side wasm recompute
+│   └── zig/                    # Zig shim, links ffi/rust/attest
 │       ├── build.zig           # Build configuration
 │       ├── build.zig.zon       # Dependencies
 │       ├── src/

@@ -31,6 +31,8 @@
 //! [`vcltotal_interface`] re-exports and are used by callers that want to
 //! work in structured form.
 
+#![forbid(unsafe_code)]
+
 use thiserror::Error;
 
 pub use vcltotal_interface::{core, types};

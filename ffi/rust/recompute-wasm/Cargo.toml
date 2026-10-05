@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: MPL-2.0
 
-# Standalone workspace root (same rationale as ../parse/Cargo.toml): the
-# parent virtual workspace has a pre-existing unresolvable external
-# path-dep, so this boundary crate builds/gates in isolation. Its ONLY
-# dependency is the in-repo, forbid-unsafe `vcltotal-parse` (internal
-# path-dep — resolves in a standalone checkout, unlike the broken
-# `../../../echidna/...` member).
+# Standalone workspace root (same rationale as
+# src/interface/parse/Cargo.toml): this FFI boundary crate builds and gates
+# in isolation from the other workspace roots. Its ONLY dependency is the
+# in-repo, forbid-unsafe `vcltotal-parse` (`src/interface/parse`, an
+# internal path-dep that resolves in a standalone checkout, unlike the
+# external `../../../echidna/...` dependency of `src/interface`).
 [workspace]
 
 [package]
@@ -23,7 +23,7 @@ crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
-vcltotal-parse = { path = "../parse" }
+vcltotal-parse = { path = "../../../src/interface/parse" }
 
 # Total/panic-free is inherited from `vcltotal-parse`'s static SPARK
 # lint set (the decoder/decider carry no panics). `panic = "abort"`
