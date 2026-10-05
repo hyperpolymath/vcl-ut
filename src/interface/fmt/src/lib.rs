@@ -25,7 +25,7 @@ pub fn format_vqlut(content: &str) -> String {
                 && trimmed
                     .as_bytes()
                     .get(kw.len())
-                    .map_or(true, |&b| !b.is_ascii_alphanumeric() && b != b'_')
+                    .is_none_or(|&b| !b.is_ascii_alphanumeric() && b != b'_')
         }) {
             formatted.push_str("  ");
         }
