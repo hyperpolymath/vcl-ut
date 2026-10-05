@@ -109,12 +109,20 @@ check "SPDX header on the first line of all src/ Rust files" \
 
 # 2. No unsafe Rust constructs anywhere under src/, tests included. The
 #    unsafe host/guest and C-ABI boundaries live under ffi/rust/.
+#    Carry a trailing unsafe token across blank/comment lines so the
+#    opening brace or declaration keyword can be on the following line.
 unsafe_hits=0
 while IFS= read -r f; do
     n=$(awk -v f="$f" '
         /^[[:space:]]*\/\// { next }
+        /^[[:space:]]*$/ { next }
+        {
+            line = pending_unsafe ? pending_unsafe : FNR
+            if (pending_unsafe) $0 = "unsafe " $0
+            pending_unsafe = ($0 ~ /(^|[^[:alnum:]_])unsafe[[:space:]]*$/) ? line : 0
+        }
         /(^|[^[:alnum:]_])unsafe[[:space:]]*(\{|fn([^[:alnum:]_]|$)|extern([^[:alnum:]_]|$)|impl([^[:alnum:]_]|$)|trait([^[:alnum:]_]|$))/ \
-            { print "    unsafe: " f ":" FNR > "/dev/stderr"; bad++; next }
+            { print "    unsafe: " f ":" line > "/dev/stderr"; bad++; next }
         /#!?\[[[:space:]]*unsafe[[:space:]]*\(/ \
             { print "    unsafe attribute: " f ":" FNR > "/dev/stderr"; bad++; next }
         /(^|[^[:alnum:]_])static[[:space:]]+mut([^[:alnum:]_]|$)/ \
