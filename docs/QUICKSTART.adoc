@@ -120,7 +120,7 @@ Create a file called `my-query.vcltotal`:
 ----
 -- A query that exercises 6 of the 10 safety levels
 SELECT GRAPH, DOCUMENT
-FROM HEXAD 550e8400-e29b-41d4-a716-446655440000
+FROM OCTAD 550e8400-e29b-41d4-a716-446655440000
 WHERE FULLTEXT CONTAINS $searchTerm
 CONSUME AFTER 1 USE
 WITH SESSION ReadOnlyProtocol
@@ -260,7 +260,7 @@ Every function is total (`%default total`), every proof is real (zero
 
 Start with:
 
-- `Core.idr` — Foundation types (modalities, hexad references)
+- `Core.idr` — Foundation types (modalities, Octad source references)
 - `Linear.idr` — Simplest safety level (QTT linearity)
 - `Proofs.idr` — Cross-cutting invariants (see how levels compose)
 

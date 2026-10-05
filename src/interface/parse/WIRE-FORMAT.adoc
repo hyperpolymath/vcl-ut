@@ -123,7 +123,7 @@ mis-parse:
 
 Header: `56 43 4C 53` ("VCLS") then `u16` version (`01 00` for v1).
 
-Body — `OctadSchema` is the 8 modality schemas in `Grammar.idr`/
+Body — `OctadSchema` is exactly the 8 modality schemas in `Grammar.idr`/
 `Schema.idr` record order (fixed arity, no count):
 
 `ModalitySchema` (graph), `ModalitySchema` (vector),
@@ -135,6 +135,16 @@ After the 8th the stream MUST be exhausted (`TrailingBytes`
 otherwise). Same totality contract as the `Statement` decoder;
 `VqlType`'s recursion is fuel-bounded identically (every node ≥ 1
 discriminant byte).
+
+[IMPORTANT]
+====
+This fixed-arity `OctadSchema` stream does not encode a modality profile,
+profile version, selected-subset count, or per-subject witness-presence bit.
+Empty fields inside a slot remain an empty schema for that slot, not a signal
+to omit it. A variable-cardinality modality profile requires a distinct,
+versioned contract; it is not a `VCLS` v1 encoding. See
+link:../../../docs/standards/MODALITY-PROFILES.adoc[the profile/Octad contract].
+====
 
 == Totality contract
 

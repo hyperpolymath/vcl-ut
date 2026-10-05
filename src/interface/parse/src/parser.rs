@@ -454,9 +454,9 @@ fn parse_select_item(p: &mut P) -> Result<SelectItem, ParseError> {
 }
 
 fn parse_source(p: &mut P) -> Result<Source, ParseError> {
-    // `OCTAD`/`HEXAD <id>`, `FEDERATION <pattern>`, `STORE <id>`.
-    // OCTAD/HEXAD both accepted (grammar comment vs constructor name
-    // disagree); reconciled with the ReScript bridge in a later slice.
+    // `OCTAD` (preferred) / `HEXAD` (legacy alias) name the same
+    // `Source::Octad`; neither spelling selects a modality profile.
+    // Other sources: `FEDERATION <pattern>`, `STORE <id>`.
     if p.is_kw("OCTAD") || p.is_kw("HEXAD") {
         p.bump();
         return Ok(Source::Octad(parse_source_arg(p)?));

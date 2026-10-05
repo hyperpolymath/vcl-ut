@@ -45,6 +45,11 @@ toc::[]
 |Epistemic types via S5 modal logic
 |Accepted
 |2026-04-10
+
+|ADR-0007
+|Separate modality profiles from the fixed Octad schema (see link:../decisions/0007-modality-profiles-vs-octad-schema.adoc[record])
+|Accepted
+|2026-10-05
 |===
 
 ---

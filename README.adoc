@@ -132,6 +132,18 @@ it. Simple statements short-circuit at the early safety levels; proof-bearing
 statements and high-risk lifecycle transitions go through the deeper proof,
 effect, resource, and cross-cutting checks (L9-L10).
 
+[NOTE]
+====
+Keep a deployment's **modality profile** (which modalities it supports or
+enables) separate from the **Octad** and VCL-UT's `OctadSchema`. The Octad is
+the fixed eight-modality model; a subject may have data in only some of its
+slots. `OctadSchema` still has all eight schema slots, even when a slot has no
+field definitions. The current `VCLS` v1 wire format is fixed-arity and does
+not carry a modality profile. See
+link:docs/standards/MODALITY-PROFILES.adoc[the terminology and compatibility
+contract].
+====
+
 [source]
 ----
 User / system writes VCL
@@ -170,6 +182,8 @@ routine VCL safe.
 
 Prefer: consonance language, statement, transition, identity claim, consonance
 subject, modal witness, proof-bearing statement, verified transition, octad.
+When discussing implementation/deployment modality support, use *modality
+profile*; reserve `OctadSchema` for the fixed eight-slot schema.
 
 Avoid or qualify: query language, query, record, CRUD, delete, proof-carrying
 query, 6-modal engine, passive store. Use "query" only for a read-only syntactic

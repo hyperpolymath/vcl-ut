@@ -85,7 +85,7 @@ modality_spec = 'GRAPH', [graph_projection]
               | 'TEMPORAL', [temporal_projection]
               | 'PROVENANCE', [provenance_projection]
               | 'SPATIAL', [spatial_projection]
-              | '*' ;  (* All available modalities *)
+              | '*' ;  (* All modalities exposed in the target context; OctadSchema stays 8-slot *)
 
 modality_name = 'GRAPH' | 'VECTOR' | 'TENSOR' | 'SEMANTIC'
               | 'DOCUMENT' | 'TEMPORAL' | 'PROVENANCE' | 'SPATIAL' ;
@@ -105,10 +105,13 @@ spatial_projection   = '(', spatial_fields, ')' ;
    ============================================================================ *)
 from_clause = 'FROM', source_spec ;
 
-source_spec = hexad_source | federation_source | store_source ;
+source_spec = octad_source | federation_source | store_source ;
 
-(* Direct hexad reference *)
-hexad_source = 'HEXAD', uuid ;
+(* Direct reference to one Octad identity; this does not select a modality profile. *)
+octad_source = octad_keyword, uuid ;
+
+(* OCTAD is preferred. HEXAD is a legacy alias for the same fixed Octad source. *)
+octad_keyword = 'OCTAD' | 'HEXAD' ;
 
 (* Federation pattern (multiple nodes) *)
 federation_source = 'FEDERATION', node_pattern, [drift_policy] ;
@@ -284,7 +287,7 @@ proof_spec_list = proof_spec, { 'AND', proof_spec } ;
 
 proof_spec = proof_type, '(', contract_name, ')', [proof_params] ;
 
-proof_type = 'EXISTENCE'       (* Hexad exists and is accessible *)
+proof_type = 'EXISTENCE'       (* Octad subject exists and is accessible *)
            | 'CITATION'        (* Citation chain is valid *)
            | 'ACCESS'          (* User has access rights *)
            | 'INTEGRITY'       (* Data has not been tampered with *)
@@ -533,7 +536,7 @@ comment = '--', { ? any character except newline ? }, '\n'  (* Line comment *)
 keywords = 'SELECT' | 'FROM' | 'WHERE' | 'PROOF' | 'LIMIT' | 'OFFSET'
          | 'GRAPH' | 'VECTOR' | 'TENSOR' | 'SEMANTIC' | 'DOCUMENT'
          | 'TEMPORAL' | 'PROVENANCE' | 'SPATIAL'
-         | 'HEXAD' | 'FEDERATION' | 'STORE'
+         | 'OCTAD' | 'HEXAD' | 'FEDERATION' | 'STORE'
          | 'WITH' | 'DRIFT' | 'STRICT' | 'REPAIR' | 'TOLERATE' | 'LATEST'
          | 'AND' | 'OR' | 'NOT'
          | 'SIMILAR' | 'TO' | 'WITHIN' | 'NEAREST' | 'USING'

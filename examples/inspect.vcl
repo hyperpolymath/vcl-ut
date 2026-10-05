@@ -5,17 +5,19 @@
 -- VCL statements are propositions and epistemic requests to a consonance
 -- engine, not queries against a passive store (see README.adoc). The
 -- read-style `SELECT ... FROM ...` surface below is the epistemic-inspection
--- convenience; `HEXAD <uuid>` is the legacy keyword naming the octad source
--- (the eight modal witnesses). VCL-total decides admissibility of any
+-- convenience; `OCTAD <uuid>` is the preferred spelling and `HEXAD <uuid>` is
+-- a legacy alias for the same fixed eight-slot Octad source. Neither spelling
+-- selects a modality profile. VCL-total decides admissibility of any
 -- proof-bearing statement before it affects live consonance state.
 
 -- Epistemic inspection: read consonance state across modal witnesses.
-SELECT GRAPH.*, DOCUMENT.*, VECTOR.* FROM HEXAD 'entity-001'
+SELECT GRAPH.*, DOCUMENT.*, VECTOR.* FROM OCTAD 'entity-001'
 
 -- Inspect cross-modal drift between two witnesses.
-SELECT * FROM HEXAD 'entity-001'
+SELECT * FROM OCTAD 'entity-001'
   WHERE DRIFT(VECTOR, DOCUMENT) > 0.3
 
+-- The legacy spelling remains accepted by the current Rust parser.
 -- Proof-bearing statement: VCL-total must discharge the attached obligation
 -- (existence + provenance) before the result is admissible.
 SELECT GRAPH.* FROM HEXAD 'entity-001'

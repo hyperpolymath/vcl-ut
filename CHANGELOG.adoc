@@ -13,6 +13,13 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
 
 ==== Changed
 
+* *Modality profiles distinguished from the fixed Octad schema* (vcl-ut#118):
+  adopted `modality profile` for versioned, implementation-specific modality
+  selections and `modality set` for membership alone. Clarified that VCL-UT's
+  `OctadSchema` and `VCLS` v1 remain fixed at eight modality slots; empty or
+  omitted schema fields do not signal profile membership or witness presence.
+  No type, JSON contract, or wire format changed. See
+  `docs/standards/MODALITY-PROFILES.adoc` and ADR-0007.
 * *Licensing and REUSE policy normalized*: software and package metadata use
   MPL-2.0; human-readable documentation uses CC-BY-SA-4.0. Removed the unused
   AGPL license text, corrected invalid PMPL SPDX declarations, and clarified

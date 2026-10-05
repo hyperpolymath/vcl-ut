@@ -1,0 +1,64 @@
+= Architecture Decision Record: 0007 — Modality Profiles vs the Fixed Octad Schema
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+
+Date: 2026-10-05
+
+## Status
+
+Accepted. Normative terminology and compatibility detail:
+[`docs/standards/MODALITY-PROFILES.adoc`](../standards/MODALITY-PROFILES.adoc).
+Tracked by hyperpolymath/vcl-ut#118, aligned with
+hyperpolymath/verisimdb#299.
+
+## Context
+
+“Octad” names VeriSimDB's fixed eight-modality model and `OctadSchema` is a
+concrete eight-slot schema in the VCL-UT type checker and `VCLS` v1 wire
+codec. At the same time, implementations and deployments can support or enable
+different modality subsets. Calling both concepts “the schema” makes a
+capability/configuration choice look like a change to the fixed Octad record
+and risks implying that current VCL-UT transport accepts variable arity.
+
+Actual per-subject witness population is a third concern: an entity may have
+data in only some modalities even though the static schema has a slot for
+each. Empty schema fields do not encode whether a modality is supported or
+populated.
+
+## Decision
+
+- Use **modality profile** for a versioned, implementation-specific selection
+  of modalities supported or enabled at a declared scope.
+- Use **modality set** for membership alone, without implied policy or version.
+- Reserve **Octad** / **`OctadSchema`** for the current fixed eight-modality
+  model and its concrete eight-slot schema.
+- Treat profile membership, field declarations, and per-subject witness
+  population as separate facts.
+- Keep `OctadSchema`, the gate contract, and `VCLS` v1 unchanged. This decision
+  adds no profile type, negotiation, serialization, or variable-arity support.
+- Treat `HEXAD` as a legacy spelling of the Octad source in the current Rust
+  parser, not as a six-modality profile. Retiring that spelling is an
+  independent compatibility decision.
+
+## Consequences
+
+### Positive
+
+- Downstream discussions can describe non-Octad or implementation-specific
+  modality selections without renaming or weakening VCL-UT's fixed schema.
+- Schema, capability, and runtime-presence claims become auditable as separate
+  contracts.
+- Existing `OctadSchema` and `VCLS` v1 consumers retain their exact contract.
+
+### Negative
+
+- A profile cannot yet be passed to or validated by VCL-UT; integrations must
+  not mistake this vocabulary decision for implemented profile support.
+
+### Future work boundary
+
+If profile exchange becomes necessary, define a separate versioned type and
+transport that states scope, catalog, membership/cardinality, omission
+semantics, and the distinction between supported, enabled, and populated
+modalities. Do not encode a profile by omitting slots from `OctadSchema` or by
+reinterpreting the existing schema-version fields.
