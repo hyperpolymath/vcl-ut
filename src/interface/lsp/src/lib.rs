@@ -1,8 +1,10 @@
-#![forbid(unsafe_code)]
 // SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 //! VCL-total LSP Library
 //!
 //! This library provides LSP support for VCL-total.
+
+#![forbid(unsafe_code)]
 
 use lsp_types::*;
 use std::collections::HashMap;

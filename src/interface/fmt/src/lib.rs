@@ -1,10 +1,11 @@
-#![forbid(unsafe_code)]
 // SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 //! VCL-total Formatting Library
 //!
 //! Provides formatting capabilities for VCL-total query files.
 //! Keywords are indented with two spaces for readability.
+
+#![forbid(unsafe_code)]
 
 /// Format VCL-total content by indenting lines that start with recognised keywords.
 ///

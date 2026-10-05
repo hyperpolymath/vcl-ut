@@ -61,7 +61,7 @@ wasm's type system:
 
 [source,sh]
 ----
-cd src/interface/recompute-wasm
+cd ffi/rust/recompute-wasm
 cargo build --release --target wasm32-unknown-unknown
 # → target/wasm32-unknown-unknown/release/vcltotal_recompute_wasm.wasm
 ----

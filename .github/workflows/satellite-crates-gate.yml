@@ -9,8 +9,8 @@
 #   /                              e2e.yml
 #   /src/interface/parse           parse-gate.yml
 #   /src/interface/echidna-client  backend-matrix.yml (needs echidna sibling)
-#   /src/interface/attest          NOTHING   <- gated here
-#   /src/interface/recompute-wasm  NOTHING   <- gated here
+#   /ffi/rust/attest               NOTHING   <- gated here
+#   /ffi/rust/recompute-wasm       NOTHING   <- gated here
 #
 # The cost of that gap was measured on 2026-07-21: both ungated crates had
 # stopped compiling. `ast::Statement` gained the S1 consonance field `verb`
@@ -76,10 +76,10 @@ jobs:
       - name: Clippy — warnings are errors
         run: |
           set -euo pipefail
-          cargo clippy --manifest-path src/interface/${{ matrix.crate }}/Cargo.toml \
+          cargo clippy --manifest-path ffi/rust/${{ matrix.crate }}/Cargo.toml \
             --all-targets -- -D warnings
 
       - name: Tests
         run: |
           set -euo pipefail
-          cargo test --manifest-path src/interface/${{ matrix.crate }}/Cargo.toml
+          cargo test --manifest-path ffi/rust/${{ matrix.crate }}/Cargo.toml

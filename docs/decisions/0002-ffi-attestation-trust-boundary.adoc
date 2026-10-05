@@ -9,7 +9,7 @@ Date: 2026-05-19
 ## Status
 
 Accepted (**both tiers RESOLVED** — Tier-1 recompute-PCC over `wasm32`;
-Tier-2 / P5d C-ABI Ed25519 attestation fallback, `src/interface/attest`
+Tier-2 / P5d C-ABI Ed25519 attestation fallback, `ffi/rust/attest`
 linked into the Zig shim). Tracked: hyperpolymath/vcl-ut#25.
 Authoritative companion:
 `verification/proofs/VERIFICATION-STANCE.adoc` (canonical two-tier
@@ -41,7 +41,7 @@ Constraints established during Phase 5:
   verdict entry is a pure resource-free function (fabricating a
   resource to satisfy the tool would violate the verification-honesty
   doctrine), and its wasm backend is Phase-2-pending. (Disclosed:
-  `src/interface/recompute-wasm/AFFINESCRIPTISER-NA.adoc`.)
+  `ffi/rust/recompute-wasm/AFFINESCRIPTISER-NA.adoc`.)
 
 ## Decision
 
@@ -49,7 +49,7 @@ Adopt a **two-tier boundary**:
 
 **Tier-1 — recompute-PCC over plain `wasm32` (the achieved tier).**
 The consumer is shipped the `wasm32` module
-`src/interface/recompute-wasm` (`vcl_recompute`) + the wire bytes of a
+`ffi/rust/recompute-wasm` (`vcl_recompute`) + the wire bytes of a
 `(Statement, OctadSchema)` + the producer's claimed level, and
 **re-runs the certified decision itself**, comparing its verdict to
 the claim. This is proof-carrying code by *recomputation*, not by
@@ -79,7 +79,7 @@ decode/decision logic in the `#![forbid(unsafe_code)]` crate.
 
 **Tier-2 — C-ABI trusted-certifier attestation (fallback, P5d,
 RESOLVED).** For consumers that cannot run the Tier-1 wasm:
-`src/interface/attest` (`vcltotal-attest`) mints an Ed25519 signature
+`ffi/rust/attest` (`vcltotal-attest`) mints an Ed25519 signature
 over `DOMAIN ‖ sha256(stmt_wire) ‖ sha256(schema_wire) ‖ level`, where
 `level` is the conformance-pinned `vcltotal_parse::certified_level`
 (signed iff `0..=10`, fail-closed); the consumer Ed25519-verifies
@@ -90,7 +90,7 @@ shim (`vclut_verify_wire`) by `build.zig`; `zig build test` exercises
 the boundary end-to-end. Strictly weaker than Tier-1 (pure trust in
 the minting certifier + that it ran the pinned decider), and labelled
 as such everywhere. Spec:
-`src/interface/attest/ATTESTATION-FORMAT.adoc`; crypto
+`ffi/rust/attest/ATTESTATION-FORMAT.adoc`; crypto
 (`ed25519-dalek`/`sha2`) contained to this Tier-2 crate, the
 zero-dep forbid-unsafe core untouched.
 

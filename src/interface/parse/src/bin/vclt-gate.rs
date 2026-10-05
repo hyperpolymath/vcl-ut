@@ -15,6 +15,7 @@
 //! Pure function of (statement, schema): no network, no filesystem,
 //! no clock, no env-dependent behaviour beyond stdin/stdout/stderr.
 
+#![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used)]
 
 use serde_json::{json, Value};

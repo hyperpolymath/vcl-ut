@@ -35,7 +35,7 @@
 //! Phase-2-pending.) The recompute security argument does not need it:
 //! soundness is the corpus proof, faithfulness is the conformance pin,
 //! and the wasm is a deterministic `cargo build` of the pinned source.
-//! See `src/interface/recompute-wasm/AFFINESCRIPTISER-NA.adoc`.
+//! See `ffi/rust/recompute-wasm/AFFINESCRIPTISER-NA.adoc`.
 //!
 //! UNSAFE POLICY. All decision/decoding logic lives in the
 //! `#![forbid(unsafe_code)]` `vcltotal-parse` crate. The ONLY `unsafe`

@@ -4,28 +4,30 @@
 #
 # tests/aspect_tests.sh — Aspect tests for vql-ut (VCL-total).
 #
-# Validates cross-cutting concerns over PRODUCTION source. The gate's
-# remit is *non-test* code: idiomatic test code legitimately uses
-# unwrap/expect (and a test harness' own `testing.expect`-style helpers),
-# so those are out of scope by design — see checks 2 and 3.
+# Validates cross-cutting concerns and the safe-source boundary
+# (vcl-ut#49). Rust code under src/ is safe Rust: the unsafe host/guest
+# (wasm) and C-ABI boundary crates live under ffi/rust/, never under src/.
 #
-#   1. SPDX licence headers on all src/ Rust files
-#   2. No UNDOCUMENTED unsafe in production src/. Audited FFI/WASM trust
-#      boundaries are permitted to contain `unsafe` (a cdylib's
-#      `#[no_mangle] extern "C"` entry *cannot* be written without it),
-#      but every `unsafe {` must carry a contiguous `// SAFETY:`
-#      justification — mirroring `clippy::undocumented_unsafe_blocks`.
-#   3. No .unwrap()/.expect()/panic!/unreachable!/todo!/unimplemented!
+#   1. SPDX licence header on the FIRST line of every src/ Rust file
+#   2. No unsafe Rust constructs anywhere under src/ (tests included):
+#      `unsafe {`, `unsafe fn|impl|trait|extern`, `#[unsafe(...)]`,
+#      `static mut`. FFI is isolated under ffi/rust/.
+#   3. Every Rust crate root under src/ (lib.rs, main.rs, bin/*.rs)
+#      carries `#![forbid(unsafe_code)]` — the compiler-level guard
+#      behind the lexical check 2.
+#   4. No .unwrap()/.expect()/panic!/unreachable!/todo!/unimplemented!
 #      in production (non-test) Rust src/ — the SPARK-grade fail-closed
 #      posture (cf. vcltotal-parse's deny lint-set, the estate pattern).
-#   4. HTTPS-only URLs
-#   5. No hardcoded secrets
-#   6. Totality marker: Cargo.lock committed (reproducible builds)
+#   5. HTTPS-only URLs
+#   6. No hardcoded secrets
+#   7. Totality marker: Cargo.lock committed (reproducible builds)
 #
-# "Production source" = *.rs under src/, EXCLUDING integration tests
-# (any path under a tests/ directory) and EXCLUDING #[cfg(test)] modules
-# (stripped below by brace depth). Non-Rust files (e.g. the Zig FFI shim)
-# are out of scope for the Rust-pattern checks 2 and 3.
+# "Production source" (check 4 only) = *.rs under src/, EXCLUDING
+# integration tests (any path under a tests/ directory) and EXCLUDING
+# #[cfg(test)] modules (stripped below by brace depth): idiomatic test code
+# legitimately uses unwrap/expect. Checks 1-3 cover test code too. Cargo
+# target/ directories are pruned everywhere. Non-Rust files (e.g. the Zig
+# FFI shim under ffi/zig) are out of scope for the Rust-pattern checks.
 
 set -euo pipefail
 
@@ -69,32 +71,81 @@ strip_cfg_test() {
         }'
 }
 
-# Production Rust sources: *.rs under src/, excluding integration tests.
-prod_rs_files() { find src/ -name '*.rs' 2>/dev/null | grep -v '/tests/' | sort; }
+# List every Rust source file under src/, tests included, skipping Cargo
+# target/ build output (which holds generated Rust).
+all_src_rs_files() {
+    find src/ -type d -name target -prune -o -type f -name '*.rs' -print | sort
+}
+
+# List the production Rust source files under src/: all_src_rs_files
+# minus integration tests (any path under a tests/ directory).
+prod_rs_files() { all_src_rs_files | grep -v '/tests/' || true; }
+
+# List the Rust crate roots under src/ (lib.rs, main.rs, src/bin/*.rs),
+# skipping Cargo target/ build output.
+crate_root_files() {
+    find src/ -type d -name target -prune -o -type f \
+        \( -name lib.rs -o -name main.rs -o -path '*/src/bin/*.rs' \) -print | sort
+}
 
 echo "=== VCL-total Aspect Tests ==="
 echo ""
 
-# 1. SPDX headers
-missing_spdx=$(find src/ -name '*.rs' 2>/dev/null \
-    | xargs grep -rL "SPDX-License-Identifier" 2>/dev/null | wc -l)
-check "SPDX headers on all src/ Rust files" "$([ "$missing_spdx" -eq 0 ] && echo 0 || echo 1)"
-
-# 2. No UNDOCUMENTED unsafe in production src/. Every `unsafe {` must be
-#    immediately preceded by a contiguous `// SAFETY:` justification.
-undoc_unsafe=0
+# 1. SPDX header must be the first line, not merely present somewhere in
+#    the file (which let misplaced headers silently pass this gate). The
+#    expected string is split so REUSE does not read it as this file's own
+#    licence declaration.
+expected_spdx='// SPDX-License-'
+expected_spdx+='Identifier: MPL-2.0'
+missing_spdx=0
 while IFS= read -r f; do
-    n=$(strip_cfg_test < "$f" | awk '
-        /\/\/[[:space:]]*SAFETY/ { armed=1 }
-        /unsafe[[:space:]]*\{/   { if (!armed) bad++; armed=0; next }
-        ($0 !~ /^[[:space:]]*\/\//) && ($0 !~ /^[[:space:]]*$/) { armed=0 }
-        END { print bad+0 }')
-    undoc_unsafe=$((undoc_unsafe + n))
-done < <(prod_rs_files)
-check "No undocumented unsafe in production src/ (// SAFETY: required)" \
-    "$([ "$undoc_unsafe" -eq 0 ] && echo 0 || echo 1)"
+    if [ "$(head -n 1 "$f")" != "$expected_spdx" ]; then
+        echo "    missing/misplaced SPDX: $f"
+        missing_spdx=$((missing_spdx + 1))
+    fi
+done < <(all_src_rs_files)
+check "SPDX header on the first line of all src/ Rust files" \
+    "$([ "$missing_spdx" -eq 0 ] && echo 0 || echo 1)"
 
-# 3. No fail-open helpers in production (non-test) Rust src/: neither
+# 2. No unsafe Rust constructs anywhere under src/, tests included. The
+#    unsafe host/guest and C-ABI boundaries live under ffi/rust/.
+#    Carry a trailing unsafe token across blank/comment lines so the
+#    opening brace or declaration keyword can be on the following line.
+unsafe_hits=0
+while IFS= read -r f; do
+    n=$(awk -v f="$f" '
+        /^[[:space:]]*\/\// { next }
+        /^[[:space:]]*$/ { next }
+        {
+            line = pending_unsafe ? pending_unsafe : FNR
+            if (pending_unsafe) $0 = "unsafe " $0
+            pending_unsafe = ($0 ~ /(^|[^[:alnum:]_])unsafe[[:space:]]*$/) ? line : 0
+        }
+        /(^|[^[:alnum:]_])unsafe[[:space:]]*(\{|fn([^[:alnum:]_]|$)|extern([^[:alnum:]_]|$)|impl([^[:alnum:]_]|$)|trait([^[:alnum:]_]|$))/ \
+            { print "    unsafe: " f ":" line > "/dev/stderr"; bad++; next }
+        /#!?\[[[:space:]]*unsafe[[:space:]]*\(/ \
+            { print "    unsafe attribute: " f ":" FNR > "/dev/stderr"; bad++; next }
+        /(^|[^[:alnum:]_])static[[:space:]]+mut([^[:alnum:]_]|$)/ \
+            { print "    static mut: " f ":" FNR > "/dev/stderr"; bad++; next }
+        END { print bad+0 }' "$f")
+    unsafe_hits=$((unsafe_hits + n))
+done < <(all_src_rs_files)
+check "No unsafe Rust in src/ (FFI isolated under ffi/rust/)" \
+    "$([ "$unsafe_hits" -eq 0 ] && echo 0 || echo 1)"
+
+# 3. Every crate root under src/ forbids unsafe code at compile time, in
+#    addition to the lexical check above.
+missing_forbid=0
+while IFS= read -r f; do
+    if ! grep -q '^#!\[forbid(unsafe_code)\]' "$f"; then
+        echo "    missing #![forbid(unsafe_code)]: $f"
+        missing_forbid=$((missing_forbid + 1))
+    fi
+done < <(crate_root_files)
+check "All src/ Rust crate roots #![forbid(unsafe_code)]" \
+    "$([ "$missing_forbid" -eq 0 ] && echo 0 || echo 1)"
+
+# 4. No fail-open helpers in production (non-test) Rust src/: neither
 #    .unwrap()/.expect() nor the panic family (`panic!`, `unreachable!`,
 #    `todo!`, `unimplemented!`). Mirrors the vcltotal-parse deny
 #    lint-set (the estate's SPARK-grade pattern).
@@ -106,16 +157,16 @@ done < <(prod_rs_files)
 check "No .unwrap()/.expect()/panic! in production src/" \
     "$([ "$failopen_hits" -eq 0 ] && echo 0 || echo 1)"
 
-# 4. HTTPS-only URLs
+# 5. HTTPS-only URLs
 http_hits=$(grep -rn 'http://[^l]' src/ 2>/dev/null | grep -v '#\|//' | wc -l || true)
 check "HTTPS-only URLs in source (no plain http://)" "$([ "$http_hits" -eq 0 ] && echo 0 || echo 1)"
 
-# 5. No hardcoded secrets
+# 6. No hardcoded secrets
 secret_hits=$(grep -rn 'password\s*=\s*["\x27][^"\x27]\|secret\s*=\s*["\x27][^"\x27]' \
     src/ 2>/dev/null | grep -iv 'test\|example\|placeholder' | wc -l || true)
 check "No hardcoded secrets in source" "$([ "$secret_hits" -eq 0 ] && echo 0 || echo 1)"
 
-# 6. Cargo.lock committed (reproducible builds)
+# 7. Cargo.lock committed (reproducible builds)
 check "Cargo.lock committed" "$([ -f Cargo.lock ] && echo 0 || echo 1)"
 
 echo ""

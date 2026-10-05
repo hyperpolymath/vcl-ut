@@ -62,13 +62,13 @@ registry/trust). "query" in the issue-#25 phrasing
 
 A tampered `stmt_wire`, `schema_wire`, `level`, or `sig`, or a wrong
 public key, all fail verification (machine-tested:
-`src/interface/attest` — roundtrip + 5 tamper variants + fail-closed +
+`ffi/rust/attest` — roundtrip + 5 tamper variants + fail-closed +
 C-ABI).
 
 == C-ABI
 
 `vclut_rs_verify(stmt_ptr, stmt_len, schema_ptr, schema_len, sk_ptr,
-out_ptr, out_cap) -> i64` (Rust, `src/interface/attest`), linked into
+out_ptr, out_cap) -> i64` (Rust, `ffi/rust/attest`), linked into
 the Zig shim `ffi/zig/src/lib.zig` and exposed as
 `vclut_verify_wire(...)`. Returns the level `0..10` (and writes the
 65-byte token) or `-1` Rejected (writes nothing; `vclut_last_error`

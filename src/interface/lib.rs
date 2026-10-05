@@ -10,6 +10,8 @@
 //! echidna-client) use this crate as their single import point for both
 //! sides of the vcl-ut ↔ echidna interface.
 
+#![forbid(unsafe_code)]
+
 /// Re-export echidna's canonical proof-surface types so callers don't need
 /// a direct dep on `echidna-core`. Covers Term, Goal, ProofState, Tactic,
 /// Hypothesis, Context, Theorem, Definition, Variable, Pattern,

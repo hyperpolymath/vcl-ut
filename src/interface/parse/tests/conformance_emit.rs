@@ -214,7 +214,10 @@ fn emit() {
     // Transition recompute-tier verdicts (schema-independent for these
     // evidence-free fixtures): both admissible ⇒ InjectionProof = 4.
     println!("ctl1 = {}", certified_transition_level(&t_merge(), &sch1()));
-    println!("ctl2 = {}", certified_transition_level(&t_normalise(), &sch1()));
+    println!(
+        "ctl2 = {}",
+        certified_transition_level(&t_normalise(), &sch1())
+    );
 }
 
 /// Self-check: every fixture round-trips through the Rust codec, so the

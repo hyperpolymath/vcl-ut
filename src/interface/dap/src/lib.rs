@@ -1,9 +1,11 @@
-#![forbid(unsafe_code)]
 // SPDX-License-Identifier: MPL-2.0
+// Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
 //! VCL-total DAP (Debug Adapter Protocol) Library
 //!
 //! Provides DAP message types and VCL query execution simulation
 //! for the VCL-total debug adapter.
+
+#![forbid(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
 

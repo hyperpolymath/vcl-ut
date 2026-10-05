@@ -13,6 +13,16 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
 
 ==== Changed
 
+* *SPARK-grade safe-source boundary* (vcl-ut#49): moved the Rust C-ABI
+  attestation crate and the `wasm32` host/guest recompute crate from
+  `src/interface/{attest,recompute-wasm}` to `ffi/rust/`, so every Rust
+  `unsafe` block in the repository lives under `ffi/`. The aspect gate
+  (`tests/aspect_tests.sh`) now requires: no unsafe Rust constructs anywhere
+  under `src/` (tests included); `#![forbid(unsafe_code)]` on every `src/`
+  crate root; and the SPDX identifier on the first line of every `src/` Rust
+  file. It keeps the fail-open check from vcl-ut#117 (`unwrap`/`expect`/
+  `panic!` family). Moved crates keep their own lockfiles; the Zig shim,
+  satellite gate, Dependabot, and audit classifications follow the new paths.
 * *Modality profiles distinguished from the fixed Octad schema* (vcl-ut#118):
   adopted `modality profile` for versioned, implementation-specific modality
   selections and `modality set` for membership alone. Clarified that VCL-UT's
@@ -123,7 +133,7 @@ the corpus decision core (`+Schema+`/`+Decide+`/`+Checker+`
 public deciders via `+WireConformance+` on shared golden bytes
 (find-dependent verdicts pinned Rust-side + input-value conformance,
 disclosed); P5c-5 (#32) the recompute *`+wasm32+`* artefact
-`+src/interface/recompute-wasm+` (`+vcl_recompute+`, fail-closed, one
+`+ffi/rust/recompute-wasm+` (`+vcl_recompute+`, fail-closed, one
 audited host/guest `+unsafe+` block; all logic in the forbid-unsafe
 crate); P5c-6 (this change) the `+OWED→RESOLVED+` stance flip + ADR
 `+docs/decisions/0002-ffi-attestation-trust-boundary.adoc+`. The
@@ -133,7 +143,7 @@ system not load-bearing under recompute); `+affinescriptiser+` N/A
 (resource-required + wasm-backend-pending; disclosed in
 `+AFFINESCRIPTISER-NA.adoc+`, not faked).
 * Phase 5 / vcl-ut#25 — *Tier-2 (P5d) RESOLVED*:
-`+src/interface/attest+` (`+vcltotal-attest+`) mints/verifies an Ed25519
+`+ffi/rust/attest+` (`+vcltotal-attest+`) mints/verifies an Ed25519
 attestation over
 `+DOMAIN ‖ sha256(stmt_wire) ‖ sha256(schema_wire) ‖ level+` (level =
 the conformance-pinned `+certified_level+`, signed iff `+0..=10+`,
@@ -143,7 +153,7 @@ crate, linked into `+ffi/zig/src/lib.zig+` (`+vclut_verify_wire+`) by
 (roundtrip + 5 tamper variants + fail-closed + C-ABI tests).
 `+ed25519-dalek+`/`+sha2+` contained to the Tier-2 crate; zero-dep
 forbid-unsafe core untouched; one audited host/guest `+unsafe+` block.
-Spec `+src/interface/attest/ATTESTATION-FORMAT.adoc+`; ADR-0002 → both
+Spec `+ffi/rust/attest/ATTESTATION-FORMAT.adoc+`; ADR-0002 → both
 tiers RESOLVED. *The vcl-ut#25 boundary-reinforcement workstream is
 complete* (only the precisely-scoped disclosed limits remain — not
 gaps). A re-checkable proof is impossible _only_ over the C-ABI fallback

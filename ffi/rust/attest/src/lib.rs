@@ -6,7 +6,7 @@
 //!
 //! See `verification/proofs/VERIFICATION-STANCE.adoc`'s canonical
 //! two-tier boundary model. Tier-1 (recompute-PCC over `wasm32`,
-//! `src/interface/recompute-wasm`) is the achieved tier: the consumer
+//! `ffi/rust/recompute-wasm`) is the achieved tier: the consumer
 //! re-validates. Tier-2 — *this crate* — is the explicit **weaker
 //! fallback** for consumers that cannot run the Tier-1 wasm. A C ABI
 //! erases types to machine words, so it cannot carry a re-checkable

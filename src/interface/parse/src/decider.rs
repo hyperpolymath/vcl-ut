@@ -611,14 +611,19 @@ fn evidence_injection_safe(t: &Transition) -> bool {
 /// `Transition.evidenceTypeCompat` — reuses the single-source-of-truth
 /// `whereComparisonsCompatible` decider on the evidence `Expr`. `None`
 /// evidence is vacuously compatible.
+///
+/// Returns whether every comparison in the evidence has compatible operand
+/// types resolved against `schema`; unresolved (`TAny`) types are compatible.
+/// Subquery contents are not checked. Evidence without comparisons returns `true`.
 fn evidence_type_compat(t: &Transition, schema: &OctadSchema) -> bool {
     match transition_evidence(t) {
         None => true,
         Some(e) => {
             let mut cs = Vec::new();
             extract_comparisons(e, &mut cs);
-            cs.iter()
-                .all(|(l, r)| types_compatible(&resolve_expr_type(l, schema), &resolve_expr_type(r, schema)))
+            cs.iter().all(|(l, r)| {
+                types_compatible(&resolve_expr_type(l, schema), &resolve_expr_type(r, schema))
+            })
         }
     }
 }

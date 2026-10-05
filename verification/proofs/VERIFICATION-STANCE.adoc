@@ -48,7 +48,7 @@ corpus compiles (**12 modules**: Phase 4 = `LayoutProofs` + L6–L10
 decoder + cross-language `Refl` conformance, the faithful Rust
 decision port, the recompute-`wasm32` artefact (**Tier-1
 recompute-PCC**), and the Ed25519 C-ABI attestation fallback
-(**Tier-2**, `src/interface/attest`, linked into the Zig shim) — both
+(**Tier-2**, `ffi/rust/attest`, linked into the Zig shim) — both
 **RESOLVED**, PRs #26/#28/#29/#30/#31/#32/#33 + P5d; see the canonical
 two-tier boundary model under "What is NOT proven").
 **Phase 2** de-vacuized L2/L3/L5
@@ -307,7 +307,7 @@ here.
   OWED: the *honest* Idris-side path is now
   **`VclTotal.ABI.Tier2`** at `src/interface/abi/Tier2.idr`, which
   binds `vclut_verify_wire` (Zig shim → `vclut_rs_verify` in
-  `src/interface/attest`) and returns a 65-byte Ed25519-signed
+  `ffi/rust/attest`) and returns a 65-byte Ed25519-signed
   attestation `[level:1][sig:64]` over `DOMAIN ‖ sha256(stmt_wire)
   ‖ sha256(schema_wire) ‖ level`. Trust-model ceiling is the same
   Tier-2 ceiling described under the boundary model below
@@ -315,7 +315,7 @@ here.
   than the deprecated asserted-integer path). The `Tier2.idr`
   module typechecks under idris2 0.8.0 (`--check` green) and
   carries no proofs (it is plumbing); the safety properties live
-  in `src/interface/attest/src/lib.rs::tests`.
+  in `ffi/rust/attest/src/lib.rs::tests`.
 . *(Phase 2 — RESOLVED) L2/L3/L5 predicates de-vacuized.* The
   content-free constructors (`ExprTypeSafe`/`WhereTypeSafe`,
   `AllNullableFieldsGuarded`'s `GuardedNull`, `AllSelectItemsTyped`'s
@@ -407,7 +407,7 @@ here.
 +
   ** *Tier-1 — recompute-PCC over `wasm32` (RESOLVED, the achieved
      tier).* The consumer is shipped the `wasm32` module
-     (`src/interface/recompute-wasm`, `vcl_recompute`) + the wire
+     (`ffi/rust/recompute-wasm`, `vcl_recompute`) + the wire
      bytes of a `(Statement, OctadSchema)` + the producer's claimed
      level, and **re-runs the certified decision itself**, comparing
      its verdict to the claim. This is proof-carrying code by
@@ -432,7 +432,7 @@ here.
      load-bearing only for a *proof-term-transport* design, which was
      **rejected** (Idris2 ships no embeddable verified core kernel;
      building one is its own subproject). `affinescriptiser` is *not*
-     used (disclosed, not an oversight — `src/interface/recompute-wasm/
+     used (disclosed, not an oversight — `ffi/rust/recompute-wasm/
      AFFINESCRIPTISER-NA.adoc`): it structurally requires ≥1
      `[[resources]]` and the entry is a pure resource-free verdict
      function (fabricating a resource to satisfy the tool would be the
@@ -444,7 +444,7 @@ here.
      RESOLVED).* A C ABI erases types to machine words, so it cannot
      transport a re-checkable dependent `SafetyCertificate`; over a C
      ABI the honest ceiling is *trusted-certifier attestation*, and
-     that ceiling is now reached. `src/interface/attest`
+     that ceiling is now reached. `ffi/rust/attest`
      (`vcltotal-attest`) mints an Ed25519 signature over
      `DOMAIN ‖ sha256(stmt_wire) ‖ sha256(schema_wire) ‖ level`, where
      `level` is the conformance-pinned `vcltotal_parse::certified_level`
@@ -462,7 +462,7 @@ here.
      (b) the certifier ran the pinned decider before signing —
      strictly weaker than Tier-1 (which trusts neither; it
      recomputes). Real key provisioning is deployment (estate token
-     vault). Spec: `src/interface/attest/ATTESTATION-FORMAT.adoc`;
+     vault). Spec: `ffi/rust/attest/ATTESTATION-FORMAT.adoc`;
      crypto (`ed25519-dalek`/`sha2`) is contained to this Tier-2 crate
      and never touches the zero-dep forbid-unsafe core.
 +
@@ -492,7 +492,7 @@ here.
   (P5c-5 #32) with the faithful Rust decision port machine-pinned to
   the corpus (P5c-2/3/4 #31). (4) *RESOLVED:* the P5d C-ABI
   signed-attestation *fallback* + `vclut_rs_verify` linkage (Tier-2,
-  `src/interface/attest`, linked into the Zig shim). **Nothing under
+  `ffi/rust/attest`, linked into the Zig shim). **Nothing under
   this issue's NAMED-OWED list remains** — what remains are the
   precisely-scoped *disclosed limitations* below, not gaps.
   *Disclosed limitations, not hidden gaps:* (i) the certified decoder
@@ -549,10 +549,10 @@ here.
   ceiling), but cryptographically bound and tamper-evident, with the
   Rust crate's test suite enforcing the fail-closed contract. For
   the strongest guarantee, use Tier-1 recompute-PCC over `wasm32`
-  (`src/interface/recompute-wasm`).
+  (`ffi/rust/recompute-wasm`).
 * *Transport (DELIVERED — Tier-1 recompute-PCC, P5c, vcl-ut#25).* The
   guarantee is **not** "trust our attestation". You are shipped the
-  `wasm32` module `src/interface/recompute-wasm` (`vcl_recompute`) +
+  `wasm32` module `ffi/rust/recompute-wasm` (`vcl_recompute`) +
   the `(Statement, OctadSchema)` wire bytes + the claimed level. **Run
   it and compare**: a match means *you* have independently
   re-established the corpus-proved verdict — your TCB is the
@@ -665,7 +665,7 @@ here.
   machine-pinned to the corpus's public deciders via `WireConformance`
   on shared golden bytes (find-dependent verdicts pinned Rust-side +
   by input-value conformance, disclosed). *P5c-5 (#32):* the
-  recompute **`wasm32` artefact** `src/interface/recompute-wasm`
+  recompute **`wasm32` artefact** `ffi/rust/recompute-wasm`
   (`vcl_recompute`, fail-closed, one audited host/guest unsafe block;
   all logic stays in the `#![forbid(unsafe_code)]` crate). Together
   these are **Tier-1 (recompute-PCC over `wasm32`), now RESOLVED** —
@@ -682,14 +682,14 @@ here.
   disclosed in `AFFINESCRIPTISER-NA.adoc`, not faked) and plain
   `wasm32` is sufficient because the wasm type system is not
   load-bearing under recompute.
-  *P5d (Tier-2 fallback) — RESOLVED:* `src/interface/attest`
+  *P5d (Tier-2 fallback) — RESOLVED:* `ffi/rust/attest`
   (`vcltotal-attest`) mints/verifies an Ed25519 attestation over
   `DOMAIN ‖ sha256(stmt_wire) ‖ sha256(schema_wire) ‖ level` (level =
   the pinned `certified_level`, signed iff `0..=10`, fail-closed); the
   previously-OWED `vclut_rs_verify` is this crate, linked into the
   `ffi/zig` shim (`vclut_verify_wire`) by `build.zig` with `zig build
   test` exercising the boundary end-to-end. Spec
-  `src/interface/attest/ATTESTATION-FORMAT.adoc`; crypto contained,
+  `ffi/rust/attest/ATTESTATION-FORMAT.adoc`; crypto contained,
   core untouched. The only remaining disclosed item is the *encode*
   direction (Idris→wire), which is **not a gap**: it is not required
   by either tier (the producer encodes from the trusted Rust side; the
@@ -717,11 +717,11 @@ P5a trusted Rust parser (#26); P5b-1 wire codec (#28); P5b-2
 decoder + `Refl` conformance (#29); P5c-1 certified `OctadSchema`
 codec (#30); P5c-2/3/4 `vcltotal_parse::decider` faithful Rust port
 of the corpus decision core, machine-pinned via `WireConformance`
-(#31); P5c-5 recompute `wasm32` artefact `src/interface/recompute-wasm`
+(#31); P5c-5 recompute `wasm32` artefact `ffi/rust/recompute-wasm`
 (fail-closed, one audited host/guest unsafe block) (#32); P5c-6 (#33)
 the Tier-1 `OWED→RESOLVED` stance flip + ADR
 `docs/decisions/0002-ffi-attestation-trust-boundary.adoc`. **P5d (this
-PR):** Tier-2 — `src/interface/attest` (`vcltotal-attest`) Ed25519
+PR):** Tier-2 — `ffi/rust/attest` (`vcltotal-attest`) Ed25519
 attestation mint/verify + the `vclut_rs_verify` backend linked into
 the `ffi/zig` shim (`vclut_verify_wire`, `zig build test` green
 end-to-end); ADR-0002 updated to Tier-2 RESOLVED. **Both tiers
@@ -763,7 +763,7 @@ total/zero-escape, `WireConformance` `Refl`-pinned to the Rust
 encoder); the decision core is a faithful Rust port machine-pinned to
 the corpus; the consumer re-runs it from a fail-closed `wasm32` module
 — *you re-validate, you do not trust a tag*. *Tier-2 (C-ABI
-attestation fallback, P5d):* `src/interface/attest` mints/verifies an
+attestation fallback, P5d):* `ffi/rust/attest` mints/verifies an
 Ed25519 token bound to `(sha256(stmt_wire), sha256(schema_wire),
 level)` (level = the pinned `certified_level`, fail-closed), with
 `vclut_rs_verify` linked into the Zig shim — for consumers that cannot

@@ -46,7 +46,7 @@ fn clearLastError() void {
 //
 // Previously NAMED OWED ("declared in intent but not linked"). Now
 // implemented by the Rust `vcltotal-attest` crate
-// (`src/interface/attest`) and linked by build.zig. It decodes the
+// (`ffi/rust/attest`) and linked by build.zig. It decodes the
 // wire `(Statement, OctadSchema)`, runs the conformance-pinned
 // `vcltotal_parse::certified_level` (the same faithful image of the
 // Idris corpus decision Tier-1 uses), and on a genuine level mints an

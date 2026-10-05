@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: MPL-2.0
 
-# Standalone workspace root (same rationale as ../parse, ../recompute-wasm):
-# decoupled from the broken parent virtual workspace. This is the Tier-2
+# Standalone workspace root (same rationale as src/interface/parse and
+# ffi/rust/recompute-wasm): an FFI boundary crate that builds and gates in
+# isolation from the other workspace roots. This is the Tier-2
 # (C-ABI trusted-certifier attestation) FALLBACK crate — explicitly the
 # weaker boundary tier (see VERIFICATION-STANCE.adoc's two-tier model).
 # The crypto dependency is CONTAINED here and never touches the
@@ -23,7 +24,7 @@ crate-type = ["staticlib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
-vcltotal-parse = { path = "../parse" }
+vcltotal-parse = { path = "../../../src/interface/parse" }
 # de-facto standard, widely audited (user decision 2026-05-19).
 # default-features off keeps the tree minimal; `std` for the host
 # staticlib; no rng feature (deterministic keys via from_bytes).
