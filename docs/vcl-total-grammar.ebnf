@@ -108,7 +108,7 @@ from_clause = 'FROM', source_spec ;
 source_spec = octad_source | federation_source | store_source ;
 
 (* Direct reference to one Octad identity; this does not select a modality profile. *)
-octad_source = octad_keyword, uuid ;
+octad_source = octad_keyword, (uuid | identifier | string_literal) ;
 
 (* OCTAD is preferred. HEXAD is a legacy alias for the same fixed Octad source. *)
 octad_keyword = 'OCTAD' | 'HEXAD' ;
