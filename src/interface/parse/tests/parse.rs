@@ -62,6 +62,7 @@ fn known_good_queries_parse() {
     }
 }
 
+/// Verifies that legacy `HEXAD` and preferred `OCTAD` produce the same source.
 #[test]
 fn legacy_hexad_spelling_is_the_same_octad_source() {
     let preferred = parse("SELECT * FROM OCTAD 'subject-1'").expect("OCTAD source parses");
