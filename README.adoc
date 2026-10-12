@@ -71,8 +71,9 @@ Language. It checks whether identity transitions proposed to VeriSimDB are
 well-formed, type-safe, authorised, resource-safe, proof-supported, and
 _admissible_ before they affect live consonance state.
 
-_Status: shape and admissibility checks implemented; the proof-supported
-layer is intended (witness independence first)._
+_Status: transition admissibility checks implemented (structural identity-
+distinctness, evidence injection-safety, and evidence type-compatibility);
+the proof-supported layer is intended (witness independence first)._
 
 == What VCL Is
 
