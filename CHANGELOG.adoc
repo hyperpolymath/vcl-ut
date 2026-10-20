@@ -11,6 +11,15 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
 
 === [Unreleased]
 
+==== Added
+
+* *`vclt-gate --input <path>`*: a second, equivalent transport for the gate
+  request, alongside stdin (contract amendment 2026-10-20, additive, still
+  v1). It lets a consumer that cannot write a child's stdin and then close
+  it (Elixir `System.cmd/3`) deliver the request with no shell. Any other
+  argument shape is now exit 2 `bad_invocation`. Tests:
+  `src/interface/parse/tests/gate_transport.rs`.
+
 ==== Changed
 
 * *SPARK-grade safe-source boundary* (vcl-ut#49): moved the Rust C-ABI
