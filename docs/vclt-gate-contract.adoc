@@ -61,7 +61,7 @@ The gate explicitly does **NOT**:
   statement can be gate-admissible and still have its proof rejected
   downstream.
 * Touch live consonance state, the network, the filesystem (beyond its own
-  stdin/stdout), or any clock. It is a pure function of its input (§"Purity").
+  stdin/stdout and an `--input` request file), or any clock. It is a pure function of its input (§"Purity").
 * Maintain state between invocations. One statement per call (batching is a
   reserved future `schema_version`).
 
@@ -69,7 +69,17 @@ The gate explicitly does **NOT**:
 
 * The consumer invokes the producer binary as a child process.
 * *Request*: a single JSON object on `stdin` (UTF-8, may be pretty or
-  compact; the binary reads to EOF).
+  compact; the binary reads to EOF), or, equivalently, the whole contents
+  of the file named by `vclt-gate --input <path>`. The two transports are
+  the same function of the request: identical bytes give identical
+  stdout and exit code. Any other argument shape is a gate error (exit 2,
+  `bad_invocation`); an unreadable `--input` file is exit 2, `io_error`.
+* Why the file form exists: a consumer whose runtime cannot write a
+  child's stdin and then close it (Erlang/Elixir ports cannot half-close;
+  `System.cmd/3` has no stdin option) would otherwise need a shell
+  redirection to deliver the request. With `--input`, it writes the request
+  to a file only it can read and passes the path as `argv[1]`, so no shell
+  ever parses the path or the payload.
 * *Response*: a single JSON object on `stdout` (compact, one line,
   newline-terminated).
 * Human/diagnostic text, if any, goes to `stderr` only and is never part of
@@ -252,7 +262,9 @@ field (`{ "schema_version": 1, "error": { "kind": "...", "message": "..." } }`).
 == Purity guarantee (producer)
 
 The binary is a pure function of (`statement`, `schema`): no network, no
-filesystem access beyond stdin/stdout, no clock, no environment-dependent
+filesystem access beyond stdin/stdout and the request file named by
+`--input` (which is the request itself, read once, not ambient state), no
+clock, no environment-dependent
 behaviour, no randomness, deterministic for identical input. This is what
 makes it safe to call synchronously on the consumer's write path.
 `decider::certified_level` already satisfies this; the wrapper MUST NOT add
@@ -307,6 +319,11 @@ treat a timeout as exit 2.
   object on the request (actor, freshness, federation hints) feeding the
   deeper obligation checks; a `batch` request form; per-level `evidence`
   on the response.
+* *Amendment 2026-10-20 (additive, still v1; owner-approved):* the
+  `--input <path>` transport (§"Transport"). It changes neither the request
+  nor the response shape, so no `schema_version` bump; stdin remains the
+  default and every existing consumer is unaffected. Covered by
+  `src/interface/parse/tests/gate_transport.rs`.
 * The L5–L10 predicates already evaluate today; no part of this contract is
   blocked on the echidna proof tier. The proof tier, when wired, is a
   *separate* downstream check, not a change to this gate.

@@ -5,15 +5,16 @@
 //!
 //! Contract: docs/vclt-gate-contract.adoc (frozen, v1).
 //!
-//! Reads a JSON request on stdin, lexes+parses the statement, calls
+//! Reads a JSON request on stdin (or from `--input <path>`), lexes+parses the statement, calls
 //! `decider::certified_level(stmt, schema)`, emits a JSON response on
 //! stdout, and exits:
 //!   0 — admissible (certified_level == requested_level)
 //!   1 — inadmissible (verdict rendered, certified_level == -1)
 //!   2 — gate error (bad/unsupported request, internal guard)
 //!
-//! Pure function of (statement, schema): no network, no filesystem,
-//! no clock, no env-dependent behaviour beyond stdin/stdout/stderr.
+//! Pure function of (statement, schema): no network, no filesystem
+//! beyond the request (`--input`), no clock, no env-dependent behaviour
+//! beyond stdin/stdout/stderr.
 
 #![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used, clippy::expect_used)]
@@ -31,11 +32,13 @@ fn main() {
 }
 
 fn run() -> i32 {
-    let mut input = String::new();
-    if io::stdin().read_to_string(&mut input).is_err() {
-        emit_gate_error("io_error", "failed to read stdin");
-        return 2;
-    }
+    let input = match read_request() {
+        Ok(s) => s,
+        Err((kind, message)) => {
+            emit_gate_error(kind, &message);
+            return 2;
+        }
+    };
 
     let req: Value = match serde_json::from_str(&input) {
         Ok(v) => v,
@@ -243,6 +246,29 @@ fn level_failure_reason(n: u8) -> &'static str {
 
 fn safety_level_to_u8(l: SafetyLevel) -> u8 {
     l as u8
+}
+
+/// The request: stdin to EOF by default, or the whole file named by
+/// `--input <path>` (contract §"Transport"). Either is the request itself,
+/// not ambient state, so the gate stays a pure function of it. Any other
+/// argument shape is a gate error rather than a guess.
+fn read_request() -> Result<String, (&'static str, String)> {
+    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+    match args.as_slice() {
+        [] => {
+            let mut input = String::new();
+            io::stdin()
+                .read_to_string(&mut input)
+                .map(|_| input)
+                .map_err(|_| ("io_error", "failed to read stdin".to_string()))
+        }
+        [flag, path] if flag == "--input" => std::fs::read_to_string(path)
+            .map_err(|e| ("io_error", format!("failed to read --input file: {e}"))),
+        _ => Err((
+            "bad_invocation",
+            "usage: vclt-gate [--input <request.json>]".to_string(),
+        )),
+    }
 }
 
 fn emit_gate_error(kind: &str, message: &str) {
