@@ -202,8 +202,10 @@ corpus soundness proof carries through to the gate.
 The optional `schema` object mirrors `src/interface/parse/src/schema.rs`
 `OctadSchema` (itself a 1:1 mirror of `src/core/Schema.idr`): the eight
 modality schemas in record order, each a list of field definitions. This is a
-fixed eight-slot schema payload, not a modality profile or a variable-length
-selection of modalities.
+fixed eight-slot schema payload that remains fixed unless this contract is
+deliberately changed; it is not a generic, implementation-specific modality
+profile and does not imply support for arbitrary modality cardinalities on the
+wire.
 
 In this JSON form, individual modality keys are optional. A missing key is
 normalized by the current gate parser to that modality's fixed slot with an

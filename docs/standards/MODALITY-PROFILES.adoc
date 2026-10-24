@@ -8,23 +8,28 @@ Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 :icons: font
 
 [.lead]
-This specification separates implementation-specific *modality profiles* from
-VCL-UT's fixed, eight-slot `OctadSchema`. It defines vocabulary and records the
-current contract; it does not add a profile API or change any wire format.
+This specification separates generic, implementation-specific *modality
+profiles* from VCL-UT's fixed, eight-slot `OctadSchema`. It defines vocabulary
+and records the current contract: `OctadSchema` and `VCLS` v1 remain fixed at
+eight slots unless their contracts are deliberately changed, and this document
+does not add a profile API or imply arbitrary-cardinality wire support.
 
 == Status and Scope
 
 This is the accepted terminology clarification for
 https://github.com/hyperpolymath/vcl-ut/issues/118[vcl-ut#118], aligned with
 the related https://github.com/hyperpolymath/verisimdb/issues/299[VeriSimDB
-proposal]. It describes the VCL-UT contract present on 2026-10-05. The
-`OctadSchema` type, gate JSON contract, `VCLS` v1 codec, and accepted statement
-syntax are unchanged.
+proposal]. It describes the VCL-UT contract present on 2026-10-05. The fixed
+eight-slot `OctadSchema` type, gate JSON contract, `VCLS` v1 codec, and
+accepted statement syntax remain fixed unless their contracts are deliberately
+changed.
 
 This document does *not* claim that VCL-UT or VeriSimDB currently negotiates,
-serializes, or validates a modality profile. The profile terms below are
-available for architecture and documentation; a runtime profile contract
-would need its own implementation and versioned interface.
+serializes, or validates a modality profile, and it does *not* imply that the
+existing wire format or gate API supports arbitrary modality cardinalities. Use
+*modality profile* only for a generic, implementation-specific selection of
+modalities; a runtime profile contract would need its own implementation and
+versioned interface.
 
 == Terms
 
@@ -38,11 +43,13 @@ that set. The generic term does not impose a fixed cardinality, version, or
 policy. A modality set is not, by itself, a schema or a capability contract.
 
 Modality profile::
-A versioned, implementation-specific selection of modalities that are
-supported or enabled at an explicitly stated scope (for example, an
-implementation, deployment, tenant, or subject). The profile's own contract
-must define its scope, versioning, cardinality/membership representation, and
-the meaning of omitted members (including any required/optional/unsupported
+A generic, implementation-specific selection of modalities (typically
+versioned) that are supported or enabled at an explicitly stated scope (for
+example, an implementation, deployment, tenant, or subject). Using the term
+*modality profile* never implies that `OctadSchema` or the existing `VCLS` v1
+wire format accepts arbitrary cardinalities. The profile's own contract must
+define its scope, versioning, cardinality/membership representation, and the
+meaning of omitted members (including any required/optional/unsupported
 semantics). The word *profile* alone defines none of those wire-level details.
 
 Octad::
@@ -167,9 +174,10 @@ statement, add/remove `OctadSchema` slots, or change `VCLS` arity.
 
 == Compatibility and Future Profile Work
 
-Keep `OctadSchema` and `VCLS` v1 fixed-arity and unchanged. Do not overload the
-current schema type, gate `schema_version`, or `VCLS` version with profile
-selection or profile versioning.
+Keep `OctadSchema` and `VCLS` v1 fixed-arity and unchanged unless their
+contracts are deliberately changed via an explicit, versioned breaking change.
+Do not overload the current schema type, gate `schema_version`, or `VCLS`
+version with profile selection or profile versioning.
 
 If a future integration needs profiles on the wire, define a separate,
 explicitly versioned profile type and transport. At minimum, that contract must
@@ -185,6 +193,14 @@ consumer contract.
 * `src/core/Schema.idr` — the dependent `OctadSchema` definition.
 * `src/interface/parse/src/schema.rs` — the Rust mirror.
 * `src/interface/parse/WIRE-FORMAT.adoc` — the exact `VCLS` v1 codec.
+* `src/interface/WireDecode.idr` and `src/interface/WireConformance.idr` —
+  certified `VCLS` v1 decoder and compile-time `Refl` proofs (including
+  rejection of non-eight-slot streams).
+* `src/interface/parse/tests/wire.rs` — Rust `VCLS` v1 round-trip, totality,
+  and fixed eight-slot arity tests.
+* `src/interface/parse/tests/gate.rs` and
+  `src/interface/parse/tests/gate_transport.rs` — `vclt-gate` tests for empty
+  and omitted modality slots.
 * `docs/vclt-gate-contract.adoc` — the JSON gate input contract.
 * `docs/decisions/0007-modality-profiles-vs-octad-schema.adoc` — the
   architecture decision that adopts this distinction.

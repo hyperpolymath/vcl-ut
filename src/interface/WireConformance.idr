@@ -124,6 +124,44 @@ expectedS1 =
 conformS1 : fromWireSchema WireConformance.goldenS1 = Right WireConformance.expectedS1
 conformS1 = Refl
 
+-- ── Fixed eight-slot OctadSchema arity (vcl-ut#118) ──────────────────
+--
+-- `VCLS` v1 carries the fixed eight-slot `OctadSchema` (never a
+-- variable-cardinality modality profile). Fewer than 8 modality slots
+-- (e.g. 6 empty slots) fail with `Left Truncated`; more than 8 slots
+-- (e.g. 9 empty slots) fail with `Left TrailingBytes`.
+
+sixSlotSchemaWire : List Bits8
+sixSlotSchemaWire =
+  [ 86, 67, 76, 83, 1, 0
+  , 0, 0, 0, 0, 0
+  , 1, 0, 0, 0, 0
+  , 2, 0, 0, 0, 0
+  , 3, 0, 0, 0, 0
+  , 4, 0, 0, 0, 0
+  , 5, 0, 0, 0, 0
+  ]
+
+conformS_sixSlotsTruncated : fromWireSchema WireConformance.sixSlotSchemaWire = Left Truncated
+conformS_sixSlotsTruncated = Refl
+
+nineSlotSchemaWire : List Bits8
+nineSlotSchemaWire =
+  [ 86, 67, 76, 83, 1, 0
+  , 0, 0, 0, 0, 0
+  , 1, 0, 0, 0, 0
+  , 2, 0, 0, 0, 0
+  , 3, 0, 0, 0, 0
+  , 4, 0, 0, 0, 0
+  , 5, 0, 0, 0, 0
+  , 6, 0, 0, 0, 0
+  , 7, 0, 0, 0, 0
+  , 7, 0, 0, 0, 0
+  ]
+
+conformS_nineSlotsTrailing : fromWireSchema WireConformance.nineSlotSchemaWire = Left TrailingBytes
+conformS_nineSlotsTrailing = Refl
+
 -- ── P5c recompute-tier verdict pins (corpus PUBLIC deciders == the
 --    Rust certified_level port, on the SAME decoded bytes) ────────────
 

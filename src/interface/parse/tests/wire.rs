@@ -15,7 +15,10 @@
 
 use proptest::prelude::*;
 use vcltotal_parse::ast::*;
-use vcltotal_parse::{from_wire, from_wire_op, from_wire_schema, to_wire, to_wire_op, WireError};
+use vcltotal_parse::schema::{FieldDef, ModalitySchema, OctadSchema, VqlType};
+use vcltotal_parse::{
+    from_wire, from_wire_op, from_wire_schema, to_wire, to_wire_op, to_wire_schema, WireError,
+};
 
 fn modality() -> impl Strategy<Value = Modality> {
     prop_oneof![
@@ -306,6 +309,82 @@ fn vclop() -> impl Strategy<Value = VclOp> {
     ]
 }
 
+/// Bounded recursive strategy for arbitrary `VqlType` values.
+fn vqltype() -> impl Strategy<Value = VqlType> {
+    let leaf = prop_oneof![
+        Just(VqlType::TString),
+        Just(VqlType::TInt),
+        Just(VqlType::TFloat),
+        Just(VqlType::TBool),
+        Just(VqlType::TBytes),
+        any::<u64>().prop_map(VqlType::TVector),
+        Just(VqlType::TTimestamp),
+        Just(VqlType::THash),
+        Just(VqlType::TOctad),
+        Just(VqlType::TAny),
+    ];
+    leaf.prop_recursive(3, 16, 2, |inner| {
+        prop_oneof![
+            inner.clone().prop_map(|t| VqlType::TList(Box::new(t))),
+            inner.clone().prop_map(|t| VqlType::TNull(Box::new(t))),
+            inner
+                .clone()
+                .prop_map(|t| VqlType::TCommonKnowledge(Box::new(t))),
+            (agent(), inner.clone()).prop_map(|(a, t)| VqlType::TKnows(a, Box::new(t))),
+            (agent(), inner.clone()).prop_map(|(a, t)| VqlType::TBelieves(a, Box::new(t))),
+            proptest::collection::vec((".*", inner), 0..3).prop_map(VqlType::TRecord),
+        ]
+    })
+}
+
+/// Strategy for arbitrary schema `FieldDef` declarations.
+fn fielddef() -> impl Strategy<Value = FieldDef> {
+    (".*", vqltype(), any::<bool>(), any::<bool>()).prop_map(|(name, ty, nullable, indexed)| {
+        FieldDef {
+            name,
+            ty,
+            nullable,
+            indexed,
+        }
+    })
+}
+
+/// Strategy for a single `ModalitySchema` slot tagged with `m`.
+fn modality_schema(m: Modality) -> impl Strategy<Value = ModalitySchema> {
+    proptest::collection::vec(fielddef(), 0..3).prop_map(move |fields| ModalitySchema {
+        modality: m.clone(),
+        fields,
+    })
+}
+
+/// Strategy for a complete fixed eight-slot `OctadSchema`.
+fn octad_schema() -> impl Strategy<Value = OctadSchema> {
+    (
+        modality_schema(Modality::Graph),
+        modality_schema(Modality::Vector),
+        modality_schema(Modality::Tensor),
+        modality_schema(Modality::Semantic),
+        modality_schema(Modality::Document),
+        modality_schema(Modality::Temporal),
+        modality_schema(Modality::Provenance),
+        modality_schema(Modality::Spatial),
+    )
+        .prop_map(
+            |(graph, vector, tensor, semantic, document, temporal, provenance, spatial)| {
+                OctadSchema {
+                    graph,
+                    vector,
+                    tensor,
+                    semantic,
+                    document,
+                    temporal,
+                    provenance,
+                    spatial,
+                }
+            },
+        )
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(2048))]
 
@@ -315,6 +394,29 @@ proptest! {
         let bytes = to_wire(&s);
         let back = from_wire(&bytes).expect("decode of own encoding must succeed");
         prop_assert_eq!(back, s);
+    }
+
+    /// The VCLS schema codec is a bijection on the fixed 8-slot `OctadSchema`.
+    #[test]
+    fn schema_roundtrip(sch in octad_schema()) {
+        let bytes = to_wire_schema(&sch);
+        let back = from_wire_schema(&bytes).expect("decode of own schema encoding must succeed");
+        prop_assert_eq!(back, sch);
+    }
+
+    /// Totality: arbitrary bytes never panic the schema decoder.
+    #[test]
+    fn schema_decoder_total_on_garbage(bytes in proptest::collection::vec(any::<u8>(), 0..2048)) {
+        let _ = from_wire_schema(&bytes);
+    }
+
+    /// Totality even with a valid VCLS header followed by garbage.
+    #[test]
+    fn schema_decoder_total_with_valid_header(tail in proptest::collection::vec(any::<u8>(), 0..512)) {
+        let mut v = b"VCLS".to_vec();
+        v.extend_from_slice(&1u16.to_le_bytes());
+        v.extend_from_slice(&tail);
+        let _ = from_wire_schema(&v);
     }
 
     /// The VCLT op codec is a bijection on the `VclOp` mirror.
@@ -517,5 +619,111 @@ fn mk_float_stmt(f: f64) -> Statement {
         epistemic_clause: None,
         requested_level: SafetyLevel::ParseSafe,
         verb: Verb::Select,
+    }
+}
+
+/// vcl-ut#118: `OctadSchema` and its `VCLS` v1 wire format are fixed at eight
+/// modality slots and do not encode generic, variable-cardinality modality
+/// profiles.
+///
+/// - When only a subset of slots carry field definitions (e.g. Graph and
+///   Document), `to_wire_schema` still emits all eight `ModalitySchema` slots
+///   in canonical record order with no modality-count prefix, and empty slots
+///   remain present with `fields = []`.
+/// - Streams with fewer than eight modality slots (0..8, including 6 for a
+///   hypothetical "hexad") fail with `WireError::Truncated`.
+/// - Streams with more than eight modality slots (e.g. 9 slots) fail with
+///   `WireError::TrailingBytes`.
+#[test]
+fn vcls_wire_format_enforces_fixed_eight_slot_octad_schema() {
+    let empty_slot = |modality| ModalitySchema {
+        modality,
+        fields: vec![],
+    };
+
+    let sparse_schema = OctadSchema {
+        graph: ModalitySchema {
+            modality: Modality::Graph,
+            fields: vec![FieldDef {
+                name: "id".to_string(),
+                ty: VqlType::TString,
+                nullable: false,
+                indexed: true,
+            }],
+        },
+        vector: empty_slot(Modality::Vector),
+        tensor: empty_slot(Modality::Tensor),
+        semantic: empty_slot(Modality::Semantic),
+        document: ModalitySchema {
+            modality: Modality::Document,
+            fields: vec![FieldDef {
+                name: "body".to_string(),
+                ty: VqlType::TString,
+                nullable: true,
+                indexed: false,
+            }],
+        },
+        temporal: empty_slot(Modality::Temporal),
+        provenance: empty_slot(Modality::Provenance),
+        spatial: empty_slot(Modality::Spatial),
+    };
+
+    let sparse_bytes = to_wire_schema(&sparse_schema);
+    assert_eq!(&sparse_bytes[0..4], b"VCLS");
+    assert_eq!(&sparse_bytes[4..6], &1u16.to_le_bytes());
+    // No modality-count prefix: byte 6 is immediately the Graph discriminant (0).
+    assert_eq!(sparse_bytes[6], 0);
+    let decoded = from_wire_schema(&sparse_bytes).unwrap();
+    assert_eq!(decoded, sparse_schema);
+    assert!(decoded.vector.fields.is_empty());
+    assert!(decoded.tensor.fields.is_empty());
+    assert!(decoded.semantic.fields.is_empty());
+    assert!(decoded.temporal.fields.is_empty());
+    assert!(decoded.provenance.fields.is_empty());
+    assert!(decoded.spatial.fields.is_empty());
+
+    // Helper: build a VCLS v1 stream with `slot_count` empty modality records.
+    let build_n_empty_slots = |slot_count: u8| -> Vec<u8> {
+        let mut v = Vec::new();
+        v.extend_from_slice(b"VCLS");
+        v.extend_from_slice(&1u16.to_le_bytes());
+        for i in 0..slot_count {
+            v.push(i % 8); // valid Modality discriminant 0..=7
+            v.extend_from_slice(&0u32.to_le_bytes()); // 0 fields
+        }
+        v
+    };
+
+    // Any cardinality < 8 (including 0, 1, 2, 3, and 6 "hexad") is rejected.
+    for slot_count in 0..8u8 {
+        assert_eq!(
+            from_wire_schema(&build_n_empty_slots(slot_count)),
+            Err(WireError::Truncated),
+            "VCLS v1 must reject {slot_count}-slot stream as Truncated"
+        );
+    }
+
+    // Exact 8-slot empty OctadSchema decodes and matches `to_wire_schema`.
+    let empty_octad = OctadSchema {
+        graph: empty_slot(Modality::Graph),
+        vector: empty_slot(Modality::Vector),
+        tensor: empty_slot(Modality::Tensor),
+        semantic: empty_slot(Modality::Semantic),
+        document: empty_slot(Modality::Document),
+        temporal: empty_slot(Modality::Temporal),
+        provenance: empty_slot(Modality::Provenance),
+        spatial: empty_slot(Modality::Spatial),
+    };
+    let eight_slot_bytes = build_n_empty_slots(8);
+    assert_eq!(eight_slot_bytes, to_wire_schema(&empty_octad));
+    assert_eq!(from_wire_schema(&eight_slot_bytes), Ok(empty_octad));
+
+    // Any cardinality > 8 (e.g. 9 or 10 slots) is rejected as TrailingBytes.
+    for slot_count in [9u8, 10u8] {
+        assert_eq!(
+            from_wire_schema(&build_n_empty_slots(slot_count)),
+            Err(WireError::TrailingBytes),
+            "VCLS v1 must reject {slot_count}-slot stream as TrailingBytes"
+        );
     }
 }

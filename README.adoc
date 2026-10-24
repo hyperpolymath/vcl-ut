@@ -138,12 +138,14 @@ effect, resource, and cross-cutting checks (L9-L10).
 
 [NOTE]
 ====
-Keep a deployment's **modality profile** (which modalities it supports or
-enables) separate from the **Octad** and VCL-UT's `OctadSchema`. The Octad is
-the fixed eight-modality model; a subject may have data in only some of its
-slots. `OctadSchema` still has all eight schema slots, even when a slot has no
-field definitions. The current `VCLS` v1 wire format is fixed-arity and does
-not carry a modality profile. See
+Keep a generic, implementation-specific **modality profile** (which modalities
+an implementation or deployment supports or enables) separate from the
+**Octad** and VCL-UT's `OctadSchema`. The Octad is the fixed eight-modality
+model; a subject may have data in only some of its slots. `OctadSchema` still
+has all eight schema slots, even when a slot has no field definitions, and
+remains fixed at eight slots unless its contract is deliberately changed. The
+current `VCLS` v1 wire format is fixed-arity and does not carry a modality
+profile or support arbitrary cardinalities. See
 link:docs/standards/MODALITY-PROFILES.adoc[the terminology and compatibility
 contract].
 ====

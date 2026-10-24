@@ -112,11 +112,12 @@ spatial. A catalog entry does not by itself say whether a deployment supports
 it or a subject currently has data in it.
 
 Modality profile::
-A versioned, implementation-specific selection of supported or enabled
-modalities at a declared scope. Its own contract must define versioning,
-membership/cardinality, and what omission means. VCL-UT currently has no
-runtime profile type or profile wire format; this term is distinct from
-`OctadSchema`.
+A generic, implementation-specific selection (typically versioned) of supported
+or enabled modalities at a declared scope. Its own contract must define
+versioning, membership/cardinality, and what omission means. VCL-UT currently
+has no runtime profile type or profile wire format; this term is distinct from
+`OctadSchema` and does not imply that the existing wire format supports
+arbitrary cardinalities.
 
 Modality set::
 A collection that states modality membership only. The term carries no fixed
@@ -143,10 +144,11 @@ have witness data in only a subset of the slots; sparse runtime population
 does not make the Octad structure variable-arity.
 
 `OctadSchema`::
-VCL-UT's fixed-arity schema value with one `ModalitySchema` for each of the
-eight Octad modalities. It declares fields and their types; it does not encode
-a deployment's modality profile or per-subject witness presence. An empty
-field list is not an unsupported/absent-modality marker.
+VCL-UT's fixed eight-slot schema value with one `ModalitySchema` for each of
+the eight Octad modalities, which remains fixed unless its contract is
+deliberately changed. It declares fields and their types; it does not encode a
+generic implementation-specific modality profile or per-subject witness
+presence. An empty field list is not an unsupported/absent-modality marker.
 
 == P
 

@@ -8,7 +8,10 @@
 ||| their types, and nullability — enabling Level 1 (schema binding) and
 ||| Level 3 (null safety) checking at compile time.
 |||
-||| `OctadSchema` is the fixed eight-slot schema, not a modality profile.
+||| `OctadSchema` is the fixed eight-slot Octad schema and remains fixed unless
+||| its contract is deliberately changed. Use "modality profile" only for a
+||| generic, implementation-specific modality selection; `OctadSchema` is not a
+||| modality profile and does not imply arbitrary-cardinality wire support.
 ||| Empty fields in a slot do not encode deployment support or per-subject
 ||| witness presence. See `docs/standards/MODALITY-PROFILES.adoc`.
 |||
