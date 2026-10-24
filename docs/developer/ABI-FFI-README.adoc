@@ -204,6 +204,40 @@ pub const lib = @import("std");
 
 ## Building
 
+### Toolchain (do this first)
+
+Three tools, and the Zig one is *pinned by this repository*:
+
+| Tool | Needed for | Version |
+|---|---|---|
+| Zig | building/testing the shim | **0.16.0** (`.tool-versions`, `mise.toml`, `zig-shim-gate.yml`) |
+| Rust / cargo | `build.zig` shells `cargo` to build `ffi/rust/attest` | stable |
+| Idris2 | only the proof-corpus and ABI gates | 0.8.0 (built from pinned source in CI) |
+
+Install the pinned Zig with the repo script — it reads the version out of
+`.tool-versions`, so it cannot drift, and it verifies the download:
+
+```bash
+./scripts/install-toolchain.sh --check    # what is installed vs the pin
+./scripts/install-toolchain.sh            # install it (into ~/.local/toolchains)
+export PATH="$HOME/.local/toolchains/bin:$PATH"
+```
+
+It will not pipe a remote script into a shell. The default method downloads
+the official tarball from `ziglang.org` and checks it against the SHA-256 in
+`https://ziglang.org/download/index.json` before extracting; `--method pip`
+uses the `ziglang` wheel where PyPI is reachable but `ziglang.org` is not;
+`--from-file <tarball> --sha256 <digest>` handles air-gapped machines. If you
+also use `mise`/`asdf`, `mise install` / `asdf install` read the same pins.
+
+**There is no official Zig `curl … | sh` installer.** Any such line for Zig is
+not from the Zig project. Nothing in this repository requires running one.
+
+Rust has no pin here (`rust stable` in `.tool-versions`); use your distro's
+rustup or the official `rustup-init`, verified against its published
+checksum. Idris2 0.8.0 is built from a pinned source commit — copy the steps
+from `.github/workflows/proof-corpus.yml` rather than trusting a package.
+
 ### Build FFI Library
 
 ```bash
