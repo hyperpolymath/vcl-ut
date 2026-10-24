@@ -217,7 +217,7 @@ zig build test                    # Run tests
 
 The normative declarations are `ffi/zig/include/vclut_ffi.h`, installed to
 `zig-out/include/` by `zig build`. It is hand-maintained and CI-checked
-against the exports (`scripts/check-ffi-header.py`: symbol presence + arity),
+against the exports (`scripts/check-ffi-header.sh`: symbol presence + arity),
 because the Zig shim — not the Idris2 ABI types — is what defines the
 symbols. There is no `idris2 --cg c-header` step for this surface: the ABI
 modules declare `%foreign` bindings, they do not emit C.
@@ -341,7 +341,7 @@ When modifying the ABI/FFI:
 2. **Update the C declarations** (`ffi/zig/include/vclut_ffi.h`)
    - These are hand-maintained, not generated: the Zig shim defines the
      symbols, the Idris modules only name them
-   - `python3 scripts/check-ffi-header.py` must pass (CI: `zig-shim-gate.yml`)
+   - `./scripts/check-ffi-header.sh` must pass (CI: `zig-shim-gate.yml`)
 
 3. **Update the FFI implementation** (`ffi/zig/src/lib.zig`)
    - Implement new functions; match the header's types and arity exactly

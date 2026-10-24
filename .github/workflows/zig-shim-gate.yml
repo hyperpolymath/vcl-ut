@@ -88,7 +88,7 @@ jobs:
       # is not exported. Shape check only — see the script's docstring for
       # exactly what it does and does not prove.
       - name: C header matches the exports
-        run: python3 scripts/check-ffi-header.py
+        run: python3 scripts/check-ffi-header.sh
 
       # Builds ffi/rust/attest (Cargo, --release), links it into
       # libvclut_ffi.{so,a} and the test runner, and runs the shim tests.

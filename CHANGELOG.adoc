@@ -26,13 +26,13 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
   which also skipped silently when Idris2 was missing).
   - `.github/workflows/zig-shim-gate.yml` — pinned Zig 0.16.0 (PyPI
     `ziglang` wheel, no third-party action) runs `zig fmt --check`,
-    `scripts/check-ffi-header.py`, and `zig build test`, which builds the
+    `scripts/check-ffi-header.sh`, and `zig build test`, which builds the
     Rust backend with Cargo, links it, and exercises the Zig↔Rust boundary.
   - `.github/workflows/abi-gate.yml` — `idris2 --build
     src/interface/abi/vclut-abi.ipkg` (new package) on the same pinned
     Idris2 0.8.0 source build as the proof-corpus gate, plus the honesty
     guard and an assertion that the `.ttc` files were produced.
-  - `scripts/check-ffi-header.py` — keeps `ffi/zig/include/vclut_ffi.h`
+  - `scripts/check-ffi-header.sh` — keeps `ffi/zig/include/vclut_ffi.h`
     and the exports in step (symbol presence + arity; explicitly not a
     type check).
 * *`ffi/zig/include/vclut_ffi.h`*: the normative C declarations for the
