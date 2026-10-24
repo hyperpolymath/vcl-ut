@@ -7,7 +7,8 @@
 ||| `ffi/zig/src/lib.zig` (`vclut_verify_wire`), which calls into the
 ||| Rust crate `ffi/rust/attest` (`vclut_rs_verify`) — see
 ||| `ffi/rust/attest/ATTESTATION-FORMAT.adoc` for the wire
-||| contract and `docs/decisions/0002-ffi-attestation-trust-boundary.adoc`
+||| contract, `ffi/zig/include/vclut_ffi.h` for the normative C
+||| declarations, and `docs/decisions/0002-ffi-attestation-trust-boundary.adoc`
 ||| for the trust model rationale.
 |||
 ||| **Architectural role.** This module replaces the level-asserting
@@ -42,8 +43,10 @@
 ||| **No proofs.** Like all FFI plumbing, this module contains no
 ||| theorems — its safety properties live in the Tier-2 Rust crate's
 ||| tests (`ffi/rust/attest/src/lib.rs::tests` — roundtrip + 5
-||| tamper variants + fail-closed + C-ABI). It is *not* in the
-||| Idris2 proof corpus (`vclut-core.ipkg`); see
+||| tamper variants + fail-closed + C-ABI) and in the Zig shim's
+||| precondition tests. It is *not* in the Idris2 proof corpus
+||| (`vclut-core.ipkg`); it is typechecked by its own package
+||| (`vclut-abi.ipkg`) in `.github/workflows/abi-gate.yml`. See
 ||| `verification/proofs/VERIFICATION-STANCE.adoc` §"Boundary model"
 ||| for what the Tier-2 ceiling does and does not guarantee.
 
@@ -63,9 +66,16 @@ import Data.List
 |||
 |||   * `Verified lvl token` — certifier signed level `lvl`, attestation
 |||     bytes are in `token` (always 65 bytes: 1 level + 64 signature).
+|||     Level 0 (`ParseSafe`) is a genuine `Verified`, not a pending state:
+|||     the level→verdict mapping below is the wire entry point's, and on
+|||     that entry point `0` carries a token. (`vclut_verify_query`, by
+|||     contrast, uses `0` for *Pending* — the two must not share a
+|||     mapping.)
 |||   * `Rejected reason` — fail-closed; the certifier did not establish
 |||     a level (decode failure, malformed input, level outside
-|||     `0..=10`, or any other reject path). Token is NOT emitted.
+|||     `0..=10`, a NULL pointer, a bad seed length, or insufficient out
+|||     capacity). Token is NOT emitted. `reason` is the backend's own
+|||     message from `vclut_last_error` where one was set.
 public export
 data Tier2Verdict : Type where
   Verified : SafetyLevel -> List Bits8 -> Tier2Verdict
@@ -77,7 +87,8 @@ public export
 attestationTokenSize : Nat
 attestationTokenSize = 65
 
-||| Ed25519 seed/secret-key byte width.
+||| Ed25519 seed/secret-key byte width. Transmitted to C explicitly so the
+||| backend can reject a mismatch instead of reading past the buffer.
 public export
 ed25519SeedSize : Nat
 ed25519SeedSize = 32
@@ -90,13 +101,13 @@ ed25519SeedSize = 32
 ||| `vclut_verify_wire` in `ffi/zig/src/lib.zig`, which calls
 ||| `vclut_rs_verify` (`ffi/rust/attest/src/lib.rs`).
 |||
-||| ABI:
+||| ABI (normative copy: `ffi/zig/include/vclut_ffi.h`):
 |||
 |||   ```c
 |||   int32_t vclut_verify_wire(
 |||       const uint8_t* stmt_ptr,   size_t stmt_len,
 |||       const uint8_t* schema_ptr, size_t schema_len,
-|||       const uint8_t* sk_ptr,                       /* 32 bytes */
+|||       const uint8_t* sk_ptr,     size_t sk_len,   /* sk_len == 32 */
 |||       uint8_t*       out_ptr,    size_t out_cap   /* >= 65 */
 |||   );
 |||   ```
@@ -104,16 +115,28 @@ ed25519SeedSize = 32
 ||| Returns `0..=10` on success (writes the 65-byte attestation to
 ||| `out_ptr`), `-1` on Reject (no write). Pointers must each describe
 ||| a valid range of the stated length; the function never reads or
-||| writes outside the documented spans. See the Rust crate's `Safety`
-||| comment for the precise contract.
-export
+||| writes outside the documented spans, and rejects NULL rather than
+||| dereferencing it. See the Rust crate's `Safety` comment and
+||| `ffi/zig/src/lib.zig` for the precise contract.
+|||
+||| Lengths are `Bits64`, matching `size_t` on every 64-bit target this
+||| repo builds — deliberately not `Int`, which Idris2 maps to C `int`
+||| (32-bit) and would silently truncate a wire buffer over 2^31 bytes.
 %foreign "C:vclut_verify_wire, libvclut_ffi"
+export
 prim__vclutVerifyWire :
-  Buffer -> Int ->     -- stmt
-  Buffer -> Int ->     -- schema
-  Buffer ->            -- 32-byte Ed25519 seed
-  Buffer -> Int ->     -- out + cap
+  Buffer -> Bits64 ->     -- stmt
+  Buffer -> Bits64 ->     -- schema
+  Buffer -> Bits64 ->     -- 32-byte Ed25519 seed
+  Buffer -> Bits64 ->     -- out + cap
   PrimIO Int
+
+||| Last error message from the shim, for a `-1` result. Empty when no
+||| error is pending. The pointer is thread-local and owned by the
+||| library: copy before the next FFI call.
+%foreign "C:vclut_last_error, libvclut_ffi"
+export
+prim__vclutLastError : PrimIO String
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Internal helpers
@@ -135,22 +158,32 @@ listToBuffer xs = do
       setBits8 buf i b
       go buf (i + 1) bs
 
-||| Read the entire contents of a `Buffer` of declared length `n` into
-||| a `List Bits8`. Reads bytes `[0, n)` in order.
+||| Read `fuel` bytes from `buf` starting at index 0, in order.
+|||
+||| Structural recursion on the `Nat` fuel, so the totality checker
+||| accepts it directly (proof-corpus gate: zero proof-escape). Callers
+||| pass a constant — `attestationTokenSize` — so no `Int`→`Nat`
+||| conversion (which is where a `partial`/`assert_total` would creep in)
+||| is needed.
 private
-bufferToList : Buffer -> Int -> IO (List Bits8)
-bufferToList buf n = go (integerToNat (cast n)) 0 []
+readBytes : Buffer -> Nat -> IO (List Bits8)
+readBytes buf fuel = go fuel 0 []
   where
-    -- Structural recursion on the remaining-byte fuel: the totality
-    -- checker accepts this directly, closing the last assert_total in
-    -- the Tier-2 ABI (proof-corpus gate: zero proof-escape). For n <= 0
-    -- the fuel is Z and we return [] — same semantics as the previous
-    -- `i >= n` guard.
     go : Nat -> Int -> List Bits8 -> IO (List Bits8)
     go Z     _ acc = pure (reverse acc)
     go (S k) i acc = do
       b <- getBits8 buf i
       go k (i + 1) (b :: acc)
+
+||| The backend's reason for a reject, with a fixed fallback for the
+||| (defensive) case where the shim set nothing.
+private
+rejectReason : IO String
+rejectReason = do
+  msg <- primIO prim__vclutLastError
+  pure (if msg == ""
+          then "Tier-2 backend Rejected (fail-closed): no certified level"
+          else msg)
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Safe public wrapper
@@ -159,7 +192,7 @@ bufferToList buf n = go (integerToNat (cast n)) 0 []
 ||| Verify a wire-marshalled `(Statement, OctadSchema)` pair via the
 ||| Tier-2 signed-attestation backend. On success returns
 ||| `Verified level token` with the 65-byte attestation; on any
-||| reject path returns `Rejected reason` with a human-readable cause.
+||| reject path returns `Rejected reason` with the backend's cause.
 |||
 ||| @param stmtWire   v1 statement-wire bytes (see
 |||                   `src/interface/parse/WIRE-FORMAT.adoc`)
@@ -173,10 +206,11 @@ bufferToList buf n = go (integerToNat (cast n)) 0 []
 |||   * `sk` not exactly 32 bytes;
 |||   * buffer allocation failure (out of memory);
 |||   * any negative `c_int` from the C backend (decode failure,
-|||     malformed input, level outside `0..=10`);
+|||     malformed input, level outside `0..=10`, NULL argument, capacity
+|||     too small) — with the backend's own message where it set one;
 |||   * a return value outside `0..=10` (defensive — the backend's
-|||     contract already constrains this, but we re-check on the way
-|||     out).
+|||     contract already constrains this, and the Zig shim rejects it,
+|||     but we re-check on the way out).
 export
 verifyWire :
   (stmtWire   : List Bits8) ->
@@ -196,17 +230,17 @@ verifyWire stmtWire schemaWire sk = do
         | Nothing => pure (Rejected "sk buffer alloc failed")
       Just outBuf    <- newBuffer (cast attestationTokenSize)
         | Nothing => pure (Rejected "out buffer alloc failed")
-      let stmtLen   : Int = cast (length stmtWire)
-      let schemaLen : Int = cast (length schemaWire)
-      let outCap    : Int = cast attestationTokenSize
+      let stmtLen   : Bits64 = cast (length stmtWire)
+      let schemaLen : Bits64 = cast (length schemaWire)
+      let skLen     : Bits64 = cast ed25519SeedSize
+      let outCap    : Bits64 = cast attestationTokenSize
       rc <- primIO (prim__vclutVerifyWire
-        stmtBuf stmtLen schemaBuf schemaLen skBuf outBuf outCap)
+        stmtBuf stmtLen schemaBuf schemaLen skBuf skLen outBuf outCap)
       if rc < 0
-        then pure (Rejected
-          "Tier-2 backend Rejected (fail-closed): no certified level")
+        then Rejected <$> rejectReason
         else case intToSafetyLevel (cast rc) of
           Nothing  => pure (Rejected
             "Tier-2 backend returned out-of-range level — defensive Reject")
           Just lvl => do
-            token <- bufferToList outBuf (cast attestationTokenSize)
+            token <- readBytes outBuf attestationTokenSize
             pure (Verified lvl token)

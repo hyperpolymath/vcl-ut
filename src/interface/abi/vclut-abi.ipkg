@@ -1,0 +1,41 @@
+-- SPDX-License-Identifier: MPL-2.0
+-- Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+--
+-- Machine-check package for the VCL-total Idris2 *ABI* modules — the
+-- `%foreign` declarations that bind the Zig shim, as opposed to the proof
+-- corpus (`verification/proofs/vclut-core.ipkg`).
+--
+-- Why a separate package. `src/interface/abi/Tier2.idr` (the Tier-2
+-- signed-attestation binding) was typechecked by nothing: it is not in
+-- `vclut-core.ipkg`, not in `src/abi/vclut.ipkg` (which only builds the
+-- older `Foreign` shim), and no recipe or workflow named it. A `%foreign`
+-- declaration is exactly the kind of code where an arity/width error is
+-- invisible until runtime, so it needs a gate.
+--
+-- The ABI modules declare `VclTotal.*` module names while living at flat
+-- paths (`src/interface/abi/*.idr`), so `corpus/` is a module→path tree of
+-- symlinks into `..` — the same convention `vclut-core.ipkg` documents.
+-- Build with idris2 0.8.0 (the version `proof-corpus.yml` pins):
+--
+--   idris2 --build src/interface/abi/vclut-abi.ipkg
+--
+-- A zero-exit `--build` means these bindings typecheck against
+-- `VclTotal.ABI.Types`. It does NOT link them: `%foreign` is resolved at
+-- link time, so a wrong `libvclut_ffi`/symbol name still has to be caught
+-- by an actual consumer build (see `docs/developer/ABI-FFI-README.adoc`).
+--
+-- Gate: `.github/workflows/abi-gate.yml`.
+
+package vclut-abi
+
+version = 0.1.0
+authors = "Jonathan D.A. Jewell (hyperpolymath)"
+brief   = "VCL-total ABI bindings: %foreign declarations for the Zig FFI shim"
+license = "MPL-2.0"
+
+depends = contrib
+
+sourcedir = "corpus"
+
+modules = VclTotal.ABI.Types
+        , VclTotal.ABI.Tier2

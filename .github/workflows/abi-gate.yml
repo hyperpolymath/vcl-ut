@@ -1,0 +1,92 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+#
+# abi-gate.yml — Typechecks the Idris2 `%foreign` declarations.
+#
+# Before this gate, `src/interface/abi/Tier2.idr` was typechecked by
+# NOTHING: not by `verification/proofs/vclut-core.ipkg` (it is not in that
+# module list), not by `src/abi/vclut.ipkg` (which builds only `VclTypes`
+# and the older `Foreign` shim), and not by `just idris-check` (which checks
+# `Types.idr` and `Checker.idr` only, and skips silently when Idris2 is
+# absent). Issues #25 / #49 tracked Tier-2 as delivered while its binding
+# had never been fed to the compiler.
+#
+# A `%foreign` declaration is exactly where an arity or width error is
+# invisible until runtime: the C side is not typechecked against the Idris
+# side by anything else, and `vclut_verify_wire` is a 8-argument call. So
+# the binding gets its own package (`src/interface/abi/vclut-abi.ipkg`)
+# and its own gate, kept separate from the proof corpus so a red here can
+# never be mistaken for a red corpus.
+#
+# SCOPE: typechecking only. `%foreign` libraries are resolved at LINK time,
+# so this does not prove that `libvclut_ffi` exports these symbols — the
+# Zig shim gate (`zig-shim-gate.yml`) builds the library itself, and
+# `scripts/check-ffi-header.py` keeps the published header in step with
+# the exports. Do not read a green here as "the ABI links".
+#
+# Tracked: vcl-ut#49, vcl-ut#25.
+
+name: ABI Bindings Gate
+
+on:
+  pull_request:
+    branches: ['**']
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+# Concurrency-cancel guard (repo convention for canonical check workflows).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  abi-typecheck:
+    name: idris2 0.8.0 --build vclut-abi
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Same pinned-source build as `proof-corpus.yml`: the former
+      # `idris-community/setup-idris` action's repository 404s, and a
+      # SHA-pinned source build is version-exact. `idris-lang/Idris2` tag
+      # v0.8.0 == commit 15a3e4e70843f7a34100f6470c04b791330788df.
+      - name: Build & install Idris2 0.8.0 from pinned source
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends chezscheme make gcc
+          git clone --no-checkout https://github.com/idris-lang/Idris2.git /tmp/Idris2
+          git -C /tmp/Idris2 checkout 15a3e4e70843f7a34100f6470c04b791330788df
+          make -C /tmp/Idris2 bootstrap SCHEME=chezscheme
+          make -C /tmp/Idris2 install PREFIX="$HOME/.idris2"
+          echo "$HOME/.idris2/bin" >> "$GITHUB_PATH"
+          echo "IDRIS2_PREFIX=$HOME/.idris2" >> "$GITHUB_ENV"
+
+      - name: Proof-escape audit (honesty guard)
+        run: |
+          set -euo pipefail
+          # An ABI binding has no theorems to prove, but it must not smuggle
+          # in `believe_me`/`assert_total`/`partial` to get past the checker.
+          sh scripts/honesty-guard.sh src/interface/abi/Tier2.idr
+
+      - name: Typecheck the ABI bindings
+        run: |
+          set -euo pipefail
+          idris2 --version
+          idris2 --build src/interface/abi/vclut-abi.ipkg
+
+      - name: The package really did compile the binding
+        # A package that silently built nothing would make the gate vacuous.
+        # Idris2 writes a .ttc per module; assert both are present.
+        run: |
+          set -euo pipefail
+          find . -name 'Tier2.ttc' -print -quit | grep -q . \
+            || { echo "FAIL: no Tier2.ttc — the gate compiled nothing"; exit 1; }
+          find . -name 'Types.ttc' -print -quit | grep -q . \
+            || { echo "FAIL: no Types.ttc — the gate compiled nothing"; exit 1; }
