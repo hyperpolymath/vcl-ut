@@ -9,7 +9,7 @@ This directory holds the *machine-verified* proof artefacts for vcl-ut.
 `vclut-core.ipkg`::
   The machine-check package for the full `VclTotal` proof corpus.
   `idris2 --build verification/proofs/vclut-core.ipkg` exits 0 over
-  **12 modules** (`ABI.{Types,Layout,LayoutProofs}` +
+  **13 modules** (`ABI.{Types,Layout,LayoutProofs}` +
   `Core.{Grammar,Schema,Decide,Levels,Checker,Composition,Epistemic}` +
   `Interface.{WireDecode,WireConformance}`)
   under `%default total` with **zero proof-escape symbols**. The
@@ -58,7 +58,7 @@ This directory holds the *machine-verified* proof artefacts for vcl-ut.
 ----
 export IDRIS2_PREFIX=<idris2-0.8.0-prefix>
 rm -rf verification/proofs/build                       # avoid stale-ttc false green
-idris2 --build verification/proofs/vclut-core.ipkg     # expect exit 0 (12 modules)
+idris2 --build verification/proofs/vclut-core.ipkg     # expect exit 0 (13 modules)
 cd verification/proofs && idris2 --check SafetyL4Model.idr   # expect exit 0
 ----
 

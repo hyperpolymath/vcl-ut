@@ -5,7 +5,7 @@
 #
 # vcl-ut is the doubly-trusted hypatia<->verisim interface. This gate
 # fails the build if the corpus (ABI.{Types, Layout, LayoutProofs} + Core.*
-# + Interface.Wire*, 12 modules) stops typechecking under idris2 0.8.0, or
+# + Interface.Wire*, 13 modules) stops typechecking under idris2 0.8.0, or
 # if a proof-escape symbol is introduced. Tracked: hyperpolymath/standards#124.
 #
 # Scope note: VclTotal.ABI.Layout is now sound and IS in

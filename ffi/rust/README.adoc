@@ -3,15 +3,27 @@
 = Rust FFI Boundary Crates
 :toc:
 
-This directory is the Rust host/guest and C-ABI boundary layer, and the
-*only* place in the repository where Rust `unsafe` is allowed (vcl-ut#49).
-Rust code under `src/` is safe Rust: every crate root there carries
+This directory is the Rust boundary layer and the *only* place in the
+repository where Rust `unsafe` is allowed (vcl-ut#49). Rust code under
+`src/` is safe Rust: every crate root there carries
 `#![forbid(unsafe_code)]`, and `tests/aspect_tests.sh` rejects any unsafe
 construct under `src/`, test code included.
 
-Each crate here keeps its unsafe surface to one audited block with a
-`// SAFETY:` justification (`#![deny(clippy::undocumented_unsafe_blocks)]`)
-and delegates all decoding and decision logic to the safe
+The two crates are not the same kind of boundary, and the distinction
+matters when reasoning about the TCB:
+
+* `recompute-wasm/` is a genuine **guest**: it is compiled to `wasm32` and
+  its `unsafe` narrows host-supplied pointers inside *guest linear memory*,
+  which the host owns.
+* `attest/` is a **native static library**. It is linked into
+  `libvclut_ffi.{so,a}` by `ffi/zig/build.zig` and runs in the caller's
+  address space; there is no guest and no linear-memory boundary. Its
+  `unsafe` is a C-ABI pointer-narrowing block whose preconditions the Zig
+  shim checks (`sk_len`, `out_cap`, NULL) before every call.
+
+Each crate keeps its unsafe surface small and justified with a
+`// SAFETY:` comment (`#![deny(clippy::undocumented_unsafe_blocks)]`) and
+delegates all decoding and decision logic to the safe
 `src/interface/parse` (`vcltotal-parse`) crate.
 
 == Crates
@@ -31,10 +43,25 @@ lockfile, so it builds without the repository's other workspace roots
 [source,sh]
 ----
 cargo clippy --manifest-path ffi/rust/attest/Cargo.toml --all-targets -- -D warnings
-cargo test   --manifest-path ffi/rust/attest/Cargo.toml --locked
+cargo test   --manifest-path ffi/rust/attest/Cargo.toml
 cargo clippy --manifest-path ffi/rust/recompute-wasm/Cargo.toml --all-targets -- -D warnings
-cargo test   --manifest-path ffi/rust/recompute-wasm/Cargo.toml --locked
-(cd ffi/zig && zig build test)   # links attest/ end to end
+cargo test   --manifest-path ffi/rust/recompute-wasm/Cargo.toml
+(cd ffi/zig && zig build test)   # builds attest/ with cargo, links it, runs the shim tests
 ----
 
-CI: `.github/workflows/satellite-crates-gate.yml`.
+The two `cargo test` lines deliberately omit `--locked`, which is what CI
+does: the lockfiles drifted while these crates were ungated, and
+`satellite-crates-gate.yml` documents the intent to restore `--locked` once
+a Dependabot cycle has run.
+
+CI, by gate:
+
+* `.github/workflows/satellite-crates-gate.yml` — clippy + tests for both
+  crates.
+* `.github/workflows/zig-shim-gate.yml` — `zig build test` (the only
+  end-to-end exercise of the Zig↔Rust link) plus the header check.
+* `.github/workflows/abi-gate.yml` — typechecks the Idris binding that calls
+  these symbols.
+
+Nothing in this directory is exercised by the Idris proof corpus; see
+`verification/proofs/VERIFICATION-STANCE.adoc` for the two-tier model.
