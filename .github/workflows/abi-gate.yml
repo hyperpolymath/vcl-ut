@@ -21,7 +21,7 @@
 # SCOPE: typechecking only. `%foreign` libraries are resolved at LINK time,
 # so this does not prove that `libvclut_ffi` exports these symbols — the
 # Zig shim gate (`zig-shim-gate.yml`) builds the library itself, and
-# `scripts/check-ffi-header.py` keeps the published header in step with
+# `scripts/check-ffi-header.sh` keeps the published header in step with
 # the exports. Do not read a green here as "the ABI links".
 #
 # Tracked: vcl-ut#49, vcl-ut#25.
