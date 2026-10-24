@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 //
-// VCL-ut FFI Build Configuration (Zig 0.15.2+).
+// VCL-ut FFI Build Configuration (Zig 0.16.0; also builds with 0.15.2).
 //
 // Builds:
 //   - libvclut_ffi.so       shared library for Idris2 / OCaml / SPARK consumers
 //   - libvclut_ffi.a        static library variant
+//   - include/vclut_ffi.h   normative C declarations for that surface
 //   - test runner           `zig build test`
 //
 // P5d (vcl-ut#25): the Tier-2 attestation backend `vclut_rs_verify`
@@ -14,6 +15,12 @@
 // that staticlib via cargo and links it into every artefact (incl. the
 // test runner), so the shim's `vclut_verify_wire` calls a real,
 // conformance-pinned, fail-closed backend — not a stub.
+//
+// HOST-ONLY. The cargo invocation below passes no `--target`, so the Rust
+// staticlib is built for the *host* triple and then linked into whatever
+// Zig targets. Cross-compiling (`-Dtarget=aarch64-macos` etc.) therefore
+// fails at link time; it is not supported by this build file. See
+// `docs/developer/ABI-FFI-README.adoc`.
 
 const std = @import("std");
 
@@ -26,8 +33,8 @@ pub fn build(b: *std.Build) void {
 
     // Build the Rust Tier-2 backend staticlib (libvcltotal_attest.a).
     const cargo = b.addSystemCommand(&.{
-        "cargo",                "build",
-        "--release",            "--manifest-path",
+        "cargo",                            "build",
+        "--release",                        "--manifest-path",
         "../../ffi/rust/attest/Cargo.toml",
     });
 
@@ -53,6 +60,7 @@ pub fn build(b: *std.Build) void {
         .linkage = .dynamic,
     });
     shared.step.dependOn(&cargo.step);
+    shared.installHeader(b.path("include/vclut_ffi.h"), "vclut_ffi.h");
     b.installArtifact(shared);
 
     // Static library variant
