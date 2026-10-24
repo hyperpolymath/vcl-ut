@@ -39,6 +39,15 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
   shim, installed by `zig build`. Earlier docs referenced a header that did
   not exist, so "does the Idris side match the C header?" could only be
   answered against prose.
+* *`scripts/install-toolchain.sh`* (with `just toolchain` /
+  `just toolchain-check`): installs the Zig version this repo pins
+  (`.tool-versions` / `mise.toml` / `zig-shim-gate.yml`), verifying the
+  download — the official tarball checked against the SHA-256 published in
+  `ziglang.org/download/index.json`, or the `ziglang` wheel when PyPI is
+  reachable and `ziglang.org` is not, or `--from-file` for air-gapped
+  machines. It never pipes a remote script into a shell, and there is no
+  official Zig `curl | sh` installer to pipe. `--check` reports what is
+  installed against the pin, plus whether `cargo`/`idris2` are present.
 
 ==== Changed
 

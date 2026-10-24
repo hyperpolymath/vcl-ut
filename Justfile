@@ -915,6 +915,14 @@ idris-check:
     idris2 --build verification/proofs/vclut-core.ipkg
     idris2 --build src/interface/abi/vclut-abi.ipkg
 
+# Report installed vs pinned toolchain versions (zig/cargo/rustc/idris2)
+toolchain-check:
+    @./scripts/install-toolchain.sh --check
+
+# Install the pinned Zig (reads .tool-versions; verifies the download)
+toolchain:
+    @./scripts/install-toolchain.sh
+
 # Build the Zig FFI library (shared + static) — ffi/zig is the C-ABI surface
 # the Idris bindings name (`vclut_verify_wire`, `libvclut_ffi`), and the one
 # the docs point at. Requires cargo: build.zig links ffi/rust/attest.
