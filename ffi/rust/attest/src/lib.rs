@@ -37,9 +37,15 @@
 //!
 //! UNSAFE POLICY. All decode/decision logic is in the
 //! `#![forbid(unsafe_code)]` `vcltotal-parse` crate; signing is the
-//! audited `ed25519-dalek`. The only `unsafe` is one documented
-//! host/guest C-ABI memory block in [`vclut_rs_verify`] — the declared
-//! trust boundary the Zig shim links against.
+//! audited `ed25519-dalek`. The only `unsafe` is in [`vclut_rs_verify`]:
+//! two documented blocks — narrowing the raw pointers to slices, and the
+//! token write. This crate is a NATIVE static library linked into the
+//! caller's process (`ffi/zig/build.zig`), not a wasm guest: there is no
+//! linear-memory boundary here, so the host↔guest wording used by the
+//! Tier-1 `recompute-wasm` crate does not apply. The ZIG SHIM owns the
+//! validation that the ranges are usable (it checks every pointer and
+//! `sk_len`/`out_cap` before calling); this entry point re-checks what it
+//! can and never trusts a NULL.
 
 #![deny(clippy::undocumented_unsafe_blocks)]
 
@@ -50,6 +56,13 @@ use vcltotal_parse::{certified_level, from_wire, from_wire_schema};
 /// Protocol + version domain-separation tag. Bump on any wire/format
 /// change so old signatures cannot be reinterpreted.
 pub const DOMAIN: &[u8; 16] = b"VCLT-ATTEST-v1\0\0";
+
+/// Ed25519 seed width. Callers transmit this explicitly as `sk_len`; it is
+/// checked, never assumed.
+pub const SEED_LEN: usize = 32;
+
+/// Attestation token width: `[level:1][sig:64]`.
+pub const TOKEN_LEN: usize = 65;
 
 /// A minted attestation: the certified level and the detached Ed25519
 /// signature over `DOMAIN ‖ sha256(stmt) ‖ sha256(schema) ‖ level`.
@@ -121,19 +134,23 @@ pub fn verify(
 
 // ── C-ABI: the `vclut_rs_verify` backend the Zig shim links ──────────
 
-/// `vclut_rs_verify` — the real backend declared (OWED) by
-/// `ffi/zig/src/lib.zig`. Decodes the wire `(Statement, OctadSchema)`,
-/// mints an attestation, and on success writes `[level:1][sig:64]` (65
-/// bytes) into `out` and returns the level (`0..=10`). Returns `-1`
-/// (Reject) — writing nothing — on any decode failure, a Reject level,
-/// a null pointer, or `out_cap < 65`. Fail-closed: never a token for an
-/// unestablished level.
+/// `vclut_rs_verify` — the real backend called by `ffi/zig/src/lib.zig`.
+/// Decodes the wire `(Statement, OctadSchema)`, mints an attestation, and
+/// on success writes `[level:1][sig:64]` (65 bytes) into `out` and
+/// returns the level (`0..=10`). Returns `-1` (Reject) — writing nothing
+/// — on any decode failure, a Reject level, a null pointer, `sk_len != 32`
+/// or `out_cap < 65`. Fail-closed: never a token for an unestablished
+/// level.
+///
+/// `sk_len` exists so the seed width is *checked* rather than assumed: the
+/// same reasoning that gives `out` an `out_cap` applies to the key.
 ///
 /// # Safety
-/// `stmt_ptr/stmt_len`, `schema_ptr/schema_len`, `sk_ptr` (32 bytes),
-/// and `out_ptr/out_cap` must each describe valid, readable/writable
-/// ranges. This is the declared host↔guest trust boundary the Zig shim
-/// owns.
+/// `stmt_ptr/stmt_len`, `schema_ptr/schema_len`, `sk_ptr/sk_len` and
+/// `out_ptr/out_cap` must each describe valid, readable (writable for
+/// `out`) ranges. This is the declared C-ABI trust boundary: the Zig shim
+/// validates every pointer and width before calling, and this function
+/// re-checks NULL and both widths before narrowing anything to a slice.
 #[no_mangle]
 pub unsafe extern "C" fn vclut_rs_verify(
     stmt_ptr: *const u8,
@@ -141,6 +158,7 @@ pub unsafe extern "C" fn vclut_rs_verify(
     schema_ptr: *const u8,
     schema_len: usize,
     sk_ptr: *const u8,
+    sk_len: usize,
     out_ptr: *mut u8,
     out_cap: usize,
 ) -> i64 {
@@ -148,7 +166,8 @@ pub unsafe extern "C" fn vclut_rs_verify(
         || schema_ptr.is_null()
         || sk_ptr.is_null()
         || out_ptr.is_null()
-        || out_cap < 65
+        || sk_len != SEED_LEN
+        || out_cap < TOKEN_LEN
     {
         return -1;
     }
@@ -161,7 +180,7 @@ pub unsafe extern "C" fn vclut_rs_verify(
         (
             core::slice::from_raw_parts(stmt_ptr, stmt_len),
             core::slice::from_raw_parts(schema_ptr, schema_len),
-            core::slice::from_raw_parts(sk_ptr, 32),
+            core::slice::from_raw_parts(sk_ptr, sk_len),
         )
     };
     let sk_arr = match <[u8; 32]>::try_from(sk_bytes) {
@@ -171,11 +190,11 @@ pub unsafe extern "C" fn vclut_rs_verify(
     let sk = SigningKey::from_bytes(&sk_arr);
     match mint(stmt_bytes, schema_bytes, &sk) {
         Some(att) => {
-            // SAFETY: out_cap >= 65 checked above; out_ptr non-null.
+            // SAFETY: out_cap >= TOKEN_LEN checked above; out_ptr non-null.
             // Write exactly [level:1][sig:64].
-            let out = unsafe { core::slice::from_raw_parts_mut(out_ptr, 65) };
+            let out = unsafe { core::slice::from_raw_parts_mut(out_ptr, TOKEN_LEN) };
             out[0] = att.level;
-            out[1..65].copy_from_slice(&att.sig);
+            out[1..TOKEN_LEN].copy_from_slice(&att.sig);
             i64::from(att.level)
         }
         None => -1,
@@ -324,6 +343,7 @@ mod tests {
                 cw.as_ptr(),
                 cw.len(),
                 skb.as_ptr(),
+                skb.len(),
                 out.as_mut_ptr(),
                 out.len(),
             )
@@ -345,6 +365,7 @@ mod tests {
                 cw.as_ptr(),
                 cw.len(),
                 skb.as_ptr(),
+                skb.len(),
                 out2.as_mut_ptr(),
                 out2.len(),
             )
@@ -368,6 +389,7 @@ mod tests {
                 cw.as_ptr(),
                 cw.len(),
                 skb.as_ptr(),
+                skb.len(),
                 tiny.as_mut_ptr(),
                 tiny.len(),
             )
@@ -381,10 +403,30 @@ mod tests {
                 cw.as_ptr(),
                 cw.len(),
                 skb.as_ptr(),
+                skb.len(),
                 tiny.as_mut_ptr(),
                 tiny.len(),
             )
         };
         assert_eq!(rc2, -1);
+
+        // sk_len != SEED_LEN ⇒ -1, before any pointer is narrowed to a
+        // slice (so a short seed can never be over-read).
+        let mut wide = [0u8; 65];
+        // SAFETY: valid slices; deliberately wrong seed length.
+        let rc3 = unsafe {
+            vclut_rs_verify(
+                sw.as_ptr(),
+                sw.len(),
+                cw.as_ptr(),
+                cw.len(),
+                skb.as_ptr(),
+                skb.len() - 1,
+                wide.as_mut_ptr(),
+                wide.len(),
+            )
+        };
+        assert_eq!(rc3, -1);
+        assert!(wide.iter().all(|&b| b == 0));
     }
 }

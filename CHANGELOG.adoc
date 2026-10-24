@@ -19,6 +19,26 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
   it (Elixir `System.cmd/3`) deliver the request with no shell. Any other
   argument shape is now exit 2 `bad_invocation`. Tests:
   `src/interface/parse/tests/gate_transport.rs`.
+* *Three gates for the FFI boundary* (vcl-ut#49 follow-up). None of this
+  surface was CI-gated: no workflow built `ffi/zig`, and the Idris binding
+  `src/interface/abi/Tier2.idr` was typechecked by nothing (absent from
+  `vclut-core.ipkg`, from `src/abi/vclut.ipkg`, and from `just idris-check`,
+  which also skipped silently when Idris2 was missing).
+  - `.github/workflows/zig-shim-gate.yml` — pinned Zig 0.16.0 (PyPI
+    `ziglang` wheel, no third-party action) runs `zig fmt --check`,
+    `scripts/check-ffi-header.sh`, and `zig build test`, which builds the
+    Rust backend with Cargo, links it, and exercises the Zig↔Rust boundary.
+  - `.github/workflows/abi-gate.yml` — `idris2 --build
+    src/interface/abi/vclut-abi.ipkg` (new package) on the same pinned
+    Idris2 0.8.0 source build as the proof-corpus gate, plus the honesty
+    guard and an assertion that the `.ttc` files were produced.
+  - `scripts/check-ffi-header.sh` — keeps `ffi/zig/include/vclut_ffi.h`
+    and the exports in step (symbol presence + arity; explicitly not a
+    type check).
+* *`ffi/zig/include/vclut_ffi.h`*: the normative C declarations for the
+  shim, installed by `zig build`. Earlier docs referenced a header that did
+  not exist, so "does the Idris side match the C header?" could only be
+  answered against prose.
 
 ==== Changed
 
@@ -52,6 +72,45 @@ https://semver.org/spec/v2.0.0.html[Semantic Versioning].
 
 ==== Fixed
 
+* *Tier-2 C-ABI contract was documentation, not a contract* (vcl-ut#49
+  follow-up). Four defects at the `vclut_verify_wire` /
+  `vclut_rs_verify` boundary:
+  - `@intCast(rc)` narrowed the backend's `i64` to `c_int` after checking
+    only `rc < 0`, so a result outside `0..=10` was a checked panic inside
+    an `extern` call (aborting the host: the Rust crate is
+    `panic = "abort"`) or UB under ReleaseFast. `levelFromRc` now rejects
+    anything outside `0..=10`.
+  - The Ed25519 seed had no length parameter anywhere; the 32-byte
+    requirement was a comment. `vclut_rs_verify` now takes `sk_len`,
+    checked in Zig and re-checked in Rust before any slice is created.
+  - Zig declared non-optional pointers (claiming non-null) while C callers
+    could pass NULL and Rust tolerated it; all parameters are now optional
+    and NULL is rejected with a reason before dereference.
+  - `vclut_last_error`'s contract had been merged into
+    `vclut_verify_wire`'s doc comment, leaving the export Idris consults
+    after a reject undocumented.
+* *Tier-2 Idris binding widths* — `size_t` parameters were declared `Int`
+  (C `int`, 32-bit on the targets this repo builds); they are now `Bits64`,
+  matching `legacy/Foreign.idr`. The binding also passes `sk_len`, binds and
+  uses `vclut_last_error` (so `Rejected reason` carries the backend's own
+  message instead of a fixed string), and puts `%foreign` before `export`
+  as `src/abi/Foreign.idr` does.
+* *`just zig-build` / `just zig-test` built the wrong package*: they ran
+  `cd src/interface/ffi` (the legacy `vqlut_*` shim) rather than `ffi/zig`,
+  so `build-all`/`test-all` never compiled the shipped C ABI. The legacy
+  package keeps `zig-build-legacy` / `zig-test-legacy`.
+* *Proof-corpus gate typechecked stale copies*: `verification/proofs/corpus/`
+  was described as "a module→path tree of symlinks into src/" but held 13
+  committed file copies, so `idris2 --build vclut-core.ipkg` checked a
+  snapshot and an edit to `src/` could not fail it. Now symlinks (content
+  was byte-identical, verified against every source).
+* *ABI/FFI docs corrected*: `docs/developer/ABI-FFI-README.adoc` documented
+  a `ffi/zig/{build.zig.zon,src/main.zig,test/integration_test.zig}` layout
+  that does not exist, a generated `generated/abi/vcl_total.h`, cross-target
+  `zig build -Dtarget=...` (build.zig links a host-built Rust staticlib, so
+  cross builds do not link), a `-lvql_ut` link line, and a fictional
+  `vcl_ut_*` API. `PROOF-NEEDS.adoc` said Tier-2 was both OWED and RESOLVED;
+  it now states which gate backs which claim.
 * *Aspect gate #49 — LSP server no longer panics on malformed requests*
   (`+src/interface/lsp/src/main.rs+`): a request whose method matched but
   whose params failed JSON deserialization used to crash the server with

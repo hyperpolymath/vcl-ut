@@ -112,9 +112,15 @@ zero-dep forbid-unsafe core untouched.
   additive↔ceil `alignUp` sliver). These are stated in
   VERIFICATION-STANCE.adoc, not faked.
 - P5d (Tier-2) is **delivered**: non-wasm consumers get a verifiable
-  bound attestation (fail-closed) instead of only the bare shim. The
-  vcl-ut#25 boundary-reinforcement workstream is complete; what
+  bound attestation (fail-closed) instead of only the bare shim. What
   remains are the precisely-scoped disclosed limits above, not gaps.
+  *Evidence scope (2026-10-24):* "delivered" means the crate, the Zig link
+  and the Idris binding exist. It is gated by `satellite-crates-gate.yml`
+  (Rust clippy/tests), `zig-shim-gate.yml` (Zig↔Rust link and shim tests)
+  and `abi-gate.yml` (Idris `%foreign` typecheck) — all three added then.
+  Before that, the end-to-end claim rested on a local `zig build test` and
+  the binding had been typechecked by nothing; a green proof-corpus gate is
+  *not* evidence about this tier.
 - (historical) Until P5d landed, non-wasm consumers received only the
   fail-closed shim (no fabricated
   level).

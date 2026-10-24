@@ -7,7 +7,10 @@ node = "latest"
 python = "latest"
 rust = "latest"
 go = "latest"
-zig = "latest"
+# Pinned: `build.zig` is verified under 0.16.0 and is CI-gated at
+# that version (.github/workflows/zig-shim-gate.yml). "latest" would
+# let a Zig release break the FFI build without any diff.
+zig = "0.16.0"
 java = "latest"
 bun = "latest"
 denojs = "latest"

@@ -3,7 +3,7 @@
 = ABI/FFI Standards
 {{~ Aditionally delete this line and fill out the template below ~}}
 
-# VCL_TOTAL ABI/FFI Documentation
+# VCL-total ABI/FFI Documentation
 
 ## Overview
 
@@ -28,24 +28,24 @@ This library follows the **Hyperpolymath RSR Standard** for ABI and FFI design:
 │  - Foreign.idr    (DEPRECATED FFI decls)    │
 └─────────────────┬───────────────────────────┘
                   │
-                  │ generates (at compile time)
+                  │ names the symbols of
                   ▼
 ┌─────────────────────────────────────────────┐
-│  C Headers (auto-generated)                 │
-│  generated/abi/vcl_total.h                │
+│  C declarations (maintained, CI-checked)    │
+│  ffi/zig/include/vclut_ffi.h                │
 └─────────────────┬───────────────────────────┘
                   │
                   │ imported by
                   ▼
 ┌─────────────────────────────────────────────┐
 │  FFI Implementation (Zig)                   │
-│  ffi/zig/src/main.zig                       │
+│  ffi/zig/src/lib.zig                        │
 │  - Implements C-compatible functions        │
 │  - Zero-cost abstractions                   │
 │  - Memory-safe by default                   │
 └─────────────────┬───────────────────────────┘
                   │
-                  │ compiled to libvql_ut.so/.a
+                  │ compiled to libvclut_ffi.so/.a
                   ▼
 ┌─────────────────────────────────────────────┐
 │  Any Language via C ABI                     │
@@ -78,18 +78,11 @@ vcl_total/
 │   │   ├── attest/             # Tier-2 Rust: signed C-ABI attestation
 │   │   └── recompute-wasm/     # Tier-1 Rust: consumer-side wasm recompute
 │   └── zig/                    # Zig shim, links ffi/rust/attest
-│       ├── build.zig           # Build configuration
-│       ├── build.zig.zon       # Dependencies
-│       ├── src/
-│       │   └── main.zig        # C-compatible FFI implementation
-│       ├── test/
-│       │   └── integration_test.zig
-│       └── include/
-│           └── vcl_total.h   # C header (optional, can be generated)
-│
-├── generated/                  # Auto-generated files
-│   └── abi/
-│       └── vcl_total.h       # Generated from Idris2 ABI
+│       ├── build.zig           # Build configuration (host-only; see below)
+│       ├── include/
+│       │   └── vclut_ffi.h     # Normative C declarations (installed by `zig build`)
+│       └── src/
+│           └── lib.zig         # C-compatible FFI implementation + its tests
 │
 └── bindings/                   # Language-specific wrappers (optional)
     ├── rust/
@@ -182,14 +175,21 @@ const handle = init() orelse return error.InitFailed;
 defer free(handle);
 ```
 
-### 3. **Cross-Compilation**
+### 3. **Cross-Compilation — NOT available for this shim**
 
-Built-in cross-compilation to any platform:
+Zig itself cross-compiles trivially, but `ffi/zig/build.zig` shells
+`cargo build --release` with no `--target` and links the resulting **host**
+staticlib (`libvcltotal_attest.a`) into every artefact. `-Dtarget=...` for a
+different triple therefore fails at link time. Cross-target artefacts would
+need the Rust backend built for the same triple (and that triple's std
+installed) first; that is not wired up, so do not document or rely on it:
 
 ```bash
-zig build -Dtarget=x86_64-linux
-zig build -Dtarget=aarch64-macos
-zig build -Dtarget=x86_64-windows
+# Works (host):
+cd ffi/zig && zig build
+
+# Does NOT work today — links a foreign-architecture Rust staticlib:
+# cd ffi/zig && zig build -Dtarget=aarch64-macos
 ```
 
 ### 4. **Zero Dependencies**
@@ -213,124 +213,89 @@ zig build -Doptimize=ReleaseFast  # Build optimized
 zig build test                    # Run tests
 ```
 
-### Generate C Header from Idris2 ABI
+### C Header
 
-```bash
-cd src/abi
-idris2 --cg c-header Types.idr -o ../../generated/abi/vcl_total.h
-```
+The normative declarations are `ffi/zig/include/vclut_ffi.h`, installed to
+`zig-out/include/` by `zig build`. It is hand-maintained and CI-checked
+against the exports (`scripts/check-ffi-header.sh`: symbol presence + arity),
+because the Zig shim — not the Idris2 ABI types — is what defines the
+symbols. There is no `idris2 --cg c-header` step for this surface: the ABI
+modules declare `%foreign` bindings, they do not emit C.
 
 ### Cross-Compile
 
-```bash
-cd ffi/zig
-
-# Linux x86_64
-zig build -Dtarget=x86_64-linux
-
-# macOS ARM64
-zig build -Dtarget=aarch64-macos
-
-# Windows x86_64
-zig build -Dtarget=x86_64-windows
-```
+Not supported by the current `build.zig` — it links a Rust staticlib built
+for the host, so only the host triple links. See "Cross-Compilation — NOT
+available for this shim" above.
 
 ## Usage
+
+The full C contract is `ffi/zig/include/vclut_ffi.h`; these examples use the
+real exported symbols. There is no `vcl_ut_*` API in this repository — an
+earlier revision of this document invented one, and a consumer following it
+would fail to link.
 
 ### From C
 
 ```c
-#include "vcl_total.h"
+#include "vclut_ffi.h"
+#include <stdio.h>
 
-int main() {
-    void* handle = vcl_ut_init();
-    if (!handle) return 1;
+int main(void) {
+    uint8_t out[VCLUT_ATTESTATION_TOKEN_SIZE];
+    const uint8_t sk[VCLUT_ED25519_SEED_SIZE] = { /* certifier seed */ 0 };
 
-    int result = vcl_ut_process(handle, 42);
-    if (result != 0) {
-        const char* err = vcl_ut_last_error();
-        fprintf(stderr, "Error: %s\n", err);
+    if (vclut_init() != 0) return 1;
+
+    int level = vclut_verify_wire(stmt, stmt_len, schema, schema_len,
+                                  sk, sizeof sk, out, sizeof out);
+    if (level < 0) {
+        /* 0 is a VERIFIED level (ParseSafe) here, not "pending". */
+        fprintf(stderr, "rejected: %s\n", vclut_last_error());
+        return 1;
     }
-
-    vcl_ut_free(handle);
+    printf("certified level %d, %zu-byte token\n", level, sizeof out);
     return 0;
 }
 ```
 
 Compile with:
 ```bash
-gcc -o example example.c -lvql_ut -L./zig-out/lib
+gcc -o example example.c -lvclut_ffi -L./zig-out/lib -I./zig-out/include
 ```
 
 ### From Idris2
 
 ```idris
-import VCL_TOTAL.ABI.Foreign
+import VclTotal.ABI.Tier2
 
 main : IO ()
 main = do
-  Just handle <- init
-    | Nothing => putStrLn "Failed to initialize"
-
-  Right result <- process handle 42
-    | Left err => putStrLn $ "Error: " ++ errorDescription err
-
-  free handle
-  putStrLn "Success"
+  case !(verifyWire stmtWire schemaWire certifierSeed) of
+    Verified level token => putStrLn $ "certified level " ++ show level
+    Rejected reason      => putStrLn $ "rejected: " ++ reason
 ```
+
+`verifyWire` checks the seed width before calling, and reports the backend's
+own message on a reject.
 
 ### From Rust
 
 ```rust
-#[link(name = "vcl_total")]
+#[link(name = "vclut_ffi")]
 extern "C" {
-    fn vcl_ut_init() -> *mut std::ffi::c_void;
-    fn vcl_ut_free(handle: *mut std::ffi::c_void);
-    fn vcl_ut_process(handle: *mut std::ffi::c_void, input: u32) -> i32;
-}
-
-fn main() {
-    unsafe {
-        let handle = vcl_ut_init();
-        assert!(!handle.is_null());
-
-        let result = vcl_ut_process(handle, 42);
-        assert_eq!(result, 0);
-
-        vcl_ut_free(handle);
-    }
+    fn vclut_init() -> std::ffi::c_int;
+    fn vclut_verify_wire(
+        stmt: *const u8, stmt_len: usize,
+        schema: *const u8, schema_len: usize,
+        sk: *const u8, sk_len: usize,
+        out: *mut u8, out_cap: usize,
+    ) -> std::ffi::c_int;
+    fn vclut_last_error() -> *const std::ffi::c_char;
 }
 ```
 
-### From Julia
-
-```julia
-const libvql_ut = "libvql_ut"
-
-function init()
-    handle = ccall((:vcl_ut_init, libvql_ut), Ptr{Cvoid}, ())
-    handle == C_NULL && error("Failed to initialize")
-    handle
-end
-
-function process(handle, input)
-    result = ccall((:vcl_ut_process, libvql_ut), Cint, (Ptr{Cvoid}, UInt32), handle, input)
-    result
-end
-
-function cleanup(handle)
-    ccall((:vcl_ut_free, libvql_ut), Cvoid, (Ptr{Cvoid},), handle)
-end
-
-# Usage
-handle = init()
-try
-    result = process(handle, 42)
-    println("Result: $result")
-finally
-    cleanup(handle)
-end
-```
+Other languages bind the same four symbols from the installed header.
 
 ## Testing
 
@@ -366,19 +331,21 @@ main = do
 
 When modifying the ABI/FFI:
 
-1. **Update ABI first** (`src/abi/*.idr`)
-   - Modify type definitions
-   - Update proofs
-   - Ensure backward compatibility
+1. **Update the ABI declarations first** (`src/interface/abi/*.idr`,
+   package `vclut-abi.ipkg`)
+   - Modify type definitions / `%foreign` signatures
+   - Keep lengths `Bits64` (C `size_t`) and IDs `Bits64` (C `uint64_t`)
+   - Typecheck it: `idris2 --build src/interface/abi/vclut-abi.ipkg`
+     (CI: `abi-gate.yml`)
 
-2. **Generate C header**
-   ```bash
-   idris2 --cg c-header src/abi/Types.idr -o generated/abi/vcl_total.h
-   ```
+2. **Update the C declarations** (`ffi/zig/include/vclut_ffi.h`)
+   - These are hand-maintained, not generated: the Zig shim defines the
+     symbols, the Idris modules only name them
+   - `./scripts/check-ffi-header.sh` must pass (CI: `zig-shim-gate.yml`)
 
-3. **Update FFI implementation** (`ffi/zig/src/main.zig`)
-   - Implement new functions
-   - Match ABI types exactly
+3. **Update the FFI implementation** (`ffi/zig/src/lib.zig`)
+   - Implement new functions; match the header's types and arity exactly
+   - Run `cd ffi/zig && zig build test` (builds the Rust backend and links it)
 
 4. **Add tests**
    - Unit tests in Zig

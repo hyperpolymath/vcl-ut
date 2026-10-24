@@ -15,7 +15,7 @@
 --
 -- SCOPE: the hypatia<->verisim safety-predicate corpus. As of 2026-06-14
 -- this is ABI.{Types, Layout, LayoutProofs} + Core.* + Interface.Wire*
--- (the 12 modules listed below). `VclTotal.ABI.Layout` was made sound and
+-- (the 13 modules listed below). `VclTotal.ABI.Layout` was made sound and
 -- is now included; `VclTotal.ABI.LayoutProofs` discharges its genuine
 -- alignment / no-padding / bounds theorems (the former `Nat` `(-)` error in
 -- `paddingFor` was fixed, and the unsound `alignUpCorrect` /

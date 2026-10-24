@@ -42,7 +42,7 @@ typecheck. The concrete blockers were:
 
 *Phase 1–4 status (RESOLVED); Phase 5 boundary reinforcement — BOTH
 tiers RESOLVED:* every blocker above is fixed *honestly* and the
-corpus compiles (**12 modules**: Phase 4 = `LayoutProofs` + L6–L10
+corpus compiles (**13 modules**: Phase 4 = `LayoutProofs` + L6–L10
 `composeJoin` closure, PR #24; Phase 5 / vcl-ut#25 added
 `Interface.{WireDecode,WireConformance}` — the certified wire/schema
 decoder + cross-language `Refl` conformance, the faithful Rust
@@ -62,7 +62,7 @@ deleted, not faked). `idris2 0.8.0 --build
 verification/proofs/vclut-core.ipkg` exits 0 over `VclTotal.ABI.{Types,
 Layout, LayoutProofs}` + `VclTotal.Core.{Grammar,Schema,Decide,Levels,
 Checker,Composition,Epistemic}` + `VclTotal.Interface.{WireDecode,
-WireConformance}` (12 modules), under `%default total`,
+WireConformance}` (13 modules), under `%default total`,
 with *zero*
 `believe_me`/`really_believe_me`/`postulate`/`assert_total`/
 `assert_smaller`/`idris_crash`/`sorry` (CI-enforced by
@@ -244,7 +244,7 @@ here.
   longer outstanding.
 . *(Phase 3c — RESOLVED for `ABI.Layout`; re-scoped for `ABI.Foreign`).*
   `VclTotal.ABI.Layout` is now *sound, compiling, and CI-gated* (it is
-  one of the 12 modules in `vclut-core.ipkg`). The three unsound claims were
+  one of the 13 modules in `vclut-core.ipkg`). The three unsound claims were
   *deleted, not faked*: `alignUpCorrect` (used `(align > 0)`, a `Bool`,
   as a type, and a bogus `Refl` asserting the divisibility goal);
   `offsetInBounds` (an open `?metavariable` — never a proof, false in
@@ -457,7 +457,13 @@ here.
      C-ABI). The previously-OWED `vclut_rs_verify` backend is this
      crate, linked into the `ffi/zig` shim (`vclut_verify_wire`) by
      `build.zig`; `zig build test` exercises the fail-closed path
-     end-to-end across the Zig↔Rust boundary. Trust model, stated:
+     end-to-end across the Zig↔Rust boundary. *Evidence scope
+     (2026-10-24):* that run is CI-gated by
+     `.github/workflows/zig-shim-gate.yml`, and the Idris binding
+     (`VclTotal.ABI.Tier2`) by `.github/workflows/abi-gate.yml`.
+     Until those existed, this paragraph rested on a local
+     `zig build test` and a binding no typechecker had seen — and
+     the corpus gate did not cover the Zig↔Rust link at all. Trust model, stated:
      the consumer trusts (a) the certifier's key is genuinely held and
      (b) the certifier ran the pinned decider before signing —
      strictly weaker than Tier-1 (which trusts neither; it
@@ -728,7 +734,7 @@ end-to-end); ADR-0002 updated to Tier-2 RESOLVED. **Both tiers
 RESOLVED; the vcl-ut#25 boundary-reinforcement workstream is
 complete.**
 The corpus now builds clean as
-*12 modules*
+*13 modules*
 (`idris2 0.8.0 --build verification/proofs/vclut-core.ipkg`, exit 0,
 `%default total`, zero proof-escape symbols — CI-enforced):
 `VclTotal.ABI.{Types,Layout,LayoutProofs}` +

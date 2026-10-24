@@ -42,7 +42,8 @@ proven byte-for-byte conformant with the Rust encoder by `+Refl+`
 decision port machine-pinned to the corpus, and a fail-closed recompute
 `+wasm32+` artefact the consumer re-runs. Remaining honest gaps
 precisely scoped: *P5d* = C-ABI signed-attestation _fallback_ contract
-for non-wasm consumers (Tier-2, OWED); plus the disclosed limits
+for non-wasm consumers (Tier-2 — delivered; see the P5d entry below for
+what is, and is not, CI-gated); plus the disclosed limits
 (NaN-payload reconstruction; cross-module `+Refl+` non-reduction of
 `+find+`/`+elemBy+` ⇒ schema-resolution-dependent verdicts pinned
 Rust-side + input-value conformance; L3 subquery/heuristic scoping;
@@ -126,7 +127,13 @@ trusted tag, _not_ a transported proof object. Plain `+wasm32+` suffices
 `+ffi/rust/attest+` mints/verifies an Ed25519 attestation bound to
 `+(sha256(stmt_wire), sha256(schema_wire),   level)+` (fail-closed); the
 `+vclut_rs_verify+` backend is linked into `+ffi/zig+`
-(`+vclut_verify_wire+`, `+zig build test+` green end-to-end).
+(`+vclut_verify_wire+`; `+zig build test+` exercises the fail-closed path
+end-to-end). *Evidence scope:* the Rust half is CI-gated by
+`+satellite-crates-gate.yml+`; the Zig half is CI-gated by
+`+zig-shim-gate.yml+` and the Idris binding is typechecked by
+`+abi-gate.yml+` — both added 2026-10-24. Before those workflows
+existed the end-to-end claim rested on a local run, and the binding
+(`+VclTotal.ABI.Tier2+`) was typechecked by nothing.
 Trusted-certifier (weaker than Tier-1), crypto contained. *The vcl-ut#25
 workstream is complete* — only precisely-scoped disclosed limits remain
 (not gaps). See the canonical two-tier boundary model in

@@ -908,20 +908,33 @@ maint-assault:
 # VCL-total PROJECT-SPECIFIC RECIPES
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Type-check the Idris2 ABI kernel (core + checker)
+# Type-check the Idris2 proof corpus + the ABI (%foreign) bindings.
+# Fails loudly when Idris2 is missing: a skipped check is not a pass.
 idris-check:
-    @echo "Type-checking Idris2 ABI kernel..."
-    cd src/core && idris2 --typecheck Checker.idr || echo "Idris2 not installed — skip"
-    cd src/interface/abi && idris2 --typecheck Types.idr || echo "Idris2 not installed — skip"
+    @echo "Type-checking the Idris2 proof corpus and ABI bindings..."
+    idris2 --build verification/proofs/vclut-core.ipkg
+    idris2 --build src/interface/abi/vclut-abi.ipkg
 
-# Build the Zig FFI library (shared + static)
+# Build the Zig FFI library (shared + static) — ffi/zig is the C-ABI surface
+# the Idris bindings name (`vclut_verify_wire`, `libvclut_ffi`), and the one
+# the docs point at. Requires cargo: build.zig links ffi/rust/attest.
 zig-build:
-    @echo "Building Zig FFI library..."
+    @echo "Building the Zig FFI library (ffi/zig)..."
+    cd ffi/zig && zig build
+
+# Run the Zig FFI unit tests (links the real Rust Tier-2 backend)
+zig-test:
+    @echo "Running the Zig FFI tests (ffi/zig)..."
+    cd ffi/zig && zig build test
+
+# Legacy `vqlut_*` shim, kept only for the deprecated
+# VclTotal.Legacy.Foreign bindings. NOT the shipped C ABI.
+zig-build-legacy:
+    @echo "Building the legacy vqlut_* shim (src/interface/ffi)..."
     cd src/interface/ffi && zig build
 
-# Run Zig FFI unit tests
-zig-test:
-    @echo "Running Zig FFI tests..."
+zig-test-legacy:
+    @echo "Running the legacy vqlut_* shim tests (src/interface/ffi)..."
     cd src/interface/ffi && zig build test
 
 # Build all VCL-total components
