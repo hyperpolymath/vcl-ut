@@ -1,0 +1,109 @@
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+#
+# zig-shim-gate.yml — Builds and tests the Zig C-ABI shim (`ffi/zig`).
+#
+# Before this gate, NO workflow built `ffi/zig`: `satellite-crates-gate.yml`
+# covers the Rust crates (`attest`, `recompute-wasm`) and nothing else
+# invoked Zig. Status files still described Tier-2 as "delivered" on the
+# strength of a `zig build test` that only ever ran on the author's
+# machine, so the Zig↔Rust link, the 65-byte token write and the
+# fail-closed reject path were ungated.
+#
+# `just zig-build` did not help: it pointed at `src/interface/ffi`, the
+# legacy `vqlut_*` package, not at `ffi/zig` (fixed in the same change).
+#
+# This job runs the real thing: `zig build test` builds the Rust backend
+# via Cargo (`build.zig`), links it, and runs the shim's tests — including
+# the only end-to-end assertion that a garbage wire yields -1 and leaves
+# `out` untouched through the actual linked symbol.
+#
+# ZIG VERSION: pinned to 0.16.0 (the version this build file is verified
+# under) and installed from the `ziglang` PyPI wheel, so no third-party
+# action and no unpinned "latest" — a Zig release that breaks `build.zig`
+# shows up as a red job, not as silent drift. `build.zig` also builds
+# under 0.15.2.
+#
+# Tracked: vcl-ut#49, vcl-ut#25.
+
+name: Zig Shim Gate
+
+on:
+  pull_request:
+    branches: ['**']
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+# Concurrency-cancel guard (repo convention for canonical check workflows).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ZIG_VERSION: "0.16.0"
+
+jobs:
+  zig-shim:
+    name: ffi/zig — fmt / header / zig build test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # rustup is preinstalled on ubuntu-latest. `build.zig` shells `cargo`
+      # to produce libvcltotal_attest.a, so the Rust toolchain is a build
+      # dependency of the Zig artefacts, not just of the Rust gate.
+      - name: Pin Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup show active-toolchain || rustup default stable
+          cargo --version
+
+      # No third-party action: the wheel ships the compiler binary and is
+      # pinned by version. `ziglang/zig` is the executable inside the
+      # package directory.
+      - name: Install Zig ${{ env.ZIG_VERSION }}
+        run: |
+          set -euo pipefail
+          python3 -m pip install --user --quiet "ziglang==${ZIG_VERSION}"
+          ZIG_BIN="$(python3 -c 'import ziglang, os; print(os.path.join(os.path.dirname(ziglang.__file__), "zig"))')"
+          test -x "$ZIG_BIN"
+          echo "$(dirname "$ZIG_BIN")" >> "$GITHUB_PATH"
+          "$ZIG_BIN" version | tee /tmp/zig-version
+          grep -qx "${ZIG_VERSION}" /tmp/zig-version
+
+      - name: zig fmt --check
+        run: |
+          set -euo pipefail
+          cd ffi/zig
+          zig fmt --check build.zig src/lib.zig
+
+      # The published header is the other half of the contract: every
+      # `pub export fn` must be declared, and nothing may be declared that
+      # is not exported. Shape check only — see the script's docstring for
+      # exactly what it does and does not prove.
+      - name: C header matches the exports
+        run: python3 scripts/check-ffi-header.py
+
+      # Builds ffi/rust/attest (Cargo, --release), links it into
+      # libvclut_ffi.{so,a} and the test runner, and runs the shim tests.
+      - name: zig build test (links the real Rust backend)
+        run: |
+          set -euo pipefail
+          cd ffi/zig
+          zig build test
+
+      # `installHeader` is only exercised by the install step; assert the
+      # artefacts a consumer is told to link against actually appear.
+      - name: zig build installs the library and header
+        run: |
+          set -euo pipefail
+          cd ffi/zig
+          zig build
+          ls -l zig-out/lib/libvclut_ffi.a zig-out/lib/libvclut_ffi.so
+          ls -l zig-out/include/vclut_ffi.h
