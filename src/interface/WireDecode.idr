@@ -818,7 +818,12 @@ schemaMagic = [86, 67, 76, 83]   -- "VCLS"
 ||| Total: every input yields `Right` or a typed `Left WireErr`, never
 ||| a crash. Fuel is the input length (sound: every node costs >= 1
 ||| discriminant byte). The 8 modality schemas are in `Schema.idr`
-||| record order; no count prefix (fixed arity).
+||| record order with no count prefix (fixed eight-slot arity, which
+||| remains fixed unless the wire contract is deliberately changed).
+||| This stream does not encode a generic implementation-specific
+||| modality profile or accept arbitrary cardinalities: fewer than 8
+||| slots fail with `Left Truncated` and more than 8 fail with
+||| `Left TrailingBytes`.
 public export
 fromWireSchema : List Bits8 -> Either WireErr OctadSchema
 fromWireSchema input = do

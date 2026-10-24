@@ -113,3 +113,32 @@ fn any_other_invocation_is_a_gate_error() {
         assert_eq!(error_kind(&out), "bad_invocation", "{args:?}");
     }
 }
+
+/// vcl-ut#118: omitting modality keys in the gate JSON `schema` object (or
+/// omitting `schema` altogether) normalizes to the fixed eight-slot
+/// `OctadSchema` with empty field lists for the omitted slots; it does not
+/// encode a variable-cardinality modality profile.
+#[test]
+fn omitted_schema_keys_normalize_to_fixed_eight_slot_octad_schema() {
+    let graph_only = r#"{"schema_version":1,"statement":"INSPECT GRAPH.knows FROM OCTAD 'e-1' LIMIT 1","schema":{"graph":{"fields":[{"name":"knows","ty":"TOctad","nullable":false,"indexed":true}]}}}"#;
+    let all_eight_explicit = r#"{"schema_version":1,"statement":"INSPECT GRAPH.knows FROM OCTAD 'e-1' LIMIT 1","schema":{"graph":{"fields":[{"name":"knows","ty":"TOctad","nullable":false,"indexed":true}]},"vector":{"fields":[]},"tensor":{"fields":[]},"semantic":{"fields":[]},"document":{"fields":[]},"temporal":{"fields":[]},"provenance":{"fields":[]},"spatial":{"fields":[]}}}"#;
+
+    let out_graph_only = via_stdin(graph_only);
+    let out_all_eight = via_stdin(all_eight_explicit);
+    assert_eq!(out_graph_only.status.code(), Some(0));
+    assert_eq!(out_graph_only.status.code(), out_all_eight.status.code());
+    assert_eq!(out_graph_only.stdout, out_all_eight.stdout);
+
+    // Omitting top-level `schema`, sending `schema: {}`, and sending all 8
+    // slots with empty `fields` produce identical verdicts.
+    let no_schema = r#"{"schema_version":1,"statement":"INSPECT SPATIAL.origin FROM OCTAD 'e-1' LIMIT 1"}"#;
+    let empty_obj = r#"{"schema_version":1,"statement":"INSPECT SPATIAL.origin FROM OCTAD 'e-1' LIMIT 1","schema":{}}"#;
+    let explicit_empty = r#"{"schema_version":1,"statement":"INSPECT SPATIAL.origin FROM OCTAD 'e-1' LIMIT 1","schema":{"graph":{"fields":[]},"vector":{"fields":[]},"tensor":{"fields":[]},"semantic":{"fields":[]},"document":{"fields":[]},"temporal":{"fields":[]},"provenance":{"fields":[]},"spatial":{"fields":[]}}}"#;
+
+    let out_no_schema = via_stdin(no_schema);
+    let out_empty_obj = via_stdin(empty_obj);
+    let out_explicit_empty = via_stdin(explicit_empty);
+    assert_eq!(out_no_schema.status.code(), Some(1));
+    assert_eq!(out_no_schema.stdout, out_empty_obj.stdout);
+    assert_eq!(out_no_schema.stdout, out_explicit_empty.stdout);
+}

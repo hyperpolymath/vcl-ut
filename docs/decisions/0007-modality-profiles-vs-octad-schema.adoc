@@ -27,15 +27,18 @@ populated.
 
 ## Decision
 
-- Use **modality profile** for a versioned, implementation-specific selection
-  of modalities supported or enabled at a declared scope.
+- Use **modality profile** only for a generic, implementation-specific
+  selection of modalities (supported or enabled at a declared scope).
 - Use **modality set** for membership alone, without implied policy or version.
-- Reserve **Octad** / **`OctadSchema`** for the current fixed eight-modality
-  model and its concrete eight-slot schema.
+- Reserve **Octad** / **`OctadSchema`** for the fixed eight-modality model and
+  its concrete eight-slot schema, which remains fixed unless its contract is
+  deliberately changed.
 - Treat profile membership, field declarations, and per-subject witness
   population as separate facts.
 - Keep `OctadSchema`, the gate contract, and `VCLS` v1 unchanged. This decision
-  adds no profile type, negotiation, serialization, or variable-arity support.
+  adds no profile type, negotiation, serialization, or variable-arity support,
+  and does not imply that the existing wire format supports arbitrary
+  cardinalities.
 - Treat `HEXAD` as a legacy spelling of the Octad source in the current Rust
   parser, not as a six-modality profile. Retiring that spelling is an
   independent compatibility decision.

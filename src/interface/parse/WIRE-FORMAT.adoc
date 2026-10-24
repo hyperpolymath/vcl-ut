@@ -138,11 +138,15 @@ discriminant byte).
 
 [IMPORTANT]
 ====
-This fixed-arity `OctadSchema` stream does not encode a modality profile,
-profile version, selected-subset count, or per-subject witness-presence bit.
-Empty fields inside a slot remain an empty schema for that slot, not a signal
-to omit it. A variable-cardinality modality profile requires a distinct,
-versioned contract; it is not a `VCLS` v1 encoding. See
+This fixed-arity `OctadSchema` stream remains fixed at eight modality slots
+unless its wire contract is deliberately changed in a future version. It does
+not encode a generic, implementation-specific *modality profile*, profile
+version, selected-subset count, or per-subject witness-presence bit, and it
+does not support arbitrary modality cardinalities (fewer than eight slots fail
+with `Truncated`; more than eight fail with `TrailingBytes`). Empty fields
+inside a slot remain an empty schema for that slot, not a signal to omit it. A
+variable-cardinality modality profile requires a distinct, versioned contract;
+it is not a `VCLS` v1 encoding. See
 link:../../../docs/standards/MODALITY-PROFILES.adoc[the profile/Octad contract].
 ====
 

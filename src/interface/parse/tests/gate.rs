@@ -269,3 +269,37 @@ fn s2_transitions_parse_and_certify() {
         other => panic!("expected FromAuthoritative Graph, got {other:?}"),
     }
 }
+
+/// vcl-ut#118: empty slot fields != missing modality.
+///
+/// `OctadSchema` always has all eight modality slots. An empty `fields` list
+/// in `schema.spatial` means only that no field definitions were supplied for
+/// the Spatial slot; the Spatial modality slot itself remains part of the
+/// fixed Octad catalog (whole-modality projection resolves to `TOctad` and
+/// certifies at L6), whereas referencing an undeclared field `SPATIAL.origin`
+/// fails L1 `SchemaBound`.
+#[test]
+fn empty_modality_slot_still_exists_in_octad_schema() {
+    let schema = schema_with_graph_fields(vec![FieldDef {
+        name: "knows".to_string(),
+        ty: VqlType::TOctad,
+        nullable: false,
+        indexed: true,
+    }]);
+    assert!(
+        schema.spatial.fields.is_empty(),
+        "Spatial slot has no declared fields in this fixture"
+    );
+
+    // Whole-modality reference `SPATIAL` resolves to `TOctad` even when
+    // `schema.spatial.fields` is empty.
+    let whole_modality =
+        parse("INSPECT SPATIAL FROM OCTAD 'e-1' LIMIT 1").expect("whole-modality query parses");
+    assert_eq!(certified_level(&whole_modality, &schema), 6);
+
+    // Field reference `SPATIAL.origin` requires a field declaration in the
+    // Spatial slot and fails closed at L1 when `schema.spatial.fields` is empty.
+    let undeclared_field = parse("INSPECT SPATIAL.origin FROM OCTAD 'e-1' LIMIT 1")
+        .expect("field-reference query parses");
+    assert_eq!(certified_level(&undeclared_field, &schema), -1);
+}

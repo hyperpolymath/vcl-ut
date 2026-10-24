@@ -1123,6 +1123,15 @@ fn enc_modschema(m: &ModalitySchema, o: &mut Vec<u8>) {
 }
 
 /// Serialise an `OctadSchema` to the v1 `VCLS` wire stream. Total.
+///
+/// The `VCLS` v1 payload is the fixed eight-slot `OctadSchema` in canonical
+/// record order (`graph`, `vector`, `tensor`, `semantic`, `document`,
+/// `temporal`, `provenance`, `spatial`) with no modality-count prefix. That
+/// eight-slot contract remains fixed unless deliberately changed by a
+/// versioned wire contract change; it does not encode a generic,
+/// implementation-specific modality profile or arbitrary modality
+/// cardinalities. Empty slot `fields` are encoded as a zero-length field list
+/// for that slot, never by omitting the slot.
 pub fn to_wire_schema(s: &OctadSchema) -> Vec<u8> {
     let mut o = Vec::new();
     o.extend_from_slice(&SCHEMA_MAGIC);
@@ -1200,6 +1209,12 @@ fn dec_modschema(d: &mut D) -> Result<ModalitySchema, WireError> {
 /// Decode a v1 `VCLS` wire stream into an `OctadSchema`. Total: every
 /// input yields `Ok`/`Err`, never a panic (same contract as
 /// [`from_wire`]).
+///
+/// Requires the exact eight `ModalitySchema` slots of `OctadSchema` in record
+/// order. The existing v1 wire format does not support arbitrary modality
+/// cardinalities or generic modality profiles: fewer than eight slots return
+/// [`WireError::Truncated`] and trailing bytes after the eighth slot return
+/// [`WireError::TrailingBytes`].
 pub fn from_wire_schema(input: &[u8]) -> Result<OctadSchema, WireError> {
     let mut d = D {
         b: input,
