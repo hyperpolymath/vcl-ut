@@ -78,8 +78,9 @@ The gate explicitly does **NOT**:
   child's stdin and then close it (Erlang/Elixir ports cannot half-close;
   `System.cmd/3` has no stdin option) would otherwise need a shell
   redirection to deliver the request. With `--input`, it writes the request
-  to a file only it can read and passes the path as `argv[1]`, so no shell
-  ever parses the path or the payload.
+  to a file only it can read and invokes the binary with `argv[1]` =
+  `--input` and `argv[2]` = the path (a bare path is `bad_invocation`), so
+  no shell ever parses the path or the payload.
 * *Response*: a single JSON object on `stdout` (compact, one line,
   newline-terminated).
 * Human/diagnostic text, if any, goes to `stderr` only and is never part of
