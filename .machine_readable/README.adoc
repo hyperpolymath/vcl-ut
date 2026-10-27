@@ -11,15 +11,8 @@ directories is intentional; they are not interchangeable copies.
 * `STATE.a2ml` is the *single canonical project checkpoint*.
 * `.machine_readable/6a2/STATE.a2ml` was a byte-identical stale mirror and has
   been removed. Do not recreate it; update only `STATE.a2ml`.
-* `descriptiles/` holds `META.a2ml`, `ECOSYSTEM.a2ml`, `AGENTIC.a2ml`,
-  `NEUROSYM.a2ml`, and `PLAYBOOK.a2ml`. Their former `6a2/` locations are
-  retired.
-* Hypatia also requires `STATE.a2ml` in `descriptiles/`, but
-  `.github/workflows/openssf-compliance.yml` still requires
-  `.machine_readable/STATE.a2ml`. Moving the checkpoint requires updating
-  that workflow and its consumers together. Until then, keep the single
-  checkpoint at its current path; a duplicate or symlink at the retired
-  path would still trigger Hypatia's location rule.
+* `.machine_readable/6a2/` holds the related 6a2 agent, metadata, and playbook
+  files, not a second project-state database.
 
 == Contractile locations
 

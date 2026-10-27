@@ -56,18 +56,10 @@ If VCL-total succeeds, it replaces VCL-DT entirely.
 
 ### Machine-Readable Metadata: `.machine_readable/` ONLY
 
-These a2ml files MUST exist under `.machine_readable/` ONLY:
-1. **STATE.a2ml** - Project state, progress, blockers (current path:
-   `.machine_readable/STATE.a2ml`; migration to `descriptiles/` is blocked
-   by the OpenSSF workflow's required-path check)
+These a2ml files MUST exist in `.machine_readable/` directory ONLY:
+1. **STATE.a2ml** - Project state, progress, blockers
 2. **META.a2ml** - Architecture decisions, governance
-   (`.machine_readable/descriptiles/META.a2ml`)
 3. **ECOSYSTEM.a2ml** - Position in ecosystem, relationships
-   (`.machine_readable/descriptiles/ECOSYSTEM.a2ml`)
-
-`AGENTIC.a2ml`, `NEUROSYM.a2ml`, and `PLAYBOOK.a2ml` also live in
-`.machine_readable/descriptiles/`. See `.machine_readable/README.adoc`
-for the file map and the remaining STATE migration requirement.
 
 **CRITICAL:** If ANY of these files exist in the root directory, this is an ERROR.
 
