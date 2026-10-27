@@ -66,18 +66,22 @@ fn input_file_and_stdin_give_the_same_verdict() {
     let rejected = r#"{"schema_version":1,"statement":"INSPECT GRAPH FROM HEXAD abc WHERE id = '1' OR '1'='1'","schema":{}}"#;
     let bad_version =
         r#"{"schema_version":7,"statement":"INSPECT GRAPH FROM HEXAD 'abc'","schema":{}}"#;
-    for (i, request) in [ADMITTED, rejected, bad_version].into_iter().enumerate() {
+    // Parity alone would pass if both transports were wrong the same way, so
+    // each case also pins its expected exit code (contract §"Exit codes").
+    for (i, (request, exit)) in [(ADMITTED, 0), (rejected, 1), (bad_version, 2)]
+        .into_iter()
+        .enumerate()
+    {
         let path = request_file(&format!("same-{i}"), request);
         let from_file = gate(&["--input".as_ref(), path.as_os_str()]);
         let from_stdin = via_stdin(request);
-        assert_eq!(
-            from_file.status.code(),
-            from_stdin.status.code(),
-            "{request}"
-        );
+        assert_eq!(from_file.status.code(), Some(exit), "{request}");
+        assert_eq!(from_stdin.status.code(), Some(exit), "{request}");
         assert_eq!(from_file.stdout, from_stdin.stdout, "{request}");
+        if exit == 2 {
+            assert_eq!(error_kind(&from_file), "unsupported_version");
+        }
     }
-    assert_eq!(via_stdin(ADMITTED).status.code(), Some(0));
 }
 
 #[test]
