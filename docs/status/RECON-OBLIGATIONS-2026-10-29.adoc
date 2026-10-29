@@ -137,6 +137,9 @@ their home repositories and *not* a Mathesis endorsement of theorem status.
 |absolute-zero / active CNO and OND models |Separate null state effect from null disclosure under a declared observer model |Useful for refusal, failed verification and side-channel/observability contracts; does not prove real I/O non-disclosure
 |jtv-halting-islands-ct / GRAMMAR.ebnf |Closed total DATA sublanguage separated from Turing-complete CONTROL |Candidate terminating sublanguage for proof expressions; grammar alone is not general termination of VCL
 |typell / src/abi/{Soundness,InferenceSoundness,LevelMonotonicity}.idr |STLC progress/preservation and formal hierarchy model |Prove a semantics-preserving interpretation from actual VCL rather than import an unrelated theorem statement
+|trope-checker / TB.Honest.agda and Idris2 checker |Honest generation: a grade assembled from allowed moves never reaches falsified/misbound/conflated states; a language-neutral IR and executable reference checker |Define a VCL-specific loss/bearer/provenance lowering and discharge its faithfulness; this is not real-world veridicality
+|echo-types / EchoProvenance.agda and EchoJanusBridge.agda |Retained fibres distinguish collapsed identity/provenance; bridges to reversibility |Bridge subject identity and witness-preserving projections; check actual module statements and independent compilation
+|nextgen-databases / typeql-experimental |Prototype Idris2 syntax for linear usage, session states, effects and proof attachment |Do NOT import as a verified VCL-UT implementation: Checker checks clause presence/shape, Linear/Session model abstract handles, and ProofCarrying.MkProved accepts any theorem tag without a proof witness
 |===
 
 == Priority and independent consumer handover
