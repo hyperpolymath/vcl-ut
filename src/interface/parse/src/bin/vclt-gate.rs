@@ -302,7 +302,15 @@ fn ms(modality: Modality) -> ModalitySchema {
     }
 }
 
+/// Parse a v1 JSON schema into the fixed eight modality slots, leaving omitted
+/// slots with empty field lists and ignoring unrecognised keys.
+///
+/// Returns an error for a non-object schema or propagates a modality or field
+/// parsing error. The gate caller reports these errors as `bad_schema` (exit 2).
 fn parse_schema(v: &Value) -> Result<OctadSchema, String> {
+    if !v.is_object() {
+        return Err("schema must be a JSON object".to_string());
+    }
     Ok(OctadSchema {
         graph: parse_modality_schema(v, "graph", Modality::Graph)?,
         vector: parse_modality_schema(v, "vector", Modality::Vector)?,
@@ -315,6 +323,11 @@ fn parse_schema(v: &Value) -> Result<OctadSchema, String> {
     })
 }
 
+/// Parse `v[key]` as the schema for `modality`, retaining the declared field order.
+/// A missing key or missing `fields` property yields an empty field list.
+///
+/// Returns an error if a supplied slot is not an object or its `fields` is not
+/// an array, and propagates errors from parsing individual fields.
 fn parse_modality_schema(
     v: &Value,
     key: &str,
@@ -323,9 +336,13 @@ fn parse_modality_schema(
     match v.get(key) {
         None => Ok(ms(modality)),
         Some(obj) => {
-            let fields_arr = match obj.get("fields").and_then(Value::as_array) {
-                Some(a) => a,
+            if !obj.is_object() {
+                return Err(format!("schema.{key} must be a JSON object"));
+            }
+            let fields_arr = match obj.get("fields") {
                 None => return Ok(ms(modality)),
+                Some(Value::Array(a)) => a,
+                Some(_) => return Err(format!("schema.{key}.fields must be an array")),
             };
             let mut fields = Vec::new();
             for f in fields_arr {
@@ -336,6 +353,12 @@ fn parse_modality_schema(
     }
 }
 
+/// Parse a field declaration with a string `name` and a contract-encoded `ty`.
+/// Missing `nullable` defaults to `true` (unknown nullability is treated
+/// conservatively); missing `indexed` defaults to `false`.
+///
+/// Returns an error for a missing or non-string name, a missing type, or a
+/// supplied non-boolean flag, and propagates type parsing errors.
 fn parse_field_def(v: &Value) -> Result<FieldDef, String> {
     let name = v
         .get("name")
@@ -344,8 +367,20 @@ fn parse_field_def(v: &Value) -> Result<FieldDef, String> {
         .to_string();
     let ty_val = v.get("ty").ok_or("field missing 'ty'")?;
     let ty = parse_vql_type(ty_val)?;
-    let nullable = v.get("nullable").and_then(Value::as_bool).unwrap_or(false);
-    let indexed = v.get("indexed").and_then(Value::as_bool).unwrap_or(false);
+    // Missing nullability must not be interpreted as non-null: L3 relies
+    // on this metadata to decide whether an unguarded field is safe.
+    // Preserve explicit false; reject malformed values rather than treating
+    // e.g. "true" or null as false.
+    let nullable = match v.get("nullable") {
+        None => true,
+        Some(Value::Bool(b)) => *b,
+        Some(_) => return Err(format!("field {name:?}: nullable must be a boolean")),
+    };
+    let indexed = match v.get("indexed") {
+        None => false,
+        Some(Value::Bool(b)) => *b,
+        Some(_) => return Err(format!("field {name:?}: indexed must be a boolean")),
+    };
     Ok(FieldDef {
         name,
         ty,
