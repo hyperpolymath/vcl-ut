@@ -8,18 +8,15 @@ directories is intentional; they are not interchangeable copies.
 
 == Canonical project state
 
-* `STATE.a2ml` is the *single canonical project checkpoint*.
+* `.machine_readable/descriptiles/STATE.a2ml` is the *single canonical project checkpoint*.
+  Update this file only; do not create a second STATE checkpoint at the old path.
 * `.machine_readable/6a2/STATE.a2ml` was a byte-identical stale mirror and has
-  been removed. Do not recreate it; update only `STATE.a2ml`.
-* `.machine_readable/descriptiles/` holds `META.a2ml`, `ECOSYSTEM.a2ml`,
-  `AGENTIC.a2ml`, `NEUROSYM.a2ml`, and `PLAYBOOK.a2ml`. The `6a2/` location
-  is retired.
-* `STATE.a2ml` remains here temporarily because
-  `.github/workflows/openssf-compliance.yml` requires this exact path.
-  Moving it to `.machine_readable/descriptiles/STATE.a2ml` requires updating
-  that workflow and the remaining state references together. Until then,
-  Hypatia's `SD004` finding for STATE remains unresolved; do not create a
-  duplicate checkpoint or suppress the finding.
+  been removed. The former `.machine_readable/STATE.a2ml` path is also retired.
+* `.machine_readable/descriptiles/` holds `STATE.a2ml`, `META.a2ml`,
+  `ECOSYSTEM.a2ml`, `AGENTIC.a2ml`, `NEUROSYM.a2ml`, and `PLAYBOOK.a2ml`.
+* `.github/workflows/openssf-compliance.yml`, the Justfile and agent guidance
+  now consume the canonical descriptile path. Hypatia structural-drift rule
+  `SD004` must be rechecked against this move rather than suppressed.
 
 == Contractile locations
 

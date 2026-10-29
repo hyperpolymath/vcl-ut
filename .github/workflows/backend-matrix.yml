@@ -1,25 +1,19 @@
 # SPDX-License-Identifier: MPL-2.0
-# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath)
 #
-# backend-matrix.yml — Per-prover smoke matrix for vcl-ut → echidna wire.
+# backend-matrix.yml — Echidna catalogue validation + real wiremock transport.
 #
-# One matrix job per ProverKind variant. Authoritative list comes from
-# echidna's .machine_readable/provers.a2ml (source-of-truth: the
-# ProverKind enum in echidna/src/rust/provers/mod.rs). The prep job
-# parses provers.a2ml and emits a matrix JSON ephemerally as a GHA
-# output — no committed JSON artefact (memory rule: tools emit A2ML,
-# not JSON).
+# Previously this expanded every entry in echidna's provers.a2ml to a separate
+# Rust job (142 jobs on the 2026-10-29 PR run; max-parallel=3). Each job ran
+# precisely the same wiremock transport suite. ECHIDNA_PROVER was set, but
+# neither the client nor its tests read it. The matrix therefore produced
+# identical evidence many times, at high latency and runner cost.
 #
-# Current scope of per-job work:
-#   - Runs the vcltotal-echidna-client wiremock integration suite
-#     with the target prover slug injected as ECHIDNA_PROVER env.
-#   - When echidna's REST surface expands to all 105 backends (today
-#     it exposes 17), each job can diverge per slug to exercise a
-#     live echidna container. That upgrade is tracked as Package 4
-#     step 7; the matrix shape here is ready for it.
-#
-# Resource budget: max-parallel=3 per the user's standing constraint
-# on parallel subagents / bash invocations applied to CI.
+# Keep the authoritative Echidna prover inventory check. Run the one transport
+# suite once. Do NOT label a mock transport check as per-prover verification.
+# If the client starts consuming ECHIDNA_PROVER, the guard below fails and the
+# real per-prover matrix must be restored, with distinct per-prover assertions
+# (ideally against the live Echidna implementations). Do not bypass the guard.
 
 name: Backend Matrix
 
@@ -30,61 +24,82 @@ on:
     branches: [main, master]
   workflow_dispatch: {}
 
+# Each PR revision supersedes only earlier revisions of the same PR. Pushes
+# to main retain their independent verification history.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
 jobs:
   prep:
-    name: Derive matrix from echidna provers.a2ml
+    name: Validate Echidna prover catalogue
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    outputs:
-      provers: ${{ steps.parse.outputs.provers }}
-      count:   ${{ steps.parse.outputs.count }}
     steps:
       - name: Checkout vcl-ut
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Checkout echidna (authoritative ProverKind source)
+      - name: Checkout Echidna authoritative prover source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: hyperpolymath/echidna
           path: echidna
           fetch-depth: 1
+          persist-credentials: false
 
-      - name: Parse provers.a2ml → matrix JSON (ephemeral GHA output only)
-        id: parse
+      - name: Validate prover slugs from provers.a2ml
         run: |
           set -euo pipefail
           a2ml=echidna/.machine_readable/provers.a2ml
-          test -f "$a2ml"
-          # Extract `slug = "..."` values from each [prover.X] section.
-          # Keep only the slug; nothing else is needed by the matrix yet.
-          slugs=$(grep -E '^slug = ' "$a2ml" | sed -E 's/slug = "(.+)"/\1/')
-          count=$(echo "$slugs" | wc -l | tr -d ' ')
-          # Convert to JSON array for GitHub Actions matrix consumption.
-          # (GHA matrix strategies require JSON; this is runtime
-          # marshalling, not a persisted artefact.)
-          json=$(printf '%s\n' "$slugs" | jq -R . | jq -sc .)
-          echo "provers=$json" >> "$GITHUB_OUTPUT"
-          echo "count=$count"  >> "$GITHUB_OUTPUT"
-          echo "Derived matrix: $count provers"
+          test -s "$a2ml"
+          slugs="$(grep -E '^slug = ' "$a2ml" | sed -E 's/^slug = "(.+)"$/\1/')"
+          count="$(printf '%s\n' "$slugs" | wc -l | tr -d ' ')"
+          if [ "$count" -eq 0 ]; then
+            echo "::error::Echidna prover catalogue contains no slugs"
+            exit 1
+          fi
+          if printf '%s\n' "$slugs" | grep -Ev '^[a-z][a-z0-9_]*$'; then
+            echo "::error::Echidna catalogue contains an invalid slug"
+            exit 1
+          fi
+          declared="$(sed -nE 's/^count[[:space:]]*=[[:space:]]*([0-9]+)$/\1/p' "$a2ml" | head -1)"
+          if [ "$declared" != "$count" ]; then
+            echo "::error::Echidna catalogue count mismatch: declared=$declared parsed=$count"
+            exit 1
+          fi
+          unique="$(printf '%s\n' "$slugs" | sort -u | wc -l | tr -d ' ')"
+          if [ "$count" -ne "$unique" ]; then
+            echo "::error::Echidna prover catalogue contains duplicate slugs"
+            exit 1
+          fi
+          echo "Echidna inventory: $count distinct prover slugs; verified, not individually tested."
 
   smoke:
-    name: Smoke (${{ matrix.prover }})
+    name: Client wiremock transport (prover-independent)
     needs: prep
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      max-parallel: 3
-      matrix:
-        prover: ${{ fromJson(needs.prep.outputs.provers) }}
-    env:
-      ECHIDNA_PROVER: ${{ matrix.prover }}
     steps:
       - name: Checkout vcl-ut
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Assert transport tests remain independent of prover selection
+        run: |
+          set -euo pipefail
+          # If future source/tests begin reading the selector, a single suite
+          # cannot certify them. Fail rather than silently lose coverage.
+          test -d src/interface/echidna-client/src
+          test -d src/interface/echidna-client/tests
+          if grep -RFn 'ECHIDNA_PROVER' \
+               src/interface/echidna-client/src \
+               src/interface/echidna-client/tests; then
+            echo "::error::ECHIDNA_PROVER is now consumed: restore a genuine per-prover test matrix"
+            exit 1
+          fi
+          echo "Prover selector unused; one wiremock transport suite is sufficient."
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
@@ -94,23 +109,10 @@ jobs:
         with:
           shared-key: backend-matrix
 
-      # The vcl-ut workspace has a path-dependency
-      # `echidna-core = { path = "../../../echidna/crates/echidna-core" }`
-      # (src/interface/Cargo.toml), so the whole workspace fails to load
-      # unless echidna is present as a sibling of the checkout. Provide it.
-      - name: Provide echidna sibling (echidna-core path-dependency)
+      # This client is not a root workspace member and depends on Echidna
+      # source as a sibling path-dependency.
+      - name: Provide Echidna sibling for echidna-core path dependency
         run: git clone --depth 1 https://github.com/hyperpolymath/echidna ../echidna
 
-      - name: Client wiremock suite (ECHIDNA_PROVER=${{ matrix.prover }})
-        # `vcltotal-echidna-client` is intentionally NOT a member of the root
-        # workspace (v0.2.0 workspace cleanup: its transitive echidna-core
-        # path-dep breaks standalone CI), so `-p` cannot select it. It is its
-        # own standalone workspace root; run it by manifest path now that the
-        # echidna sibling has been cloned above.
-        # NOTE: echidna-client is a standalone workspace with NO committed
-        # Cargo.lock — its transitive `echidna-core` path-dep only exists once
-        # the sibling is cloned (step above), so a lockfile cannot be committed
-        # and `--locked` can never be satisfied: it fails before the tests even
-        # build ("cannot create the lock file ... because --locked was passed").
-        # Resolve fresh against the just-cloned sibling instead (omit --locked).
+      - name: Client wiremock transport suite
         run: cargo test --manifest-path src/interface/echidna-client/Cargo.toml --tests
