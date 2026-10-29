@@ -3,12 +3,15 @@
 :toc:
 :sectnums:
 
-Status: PROPOSAL / reconnaissance, 2026-10-29. This document does not
-modify the normative L0–L10 safety levels, the source grammar, or the
-VCLW/VCLS/VCLT wire contracts. It proposes a separate programme for
-VCL-UT as an independent language and admission system, not as a
+Status: EXPLORATORY RESEARCH CONTEXT / reconnaissance, 2026-10-29.
+This document does not modify the normative L0–L10 safety levels,
+the source grammar, or VCLW/VCLS/VCLT wire contracts. It explains
+questions motivating several independent language/database experiments,
+not a selected architecture or ordered implementation mandate.
+VCL-UT remains its own language/admission research system, not a
 Hypatia-specific frontend. No type–trope equivalence or general
-triangulation theorem is claimed.
+triangulation theorem is claimed. Its proposed judgements and work items
+are candidates, not architectural decisions.
 
 == Core question
 
@@ -37,6 +40,60 @@ Type formalisms *can* encode individual records and intensional
 distinctions; tropes *can* have rigorous operations and checkers.
 The distinction is about what a judgement asserts and its evidence,
 not that one side is mathematics and the other is metaphor.
+
+== The motivating problem, not a predetermined solution
+
+The owner is exploring **identity and equivalence**, including *synchronic*
+questions (what agrees or counts as the same at a given observational
+cut?) and *diachronic* questions (what survives change of
+representation, algorithm, record, history and authority over time?).
+Different systems are intentionally different probes of this question.
+Nothing requires one global identity type, common coercion language,
+a total hierarchy of kinds of space or a grand unified calculus.
+
+Crucially, *equivalence under a chosen relation* is not automatically
+*identity through a history*. A static equivalence relation can
+identify two presentations at one boundary, while a transition
+requires a directed, evidence-bearing account of what persisted,
+what was intentionally changed, which commitments survived and who
+had authority at each point. Conversely, a continuing service may
+change its future decisions without breaking a narrower contract
+of identity. Proof of either judgement must name its criteria.
+
+[cols="2,2,3,3",options="header"]
+|===
+|Independent project |Identity or equivalence lens |Source-grounded example |Known limit
+|https://github.com/hyperpolymath/firmboot[Firmboot] |Diachronic continuity through live implementation change |Its `PURPOSE.md` explicitly separates synchronic state/history/authority coherence from diachronic observation order, commitments and migration. `SPEC.md` fixes episode IDs and activation ownership |Proved model contracts for known detector versions, not universal equivalence or actual hardware uptime; model-to-live refinement remains open
+|https://github.com/hyperpolymath/lithoglyph[Lithoglyph] |Persistent, reversible and audited database history |Journals, migration artefacts, provenance and schema/version changes remain first-class narrative records |Durability, reversal and versioning alone do not establish numerical identity across arbitrary transformations
+|https://github.com/hyperpolymath/gnpl[GNPL] |Identity of an evidence-grounded account as its evidence and focalisation evolve |Its `docs/THEORY.adoc` distinguishes a projection at time t from the history of changing projections; withdrawal may retract claims and a checked account is indexed by an evidence snapshot |Current kernel handles versioned evidence and withdrawals but lacks a general event-identity/partial-order temporal semantics (`docs/STATE-OF-PLAY.adoc`)
+|https://github.com/hyperpolymath/tangle[Tangle] |Structural equivalence by admissible transformations |General braid/knot language where program equivalence is interpreted through isotopy and loss-bearing closure has an Echo-like account |A domain-specific equivalence model; it does not automatically specify identity for people, records or institutions
+|https://github.com/hyperpolymath/quandledb[QuandleDB] + https://github.com/hyperpolymath/krl[KRL] |Distinguish possible matches, invariants and certified equivalence |Stored knot presentations and invariants yield candidates; intended resolution questions include witnessed isotopy and equivalence |The current `find_equivalent` gives heuristic candidates; `find_path` does not give a checked Reidemeister path; KRL's full resolution proof obligations remain open
+|https://github.com/hyperpolymath/invariant-path[Invariant Path] |Sortal identity across presentations |Separate well-formedness, use-relative warrant and identity/counting; its double-counting attack shows why two apparently independent presentations may be one argument |The three-layer design is accepted, but proof-carrying equivalence/obstruction machinery is not yet implemented
+|===
+
+The distinctions offer **tests of any eventual theory**, not inputs that
+must all be incorporated into VCL-UT. Some useful questions are:
+
+* Can two different presentations be equivalent under a named
+  observer/sortal yet retain separate provenance or numerical identities?
+* Can a single subject persist over time even when its representation,
+  behaviour, effective authority or attached claims change? Which parts
+  of its history are non-negotiable?
+* If account A was warranted at t1 and later retracted at t2, what is
+  the identity of the *account*, the *claim* and the *evidence*? How
+  are event time, admission time and knowledge-revision time separated?
+* When a path is missing, do we mean not-equivalent, no proof found,
+  insufficient evidence, forbidden transformation or the relation is
+  not even defined? These are materially different outcomes.
+* Under what circumstances can multiple views count as independent
+  corroboration, rather than duplicated presentations of one witness?
+
+These questions also connect back to the independent type disciplines:
+linear/affine/immutable/phantom types can maintain tokens or versions;
+epistemic and residual-evidence types can expose what a view warrants;
+trope grades can report alteration of situated particularity; and
+session/choreographic/dyadic types can constrain transitions. None
+of those mechanisms, individually, settles the general identity question.
 
 == Separate objects, not assumed equivalences
 
@@ -145,7 +202,15 @@ These are *open obligations*, not statements of proved results.
 An inability to prove one under current assumptions should be
 reported by its missing premise or countermodel.
 
-== Sensible staged programme
+== Possible experiments (not an agreed sequence)
+
+The following order reflects low-risk experiments *if* VCL-UT adopts
+this line of research. It should not be interpreted as committing
+Firmboot, GNPL, Tangle, QuandleDB, KRL, Haec, Vocarium or Hermeneia
+to VCL-UT's architecture, or as requiring an all-purpose identity
+calculus before doing local correctness work.
+
+=== Earlier draft: a staged programme
 
 . **Vocabulary and discovery (now).** Publish an extensible,
   source-anchored, theorem-aware index of type disciplines and
