@@ -12,7 +12,7 @@ description: |
   automation scripts.
 
 canonical_locations:
-  state: "STATE.a2ml"
+  state: "descriptiles/STATE.a2ml"
   meta: "META.a2ml"
   ecosystem: "ECOSYSTEM.a2ml"
   agentic: "AGENTIC.a2ml"
