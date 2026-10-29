@@ -303,6 +303,9 @@ fn ms(modality: Modality) -> ModalitySchema {
 }
 
 fn parse_schema(v: &Value) -> Result<OctadSchema, String> {
+    if !v.is_object() {
+        return Err("schema must be a JSON object".to_string());
+    }
     Ok(OctadSchema {
         graph: parse_modality_schema(v, "graph", Modality::Graph)?,
         vector: parse_modality_schema(v, "vector", Modality::Vector)?,
@@ -323,9 +326,13 @@ fn parse_modality_schema(
     match v.get(key) {
         None => Ok(ms(modality)),
         Some(obj) => {
-            let fields_arr = match obj.get("fields").and_then(Value::as_array) {
-                Some(a) => a,
+            if !obj.is_object() {
+                return Err(format!("schema.{key} must be a JSON object"));
+            }
+            let fields_arr = match obj.get("fields") {
                 None => return Ok(ms(modality)),
+                Some(Value::Array(a)) => a,
+                Some(_) => return Err(format!("schema.{key}.fields must be an array")),
             };
             let mut fields = Vec::new();
             for f in fields_arr {
@@ -344,8 +351,20 @@ fn parse_field_def(v: &Value) -> Result<FieldDef, String> {
         .to_string();
     let ty_val = v.get("ty").ok_or("field missing 'ty'")?;
     let ty = parse_vql_type(ty_val)?;
-    let nullable = v.get("nullable").and_then(Value::as_bool).unwrap_or(false);
-    let indexed = v.get("indexed").and_then(Value::as_bool).unwrap_or(false);
+    // Missing nullability must not be interpreted as non-null: L3 relies
+    // on this metadata to decide whether an unguarded field is safe.
+    // Preserve explicit false; reject malformed values rather than treating
+    // e.g. "true" or null as false.
+    let nullable = match v.get("nullable") {
+        None => true,
+        Some(Value::Bool(b)) => *b,
+        Some(_) => return Err(format!("field {name:?}: nullable must be a boolean")),
+    };
+    let indexed = match v.get("indexed") {
+        None => false,
+        Some(Value::Bool(b)) => *b,
+        Some(_) => return Err(format!("field {name:?}: indexed must be a boolean")),
+    };
     Ok(FieldDef {
         name,
         ty,
