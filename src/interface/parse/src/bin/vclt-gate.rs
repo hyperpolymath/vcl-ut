@@ -302,6 +302,11 @@ fn ms(modality: Modality) -> ModalitySchema {
     }
 }
 
+/// Parse a v1 JSON schema into the fixed eight modality slots, leaving omitted
+/// slots with empty field lists and ignoring unrecognised keys.
+///
+/// Returns an error for a non-object schema or propagates a modality or field
+/// parsing error. The gate caller reports these errors as `bad_schema` (exit 2).
 fn parse_schema(v: &Value) -> Result<OctadSchema, String> {
     if !v.is_object() {
         return Err("schema must be a JSON object".to_string());
@@ -318,6 +323,11 @@ fn parse_schema(v: &Value) -> Result<OctadSchema, String> {
     })
 }
 
+/// Parse `v[key]` as the schema for `modality`, retaining the declared field order.
+/// A missing key or missing `fields` property yields an empty field list.
+///
+/// Returns an error if a supplied slot is not an object or its `fields` is not
+/// an array, and propagates errors from parsing individual fields.
 fn parse_modality_schema(
     v: &Value,
     key: &str,
@@ -343,6 +353,12 @@ fn parse_modality_schema(
     }
 }
 
+/// Parse a field declaration with a string `name` and a contract-encoded `ty`.
+/// Missing `nullable` defaults to `true` (unknown nullability is treated
+/// conservatively); missing `indexed` defaults to `false`.
+///
+/// Returns an error for a missing or non-string name, a missing type, or a
+/// supplied non-boolean flag, and propagates type parsing errors.
 fn parse_field_def(v: &Value) -> Result<FieldDef, String> {
     let name = v
         .get("name")
