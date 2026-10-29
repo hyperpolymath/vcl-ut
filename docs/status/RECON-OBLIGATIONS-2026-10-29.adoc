@@ -40,7 +40,15 @@ be checked against pinned CI before upgrading any `REPORTED` status to
   a mutation lacks a proof, `execute_insert/update/delete` uses
   `{:ok, []}`. This is an *integration contract gap*, not a VCL-UT theorem.
 
-== Safety level matrix
+== Current VCL-UT gate matrix (NOT a ceiling on type systems)
+
+This L0–L10 is the existing, fixed *VCL-UT query safety / wire
+compatibility* numbering. It is NOT the Kategoria 1–10 language-feature
+taxonomy, is NOT the TypeLL 1–10 property numbering, and does NOT mean that
+VCL-UT as a research programme ends at epistemic safety. The matrix below
+is an audit of *today's certified decision predicates and their source
+reachability*, not a catalogue of the strongest types VCL-UT may eventually
+express.
 
 `Proved` here means proof of the *specified predicate* as reported in
 the checked Idris2 corpus, NOT the colloquial force of a level's name.
@@ -68,6 +76,59 @@ and larger expressive surface than the executable parser. The separate
 VeriSimDB parser supports PROOF syntax not accepted by this gate.
 L7–L10 may be reachable by constructing `Statement` values through
 other interfaces; this is not evidence that ordinary source reaches them.
+
+== Kategoria and the open-ended advanced-type programme
+
+The actual reference is
+https://github.com/hyperpolymath/kategoria[Kategoria], especially
+`README.adoc`, `ROADMAP.adoc`,
+`routes/alpha-extend/README.adoc` and
+`routes/delta-aggregate/TYPELL-BRIDGE.adoc`.
+Kategoria's first ten *type-theoretic capabilities* are basic types,
+ADTs, polymorphism, type classes, GADTs, dependent types, linear types,
+refinements, session types, and cubical/homotopy types. These are
+*not* VCL-UT safety levels. Its ten items are a first working taxonomy,
+not a theorem establishing that all type systems fit one total chain.
+
+The TypeLL bridge explicitly documents the collision between the
+Kategoria level numbers and TypeLL's distinct, query-oriented safety
+numbers. In VCL-UT the compatibility-critical gate levels are *L0–L10*,
+with `L10 EpistemicSafe`; in Kategoria `L10` concerns cubical types.
+The similarity of ordinal names does not imply equal meanings,
+correspondence, or capability. Crosswalks must map actual mechanisms to
+specific proof obligations, with no inferred one-to-one alignment.
+
+Kategoria tests five research routes: alpha (extend Idris2), beta
+(dyadic type-checker split), gamma (independent checking aspects), delta
+(cross-language/prover bridge) and epsilon (new unified calculus).
+Its documented cubical wall is specific to route alpha's Idris2/QTT
+foundation, not a proof of universal impossibility. Its candidates for
+work *beyond the first ten* include graded, effect, modal, directed,
+capability, observational-equality, sized and gradual types. Some
+are orthogonal alternatives or different kinds of guarantee rather
+than numerically ordered successors. No future Kategoria or VCL-UT
+L11+ wire tags are defined here.
+
+[cols="2,3,3",options="header"]
+|===
+|Advanced mechanism |Potential independent VCL-UT application |Required evidence before claiming protection
+|Graded / quantitative / linear types |State-indexed consumption budgets, evidence or authority attenuation |Preservation across parsing, lowering, runtime and retries; no resource duplication
+|Algebraic effect and capability types |Authority- and effect-indexed admissibility for mutations, verification and federation |Actual operation effects and principal permissions must refine the declared type/effect context
+|Session, choreographic and directed types |Typed multi-party operations, merge/split/federation protocols |Protocol projection, non-forgeable identities, execution fidelity and failure semantics
+|Modal, temporal and epistemic types |Separate belief, verification, knowledge, disclosure and time-indexed evidence |Explicit sound warrants, independent evidence, trusted clock/source and authenticated provenance
+|Cubical / higher-dimensional / observational equality |Investigate identity-preserving equivalence and transport across representations |Specify identity/equivalence model and prove bridge correctness in an appropriate kernel; do not equate isomorphism with factual identity
+|Sized / total and gradual typing |Terminating proof sublanguages; guarded typed/untyped consumer interoperability |Decidable elaboration or runtime blame/error safety with explicit unchecked regions
+|===
+
+Research progression is therefore an *open, multi-axis assurance
+programme*, not simply 'pass L10, then increment the level number'.
+Each proposal needs a typed source construct, semantics, decidable or
+bounded checker where applicable, a proof statement and assumptions,
+source-to-IR preservation, independent runtime enforcement (or an
+explicit external-evidence contract), and a negative test.
+The existing normative L0–L10 discriminants remain stable. Any future
+extensions must be independently specified and versioned, with no
+silent reinterpretation of old safety levels.
 
 == Proof-obligation register
 
@@ -159,7 +220,10 @@ P2 (cross-language / theorem reuse): establish checker correspondence beyond
 golden fixtures, schema-binding and TOCTOU invariants, evidence
 authentication, provenance descent, causal witness independence,
 and Grade/session preservation. Consider ProofTransport and JanusKey as
-first proof bridge experiments, with actual assumptions exposed.
+first proof bridge experiments, with actual assumptions exposed. Map
+these against Kategoria's five alternative routes and TypeLL's
+mechanism/property bridge; the existing VCL-UT L0–L10 matrix is only a
+current implementation slice, NOT the extent of research into high-end types.
 
 P3 (maturity): incremental check caching keyed by versioned schema,
 subject identity, operation, evidence hash and verifier version,
