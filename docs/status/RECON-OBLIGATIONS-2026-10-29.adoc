@@ -120,6 +120,13 @@ L11+ wire tags are defined here.
 |Sized / total and gradual typing |Terminating proof sublanguages; guarded typed/untyped consumer interoperability |Decidable elaboration or runtime blame/error safety with explicit unchecked regions
 |===
 
+For the separate ontological and language-design implications of type
+families, tropes, sortal identity, occupancy, and identity across
+context/time/modality spaces, see
+link:../research/TYPE-TROPE-IDENTITY-SPACES.adoc[Types, tropes and
+identity across spaces]. That research direction does *not* assume a
+proved equivalence, triangulation, or universal coercion between them.
+
 Research progression is therefore an *open, multi-axis assurance
 programme*, not simply 'pass L10, then increment the level number'.
 Each proposal needs a typed source construct, semantics, decidable or
