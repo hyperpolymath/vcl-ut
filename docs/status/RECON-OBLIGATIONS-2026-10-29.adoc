@@ -1,0 +1,179 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= VCL-UT reconnaissance: source-to-proof obligations and independent consumers
+:toc:
+:sectnums:
+
+Status: source-inspected 2026-10-29, BASE `main@ada2e7994632c35c9f46346acb41d84408fab4a0`.
+This is an *obligation register*, NOT a claim that the complete architecture or
+every proof has been independently reproduced. Runtime and formal builds must
+be checked against pinned CI before upgrading any `REPORTED` status to
+`REPRODUCED`. This document is independent of the Hypatia roadmap.
+
+== As-built slices inspected
+
+* The Rust source boundary is `src/interface/parse/src/{lexer,parser,ast,decider,wire}.rs`;
+  `src/interface/parse/src/bin/vclt-gate.rs` is the JSON/exit-code front door.
+  `parse_op` distinguishes relational `Query` from `Transit`; `parse`
+  deliberately remains query-only.
+* The Idris2 corpus `src/core/{Grammar,Schema,Decide,Levels,Checker,
+  Composition,Epistemic,Transition}.idr` and
+  `src/interface/{WireDecode,WireConformance}.idr` is built by
+  `verification/proofs/vclut-core.ipkg`, gated by
+  `.github/workflows/proof-corpus.yml` (Idris2 0.8.0 plus escape scan).
+  Its Foreign/legacy Foreign modules are excluded from this package.
+* `VCLW` (statement), `VCLS` (fixed octad schema), and `VCLT` (operation)
+  are distinct versioned wire formats; the immutable tags are specified in
+  `src/interface/parse/WIRE-FORMAT.adoc`. Cross-language correspondence is
+  pinned on concrete golden vectors, not proved universally for arbitrary
+  Rust byte strings.
+* The principal runtime gate computes a Rust recomputation of predicates.
+  It does NOT call Idris2 per request. The signed-attestation and wasm
+  boundaries are separately described in the canonical
+  `verification/proofs/VERIFICATION-STANCE.adoc`; the attestation and
+  recomputation tiers must not be confused with a proof of real-world evidence.
+* The top-level `vcl-total` Rust crate and the standalone
+  `src/interface/parse` workspace are different build artefacts. The
+  historical name is retained in crate, module and wire compatibility
+  terminology. VCL-UT is the independent research/system identity.
+* VeriSimDB's Elixir `VCLExecutor` and `VCLTGate` are distinct consumers.
+  `VCLExecutor.gate_check` explicitly skips INSERT/UPDATE/DELETE; if
+  a mutation lacks a proof, `execute_insert/update/delete` uses
+  `{:ok, []}`. This is an *integration contract gap*, not a VCL-UT theorem.
+
+== Safety level matrix
+
+`Proved` here means proof of the *specified predicate* as reported in
+the checked Idris2 corpus, NOT the colloquial force of a level's name.
+`Source` records ordinary `parse_op` reachability. The Rust
+`Statement`/wire data type can represent some fields that source cannot.
+
+[cols="1,2,3,2,4",options="header"]
+|===
+|Level |Name |Rust predicate |Source |Meaning / limitation
+|L0 |ParseSafe |Lex and parse |YES |Syntax only
+|L1 |SchemaBound |Field references resolve |YES |Schema identity/authenticity external
+|L2 |TypeCompat |WHERE comparisons compatible |INDIRECT |Unknown `TAny` permitted; HAVING and subquery scope need scrutiny
+|L3 |NullSafe |Syntactic set of null guards |INDIRECT |Logical dominance/branch-sensitive safety not established
+|L4 |InjectionProof |No string literal in WHERE |YES |Not arbitrary execution/injection freedom
+|L5 |ResultTyped |SELECT items resolve beyond TAny |INDIRECT (through L6) |Not a universal runtime result type theorem
+|L6 |CardinalitySafe |LIMIT is present |YES |No independent cardinality checking
+|L7 |EffectTracked |Effect declaration present |NO |Parser rejects EFFECTS
+|L8 |TemporalSafe |Version constraint present |NO |Parser rejects AT
+|L9 |LinearSafe |UseOnce / Bounded annotation |NO |Parser rejects USAGE/CONSUME
+|L10 |EpistemicSafe |Nonempty declared agents; direct 2-cycle exclusion |NO |Parser rejects EPISTEMIC/modal clauses; not knowledge veridicality
+|===
+
+The historical `docs/vcl-total-grammar.ebnf` has a different vocabulary
+and larger expressive surface than the executable parser. The separate
+VeriSimDB parser supports PROOF syntax not accepted by this gate.
+L7–L10 may be reachable by constructing `Statement` values through
+other interfaces; this is not evidence that ordinary source reaches them.
+
+== Proof-obligation register
+
+Status key: `REPORTED` = named Idris proof/CI gate exists; not
+independently re-run in this audit. `PARTIAL` = a smaller formal
+predicate has a proof but the stronger property does not.
+`OPEN` = no matching end-to-end proof identified.
+`EXTERNAL` = requires runtime/world evidence, not a theorem alone.
+
+[cols="1,3,4,2,3",options="header"]
+|===
+|ID |Obligation (assumptions explicit) |Current location / status |Test link |Consequence if unproved
+|V-01 |For every accepted source string x, `parse_op x` yields precisely a grammar-valid operation with no silently discarded clause |Rust parser + `Grammar.idr`; OPEN universal parser-refinement proof |parse.rs, gate.rs, negative clauses |Accepted syntax escapes checker or misinterprets obligations
+|V-02 |If `certifiedLevel(s,S)=k`, every `P_i(s,S)` for `1≤i≤k` holds |Checker.certifyAt/certifyRequested and L1–L10 soundness; REPORTED for predicates |proof-corpus.yml, conformance_emit.rs |False safety-level claims
+|V-03 |Supplied schema accurately describes runtime field types, nullability, version and intended subject |Schema.idr and gate JSON boundary; EXTERNAL |schema-boundary regression PR #131 |Invalid evidence is upgraded into L1–L5 safety
+|V-04 |For any well-typed operation, evaluation preserves the typing invariant and cannot get stuck except in declared error states |Level/checker predicates versus actual engine execution; OPEN |cross-language E2E incomplete |Type-sound source still fails at runtime
+|V-05 |For any consumer identity and state, an admitted write has authenticated authority, a valid scope and a non-replayed authorization |No authority context in gate request; EXTERNAL |consumer contract required |Unauthorized identity mutation
+|V-06 |Effects realised by evaluation are a subset of declared + authorised effects |L7 merely checks `Some(effect_decl)`; OPEN |L7 unreachable from source |Effect declaration is misrepresented as enforcement
+|V-07 |Linear/session resources are neither duplicated nor used beyond an authorised grade |L9 checks annotation shape; OPEN |L9 unreachable from source |Double spend/replay/invalid session transition
+|V-08 |Version guard and committed state are checked together, without TOCTOU; retraction/tombstone lineage is preserved |L8 checks presence of constraint; OPEN |VeriSimDB transition tests required |Stale/replayed operations, lost provenance
+|V-09 |For MERGE/SPLIT/NORMALISE, source and target identities are live, permissions hold, provenance descends correctly, and modality authority is valid |Transition.idr proves structural distinctness + evidence predicates only; PARTIAL |gate.rs S2 fixtures, wire golden vectors |Incorrect identity merge/split/repair
+|V-10 |For claim C, a verifier-certified artifact with trusted meaning map proves C; a receipt or bare warrant never proves C |VCL's proof attachment is not runtime verified by gate; OPEN / EXTERNAL |epistemic-types ProofTransport model is a bridge candidate |Evidence laundering into false factual assertions
+|V-11 |Independent witnesses do not secretly share causal ancestry or reused evidence when claimed independent |No witness-independence mechanism proven; OPEN / EXTERNAL |residual-evidence-types examples are candidate |Correlated witnesses counted as independent
+|V-12 |All accepted wire images round-trip and any invalid image is rejected without unsafe interpretation |Rust wire property tests; Idris `WireConformance` concrete golden Refl checks; PARTIAL for universal correspondence |wire.rs tests, proof-corpus.yml |Cross-language mismatch or forged certificate
+|V-13 |The actual VeriSimDB mutating entrypoint invokes required authorization, proof, gate and transaction checks on every path |VCLExecutor.gate_check skips mutations, missing proof passes; OPEN |consumer E2E tests |Safety gate is not an actual write guard
+|===
+
+== Semantic contradictions / gaps to track
+
+. `InjectionProof` names a narrow predicate, `!where_has_string_lit`.
+  A raw string in HAVING is outside that check. Parameters are `TAny`
+  for the recompute wire domain, so L2 comparison typing is weaker than
+  resolved literal/parameter typing. Preserve the normative L4 predicate
+  while designing a distinct, stronger safety condition; do not silently
+  redefine L4.
+. `NullSafe` is a set-of-guards test, not flow-sensitive dominance. In
+  `GRAPH.x = NULL OR GRAPH.x > 0` the guard is collected globally.
+  A preservation/safety theorem for this syntactic heuristic must not be
+  assumed.
+. `linearEnforced` and `epistemicConsistentStmt` certify limited shapes:
+  a resource annotation and a direct two-cycle check are not resource
+  accounting or general acyclicity, let alone real-world warrant.
+. The normalisation syntax carries a `RepairJustification` tag but does
+  not carry an authenticated proof that the selected modality is present
+  or authoritative.
+. The proof corpus is an intentionally narrow TCB model. No proof here
+  establishes an authentic schema, clock, principal, physical witness,
+  cryptographic primitive or correct side effects of the production store.
+. Executable grammar, historical EBNF, Elixir/ReScript VCL and the wire
+  AST are different language surfaces. Freeze compatibility effects and
+  map each before extending syntax.
+
+== Mathesis candidates (source reviewed, not imported)
+
+`mathesis` currently indexes repositories and proof-source counts. Its
+atlas is not a theorem-level proof registry, so names below refer to
+their home repositories and *not* a Mathesis endorsement of theorem status.
+
+[cols="2,3,3",options="header"]
+|===
+|Source |Candidate bridge |Work required
+|epistemic-types / Warrant.agda + ProofTransport.agda |Warrant tokens do not imply their claims; checked proof status entails caller-defined `Meaning` only with a sound verifier |Formal map `VCL evidence → ProofTransport artifact`, with holder, claims and verifier assumptions explicit; Agda-to-Idris port/reproof
+|residual-evidence-types / Finite/Soundness.agda |Finite evidence verdicts distinguish entailment, refutation, non-identification and inconsistency under explicit assumptions |Define identity witnesses and scopes; do not generalise bounded finite model to all real evidence
+|januskey / TransactionAtomicity.agda |Conditional rollback restoration, lifecycle invariant and irreversibility handling |Translate identity transition state machine; commit atomicity and external side-effects need separate premise
+|marches / Cut.lean + Provenance.lean |Acyclic cut/frontier, compositional path provenance and no-reentry under explicit hypotheses |Bridge network-path semantics to VCL federated proof transports, not a direct theorem reuse
+|tropical-types / TropicalSessionTypes.lean |Resource composition and graded session costs, including parallel bottleneck |Define actual VCL resource algebra; demonstrate preservation from source to runtime
+|absolute-zero / active CNO and OND models |Separate null state effect from null disclosure under a declared observer model |Useful for refusal, failed verification and side-channel/observability contracts; does not prove real I/O non-disclosure
+|jtv-halting-islands-ct / GRAMMAR.ebnf |Closed total DATA sublanguage separated from Turing-complete CONTROL |Candidate terminating sublanguage for proof expressions; grammar alone is not general termination of VCL
+|typell / src/abi/{Soundness,InferenceSoundness,LevelMonotonicity}.idr |STLC progress/preservation and formal hierarchy model |Prove a semantics-preserving interpretation from actual VCL rather than import an unrelated theorem statement
+|trope-checker / TB.Honest.agda and Idris2 checker |Honest generation: a grade assembled from allowed moves never reaches falsified/misbound/conflated states; a language-neutral IR and executable reference checker |Define a VCL-specific loss/bearer/provenance lowering and discharge its faithfulness; this is not real-world veridicality
+|echo-types / EchoProvenance.agda and EchoJanusBridge.agda |Retained fibres distinguish collapsed identity/provenance; bridges to reversibility |Bridge subject identity and witness-preserving projections; check actual module statements and independent compilation
+|nextgen-databases / typeql-experimental |Prototype Idris2 syntax for linear usage, session states, effects and proof attachment |Do NOT import as a verified VCL-UT implementation: Checker checks clause presence/shape, Linear/Session model abstract handles, and ProofCarrying.MkProved accepts any theorem tag without a proof witness
+|===
+
+== Priority and independent consumer handover
+
+P0 (engine and boundary): close bad schema metadata (VCL-UT PR #131),
+make actual gate and parser semantics explicit, block missing-proof write
+execution where policy requires proofs, and require authenticated
+authorization/identity state checks before all mutations. Consumer changes
+belong in VeriSimDB, not this language repo.
+
+P1 (language and proof): separate predicate soundness from true execution
+preservation; test HAVING, subquery, null-guard and unknown-type gaps;
+add fail-closed source syntax for L7–L10 *only* with sound contextual
+checking, not merely by parsing their existing AST variants.
+
+P2 (cross-language / theorem reuse): establish checker correspondence beyond
+golden fixtures, schema-binding and TOCTOU invariants, evidence
+authentication, provenance descent, causal witness independence,
+and Grade/session preservation. Consider ProofTransport and JanusKey as
+first proof bridge experiments, with actual assumptions exposed.
+
+P3 (maturity): incremental check caching keyed by versioned schema,
+subject identity, operation, evidence hash and verifier version,
+with revocation on any dependent change; measured performance and
+per-consumer readiness classes.
+
+The contract to a consumer is narrow: `admissible=true` attests successful
+execution of the configured *static decision predicates on the supplied
+syntax and schema*, not that a proposed state mutation is safe to commit.
+An engine must independently authenticate principal and source data,
+validate provenance and witnesses, enforce temporal/version and resource
+constraints, and perform state transitions atomically. If any required
+evidence is missing or a verifier is unavailable, fail closed.
+
+This register must be updated per theorem with exact proof statement,
+required premises, checker invocation and a reproducible CI receipt before
+any item is promoted to fully verified production assurance.
