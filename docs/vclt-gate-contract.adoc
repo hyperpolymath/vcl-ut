@@ -243,6 +243,27 @@ Until the producer publishes a schema-emit helper, the consumer MAY send no
 `schema` (empty schema, schema-dependent levels fail closed) — this is the
 honest conservative default, not a silent pass.
 
+=== JSON schema metadata fail-closed rules
+
+A supplied `schema` MUST be an object. Present modality slots MUST be
+objects; their `fields` property, when present, MUST be an array. Each
+field requires a string `name` and valid `ty`. A missing `nullable`
+means *unknown nullability*, conservatively represented as `true` for
+L3 `NullSafe`; explicit `nullable: false` is the only assertion that a
+field is non-null. A supplied `nullable` MUST be boolean. Similarly,
+`indexed` defaults to `false` if absent and MUST be boolean if supplied.
+
+Malformed metadata produces a `bad_schema` gate error (exit 2); it MUST
+NOT be silently replaced by non-null field metadata. An omitted modality
+slot still maps to an empty slot under the fixed eight-slot v1 schema,
+without implying that the modality is absent from an identity.
+
+These rules interpret previously underspecified optional JSON metadata
+conservatively; they do not change the binary `VCLS` wire representation,
+the safety-level predicates or their tags. Consumers that omitted
+`nullable` for known non-null fields should now supply an explicit
+`nullable: false` (after validating that premise).
+
 == Exit codes
 
 [cols="1,2,4"]
