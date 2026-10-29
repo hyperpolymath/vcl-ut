@@ -1,0 +1,247 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= Research direction: types, tropes and identity across spaces
+:toc:
+:sectnums:
+
+Status: EXPLORATORY RESEARCH CONTEXT / reconnaissance, 2026-10-29.
+This document does not modify the normative L0–L10 safety levels,
+the source grammar, or VCLW/VCLS/VCLT wire contracts. It explains
+questions motivating several independent language/database experiments,
+not a selected architecture or ordered implementation mandate.
+VCL-UT remains its own language/admission research system, not a
+Hypatia-specific frontend. No type–trope equivalence or general
+triangulation theorem is claimed. Its proposed judgements and work items
+are candidates, not architectural decisions.
+
+== Core question
+
+A subject can have representations, occupy roles, hold capabilities,
+instantiate properties, participate in protocols, persist through time
+and be described by different witnesses. These are not one kind of
+identity claim. Their legitimate operations, equivalence criteria,
+evidence and proof obligations can differ. The relevant research
+question is: **when may a proposition or transition cross between
+those spaces without conflating distinct identities or inventing
+authority, evidence or preserved particularity?**
+
+Do not equate:
+
+* equality of values with numerical identity of particulars;
+* equality of type inhabitants with identity of bearers;
+* structural compatibility with authority to occupy a role;
+* membership of a protocol state with permission to act;
+* identical observations with identical origins;
+* two compatible witnesses with causally independent witnesses;
+* retrieval, interpretability or loss-relative licensing with real-world truth;
+* two presentations meeting a sortal criterion with an unconditional,
+  global equivalence relation.
+
+Type formalisms *can* encode individual records and intensional
+distinctions; tropes *can* have rigorous operations and checkers.
+The distinction is about what a judgement asserts and its evidence,
+not that one side is mathematics and the other is metaphor.
+
+== The motivating problem, not a predetermined solution
+
+The owner is exploring **identity and equivalence**, including *synchronic*
+questions (what agrees or counts as the same at a given observational
+cut?) and *diachronic* questions (what survives change of
+representation, algorithm, record, history and authority over time?).
+Different systems are intentionally different probes of this question.
+Nothing requires one global identity type, common coercion language,
+a total hierarchy of kinds of space or a grand unified calculus.
+
+Crucially, *equivalence under a chosen relation* is not automatically
+*identity through a history*. A static equivalence relation can
+identify two presentations at one boundary, while a transition
+requires a directed, evidence-bearing account of what persisted,
+what was intentionally changed, which commitments survived and who
+had authority at each point. Conversely, a continuing service may
+change its future decisions without breaking a narrower contract
+of identity. Proof of either judgement must name its criteria.
+
+[cols="2,2,3,3",options="header"]
+|===
+|Independent project |Identity or equivalence lens |Source-grounded example |Known limit
+|https://github.com/hyperpolymath/firmboot[Firmboot] |Diachronic continuity through live implementation change |Its `PURPOSE.md` explicitly separates synchronic state/history/authority coherence from diachronic observation order, commitments and migration. `SPEC.md` fixes episode IDs and activation ownership |Proved model contracts for known detector versions, not universal equivalence or actual hardware uptime; model-to-live refinement remains open
+|https://github.com/hyperpolymath/lithoglyph[Lithoglyph] |Persistent, reversible and audited database history |Journals, migration artefacts, provenance and schema/version changes remain first-class narrative records |Durability, reversal and versioning alone do not establish numerical identity across arbitrary transformations
+|https://github.com/hyperpolymath/gnpl[GNPL] |Identity of an evidence-grounded account as its evidence and focalisation evolve |Its `docs/THEORY.adoc` distinguishes a projection at time t from the history of changing projections; withdrawal may retract claims and a checked account is indexed by an evidence snapshot |Current kernel handles versioned evidence and withdrawals but lacks a general event-identity/partial-order temporal semantics (`docs/STATE-OF-PLAY.adoc`)
+|https://github.com/hyperpolymath/tangle[Tangle] |Structural equivalence by admissible transformations |General braid/knot language where program equivalence is interpreted through isotopy and loss-bearing closure has an Echo-like account |A domain-specific equivalence model; it does not automatically specify identity for people, records or institutions
+|https://github.com/hyperpolymath/quandledb[QuandleDB] + https://github.com/hyperpolymath/krl[KRL] |Distinguish possible matches, invariants and certified equivalence |Stored knot presentations and invariants yield candidates; intended resolution questions include witnessed isotopy and equivalence |The current `find_equivalent` gives heuristic candidates; `find_path` does not give a checked Reidemeister path; KRL's full resolution proof obligations remain open
+|https://github.com/hyperpolymath/invariant-path[Invariant Path] |Sortal identity across presentations |Separate well-formedness, use-relative warrant and identity/counting; its double-counting attack shows why two apparently independent presentations may be one argument |The three-layer design is accepted, but proof-carrying equivalence/obstruction machinery is not yet implemented
+|===
+
+The distinctions offer **tests of any eventual theory**, not inputs that
+must all be incorporated into VCL-UT. Some useful questions are:
+
+* Can two different presentations be equivalent under a named
+  observer/sortal yet retain separate provenance or numerical identities?
+* Can a single subject persist over time even when its representation,
+  behaviour, effective authority or attached claims change? Which parts
+  of its history are non-negotiable?
+* If account A was warranted at t1 and later retracted at t2, what is
+  the identity of the *account*, the *claim* and the *evidence*? How
+  are event time, admission time and knowledge-revision time separated?
+* When a path is missing, do we mean not-equivalent, no proof found,
+  insufficient evidence, forbidden transformation or the relation is
+  not even defined? These are materially different outcomes.
+* Under what circumstances can multiple views count as independent
+  corroboration, rather than duplicated presentations of one witness?
+
+These questions also connect back to the independent type disciplines:
+linear/affine/immutable/phantom types can maintain tokens or versions;
+epistemic and residual-evidence types can expose what a view warrants;
+trope grades can report alteration of situated particularity; and
+session/choreographic/dyadic types can constrain transitions. None
+of those mechanisms, individually, settles the general identity question.
+
+== Separate objects, not assumed equivalences
+
+[cols="2,3,3",options="header"]
+|===
+|Kind of judgement |Example question |Primary existing home
+|Typed admissibility / capability |Does the source term inhabit the declared type, and is this effect or resource use allowed? |Kategoria, TypeLL, VCL-UT
+|Particularity / bearer |Is this the *same situated property-instance*, preserving bearer, context and history under a transformation? |trope-particularity-workbench, trope-checker, Haec
+|Storage / warrant-relative use |What is stored, what did a transformation lose, and does the use-specific floor license this invocation? |Vocarium + Hermeneia
+|Sortal identity across presentations |What *criterion of identity and counting* lets us identify these as the same argument? |invariant-path (sortal layer, accepted ADR-0001)
+|Epistemic standpoint |Who has which proof-relevant evidence, and what extra soundness premise makes it a factive warrant? |epistemic-types, residual-evidence-types
+|Information-loss / representation |Which origins remain compatible after projection? |echo-types
+|Live resource occupancy |What is the maximal live-state footprint under concurrency and reclamation? |occupancy-types
+|Institutional/role occupancy |Which occupant can legitimately exercise which normative position at time t? |Separate research obligation; NOT implied by occupancy-types' memory model
+|Temporal / provenance identity |What still exists, what survives a merge or split, and which provenance descendants exist? |VeriSimDB lifecycle; VCL-UT's current transition obligations
+|===
+
+In particular, `occupancy-types` currently concerns resource/high-water-mark
+occupancy. It should not be silently treated as a proof of legitimacy
+for occupants of institutional positions.
+
+A possible *research* judgement (notation illustrative, NOT an existing
+VCL-UT syntax or new type constructor) is:
+
+----
+Γ ; sortal S ; context C ; time t ; evidence E
+  ⊢ representation r : T
+  ⊢ particular p borne-by b in C
+  ⊢ bridge(r,p) : admissible under obligation O and warrant E
+----
+
+The bridge is a *partial and potentially many-to-many, direction-sensitive
+relation*, not an assumed coercion or equivalence. A concrete bridge
+must say exactly what it preserves and what it forgets, and name the
+sortal and observer when identity claims are involved. A sortal may
+supply criteria of identity and counting without being identical to
+a type or a trope.
+
+== Wider type-discipline estate: sampled implementation status
+
+The first ten Kategoria *type-feature* labels and the VCL-UT
+*query-safety* L0–L10 labels use different numberings. Neither caps
+VCL-UT research. `echidna/docs/architecture/TYPE-DISCIPLINE-EMBEDDING.adoc`
+registers a larger set of disciplines; its detector and dispatch are
+not themselves formal enforcement receipts.
+
+[cols="2,3,3",options="header"]
+|===
+|Discipline / cluster |Evidence inspected |Potential VCL-UT role and unproved gap
+|Parametric polymorphism |Kategoria `routes/alpha-extend/Level03_Polymorphism.idr`; TypeLL |Reusable generic inference; formal free-theorem/parametricity obligations differ from mere polymorphic syntax
+|Phantom / indexed / nominal |Ephapax phantom examples; ECHIDNA taxonomy; Kategoria GADTs and dependent types |Distinguish unforgeable subject or schema tags and typed identities; phantom labels alone do not authenticate a subject
+|Immutability / uniqueness / affine / linear |ECHIDNA taxonomy; Ephapax; Idris2 QTT |Versioned state and resource ownership; distinguish immutable value, binding, reference, snapshot and persistent historical identity
+|Dyadic |Ephapax linear/affine architecture; Echo `Dyadic.agda`; KitchenSpeak's tensor/binding example |Do not merge unrelated dyadic meanings: two-party interaction, two-mode usage, and irreversible material binding have different properties
+|Ceremonial / contextual |KitchenSpeak `COMMENTARY.adoc` contextual/ambient effect semantics; ECHIDNA `Ceremonial` detector but no dedicated ProverKind |Context-qualified protocol obligations, role permission and social pacing; no general VCL-UT ceremonial checker exists
+|Echo / epistemic / residual evidence |Independent Agda projects with scoped formal cores |Identity fibres, evidence and witness/non-identification; require source-to-checker and real-world warrant bridges
+|Tropical / graded / choreographic / occupancy |Dedicated Lean/Agda formal models and resource algebra; `occupancy-types` operational model |Distinct cost, occupancy and trace semantics; no implicit exchange of resource measures
+|Secret / capability / effect / session |secret-types noninterference fragment; ECHIDNA taxonomy; TypeLL |Prove actual allowed flows, effects, protocol transitions, privileges and declassification conditions
+|Sortal criteria / representation |invariant-path ADR-0001 and its recorded open proof debt |Check whether a presentation is the same argument under a stated sortal; formal move/quotient/equivalence certificate is not yet established
+|Trope particularity / graded transformation |trope-checker calculus and checked honesty fragment; Haec lowering design |Loss-relative use judgments are formal, but faithful lowering and real-world veridicality remain independent obligations
+|===
+
+No claim is made that this is an exhaustive type taxonomy. Additional
+candidates include higher-kinded, row, intersection, union, relevant,
+ordered, bunched, refinement, Hoare, sized, gradual, cubical,
+modal, deontic and observational-equality formalisms. Entries
+must be classified by *mechanism*, *judgement*, *space*, *proof*, and
+*operational enforcement*, not pushed into an invented L11+ ordering.
+
+== The trope programme is already formal, not decorative
+
+`trope-checker` has a typed IR and graded operation calculus with
+Idris2 reference checking; its Agda `TB.Honest` development shows that
+the specified honest constructors/composition do not generate
+deceptive grades. `Haec` records separate lowering-correctness
+obligations (O2). The October 2026 stack status identifies the
+workbench as vocabulary/specification, Haec as design, and Vocarium
+and Hermeneia as partial executable slices. Thus a theorem about
+the grade algebra is **not** a theorem that a particular real input
+was faithfully represented or that a received claim is true.
+
+`invariant-path`'s accepted sortal ADR provides a useful distinct
+third task: determining whether two presentations are the *same*
+argument under specified identity criteria. Its ADR also explicitly
+reports missing equivalence-certificate machinery. Do not call this
+a completed triangulation theorem. A general construction of
+types ↔ tropes ↔ sortals has not been located in the inspected
+repositories, so the relationship remains a research question.
+
+== Candidate proof obligations
+
+[cols="1,3,4",options="header"]
+|===
+|ID |Claim to prove, with its assumptions |Needed implementation evidence
+|X-01 |Lowering preserves the stated type judgement, and every runtime operation refines the typed effect/resource judgement |Typed source → IR → actual executor, negative controls
+|X-02 |A type tag or schema equality cannot forge numerical subject identity, provenance or principal authority |Authenticated identity/sortal comparator, counterexamples
+|X-03 |A declared trope transformation's IR grade soundly bounds its actual particularity loss |Per-construct faithful-lowering proofs and a declared observation model
+|X-04 |If a sortal reports same identity under an allowed transition sequence, every permitted intermediate move preserves that sortal's invariant |Formal move relation and composition certificate or obstruction, not just hash equality
+|X-05 |A position does not confer legitimacy on its occupant; authority is conditioned on independently valid occupancy evidence and interval |Institutional occupancy judgement + consumer enforcement
+|X-06 |A proof receipt cannot upgrade mere claim/evidence to factive knowledge without an explicit sound-warrant premise |Bridge to epistemic-types' `SoundWarrant` / ProofTransport
+|X-07 |A merge or split retains exactly its declared number and ancestry of particulars; honest fusion is distinguishable from conflation |Trope merge grades + provenance identity transition model + counterexamples
+|X-08 |Combined typed and trope verdicts do not imply one another; each can fail while the other succeeds |Independent acceptance/rejection fixtures, and a formal independence proof where models allow
+|X-09 |The same identity may be represented across multiple modality/role/time charts without illicit equality or a fabricated global clock |Chart-indexed witnesses, explicit partial maps, time and causal-order premises
+|===
+
+These are *open obligations*, not statements of proved results.
+An inability to prove one under current assumptions should be
+reported by its missing premise or countermodel.
+
+== Possible experiments (not an agreed sequence)
+
+The following order reflects low-risk experiments *if* VCL-UT adopts
+this line of research. It should not be interpreted as committing
+Firmboot, GNPL, Tangle, QuandleDB, KRL, Haec, Vocarium or Hermeneia
+to VCL-UT's architecture, or as requiring an all-purpose identity
+calculus before doing local correctness work.
+
+=== Earlier draft: a staged programme
+
+. **Vocabulary and discovery (now).** Publish an extensible,
+  source-anchored, theorem-aware index of type disciplines and
+  identity/particularity judgements; incorporate Mathesis and
+  `nextgen-typing` rather than copying large cross-estate inventories.
+  Record `PROVEN`, `TESTED`, `MODEL-ONLY`, `SPECIFIED`, `OPEN`
+  separately. The old L0–L10 safety matrix remains intact.
+. **Small proof bridge.** Propose a single carefully scoped
+  identity–particularity use case: two schema-compatible records,
+  distinct particulars, and an attempted MERGE. Test that static
+  compatibility alone cannot license an identity conflation and that
+  an explicit, appropriately warranted fusion can be represented.
+  Do not assume all types/tropes have a common equivalence.
+. **Source and runtime obligations.** Give the new checks explicit
+  source forms only when their operational semantics, authority and
+  evidence contracts are specified. Keep transition admission and
+  commit permission separate; make the consumer fail closed.
+. **Type-family graduation.** Add independent plugin/discipline
+  boundaries and proof receipts for the families that genuinely add
+  guarantees. When formal modelling requires a different prover,
+  establish and review the bridge instead of labelling a heuristic
+  detector a theorem.
+. **Only then broader ontology.** Evaluate partial maps and
+  context-relative identity across additional semantic, spatial,
+  temporal, social, normative and evidential spaces. A claim
+  crossing spaces must preserve exactly the invariants stated in its
+  certificate, never a universal identity promised by default.
+
+VCL-UT owns its language/admissibility design and proof obligations;
+Mathesis inventories theorem evidence; Kategoria/TypeLL research and
+implement type mechanisms; Haec/Vocarium/Hermeneia and trope-checker
+own situated particularity, use and loss. Shared work requires reviewed,
+versioned interfaces without changing ownership or collapsing
+these independently meaningful objects.
