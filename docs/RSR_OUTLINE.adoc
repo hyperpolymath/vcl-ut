@@ -162,12 +162,13 @@ project/
 │   ├── humans.txt
 │   └── security.txt
 ├── .machine_readable/         # ALL machine-readable content
-│   ├── STATE.a2ml             # Project state, progress, blockers
-│   ├── META.a2ml              # Architecture decisions, governance
-│   ├── ECOSYSTEM.a2ml         # Ecosystem position, relationships
-│   ├── AGENTIC.a2ml           # AI agent interaction patterns
-│   ├── NEUROSYM.a2ml          # Neurosymbolic integration config
-│   ├── PLAYBOOK.a2ml          # Operational runbook
+│   ├── descriptiles/          # Canonical typed project records
+│   │   ├── STATE.a2ml         # Project state, progress, blockers
+│   │   ├── META.a2ml          # Architecture decisions, governance
+│   │   ├── ECOSYSTEM.a2ml     # Ecosystem position, relationships
+│   │   ├── AGENTIC.a2ml       # AI agent interaction patterns
+│   │   ├── NEUROSYM.a2ml      # Neurosymbolic integration config
+│   │   └── PLAYBOOK.a2ml      # Operational runbook
 │   ├── bot_directives/        # Per-bot rules and constraints
 │   └── contractiles/          # Policy enforcement contracts
 │       ├── k9/                # Security levels (Kennel/Yard/Hunt)
@@ -235,30 +236,35 @@ project/
 
 == STATE.a2ml
 
-The STATE.a2ml file tracks project state:
+The canonical `.machine_readable/descriptiles/STATE.a2ml` tracks project
+state. This minimal TOML-shaped A2ML example satisfies `just validate-state`:
 
-[source]
+[source,toml]
 ----
+# SPDX-License-Identifier: MPL-2.0
 # STATE — Project State Checkpoint
-# Format: a2ml (AI-readable markup)
 
-project: v-graphql
-version: 0.1.0
-last-updated: 2026-02-14
-status: active
+[metadata]
+project = "v-graphql"
+version = "0.1.0"
+last-updated = "2026-02-14"
+status = "active"
 
-phase: implementation
-maturity: beta
+[project-context]
+phase = "implementation"
+maturity = "beta"
 
-ecosystem:
-  part-of: RSR Framework
-  depends-on: []
+[ecosystem]
+part-of = "RSR Framework"
+depends-on = []
 
-milestones:
-  - name: Initial setup
-    completion: 100
-  - name: Core implementation
-    completion: 0
+[[milestones]]
+name = "Initial setup"
+completion = 100
+
+[[milestones]]
+name = "Core implementation"
+completion = 0
 ----
 
 == Badge Schema
