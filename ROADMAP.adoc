@@ -122,10 +122,12 @@ These are ordered by value, not by version number.
 === v0.3.0 — Research Levels (L6-L9)
 * [x] `CardinalitySafe` LIMIT-presence predicate (source reachable; no exact
   result-count inference)
-* [ ] Effect-declaration predicate (AST only; no surface syntax or operation
-  enforcement)
-* [ ] Version-constraint presence predicate and proof over AST — no surface syntax or freshness validation
-* [ ] L9 bounded-use annotation predicate and proof — no surface syntax or runtime resource enforcement
+* [x] Effect-declaration-presence predicate and proof over AST
+* [ ] `EFFECTS` source syntax/elaboration and operation enforcement
+* [x] Version-constraint-presence predicate and proof over AST
+* [ ] Temporal source syntax/elaboration and freshness validation
+* [x] L9 bounded-use annotation predicate and proof over AST
+* [ ] Linear source syntax/elaboration and runtime resource enforcement
 * [ ] Integrate TypeQL-Experimental mechanisms
 
 === v0.4.0 — Consonance Level (L10)

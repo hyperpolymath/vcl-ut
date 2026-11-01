@@ -103,9 +103,9 @@ rungs and not ten.
 | Silent blanks in results
 
 | 4 -- Injection
-| Is user input separated from query structure?
-| Compile time (by construction)
-| Attackers run arbitrary commands
+| Does the `WHERE` clause contain an embedded string literal?
+| AST predicate; only `WHERE` is inspected
+| An embedded string literal in `WHERE` fails L4
 
 | 5 -- Result
 | Is the return type known?
@@ -292,21 +292,32 @@ but violate every reasonable expectation.
 
 ---
 
-== Level 4: Injection-Proof Safety
+== Level 4: InjectionProof — WHERE Literal Predicate
+
+[NOTE]
+====
+The current L4 predicate checks only for embedded string literals in the
+`WHERE` expression. It does not inspect `HAVING` or other clauses, and it does
+not prove a general no-injection property for the whole statement.
+====
 
 === What It Checks
 
-User input is a fundamentally different type from query structure. They _cannot_
-be combined. This is not sanitisation or escaping -- it is a structural
-impossibility enforced by the type system.
+`InjectionProof` is witnessed by the structural condition that the `WHERE`
+clause contains no string literal. This is narrower than proving that user
+input can never be combined with query structure.
 
 === When It Checks
 
-At **compile time**, by construction. The parser produces a typed AST where
-parameters are typed slots, not string holes. There is no string concatenation
-path that could produce a query.
+The predicate inspects the `where_clause` field on an already-constructed
+`Statement`; it is not a general compile-time proof about how the statement was
+created or how values will be bound.
 
-=== How VCL-total Implements It
+=== Intended Design Sketch
+
+Typed parameters are one intended way to keep user input separate from query
+structure. The following pseudocode illustrates that design goal; it is not the
+full guarantee provided by the current L4 predicate.
 
 ----
 -- VCL-total query with typed parameter
@@ -324,7 +335,9 @@ SELECT users WHERE users.id = ?id
 
 === What You Lose Without It
 
-Injection attacks. The #1 web application security risk for over a decade.
+Without broader parameterization and validation, injection risks remain. The
+current L4 predicate rejects embedded string literals in `WHERE`; it is not a
+general injection proof for all clauses or for the full source-to-runtime path.
 
 ---
 
@@ -836,7 +849,7 @@ link:audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc[audit].
 | Null pointer exceptions, silent blanks in results
 
 | 4 -- Injection
-| SQL/VCL injection attacks -- the #1 web security risk
+| Embedded string literal in `WHERE`; not a general injection proof
 
 | 5 -- Result
 | Runtime type mismatches when processing query results

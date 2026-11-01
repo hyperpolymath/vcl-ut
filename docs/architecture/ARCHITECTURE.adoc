@@ -87,7 +87,7 @@ expressibility remains bounded by the parser's L6 ceiling.
 
 |L4
 |`InjectionProof`
-|Implemented raw-string-literal predicate holds
+|No embedded string literal in `WHERE`; other clauses are not checked
 |`Core.Decide`, `Core.Checker`
 |Check
 

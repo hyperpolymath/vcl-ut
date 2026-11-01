@@ -252,7 +252,7 @@ scope, not the stronger design semantics sketched in older material.
 | L1 | `SchemaBound` | Ordinary field references resolve against `OctadSchema`
 | L2 | `TypeCompat` | Type compatibility of comparisons in `WHERE`
 | L3 | `NullSafe` | Implemented null-safety predicate holds
-| L4 | `InjectionProof` | Implemented raw-string-literal predicate holds
+| L4 | `InjectionProof` | No embedded string literal in `WHERE` (other clauses are not checked)
 | L5 | `ResultTyped` | Selected expressions satisfy the result-type predicate
 | L6 | `CardinalitySafe` | A `LIMIT` is present; no exact result count is inferred
 | L7 | `EffectTracked` | An effect declaration is present
