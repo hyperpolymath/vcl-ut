@@ -19,11 +19,12 @@ rename scope. The GitHub repository URL is unchanged.
 
 NOTE: Two superseded expansions of "UT" are still in circulation and should
 not be used: "Ubiquitous Type-safe" (which appeared in this README) and
-"-total". *Usage-Tracked* is canon, and it is the accurate one: the
-distinguishing feature of this tier is that resource usage is tracked in the
-type system (L9 `LinearSafe`, via QTT). "-total" survives in the crate name
-`vcl-total` and the Idris namespace `VclTotal`; renaming those is a separate,
-invasive change and is deliberately not bundled here.
+"-total". *Usage-Tracked* is the canonical name and design direction. The
+current L9 `LinearSafe` predicate checks an AST annotation (`UseOnce` or
+`Bounded`); that annotation is not yet expressible from source and is not a
+runtime resource-use proof. "-total" survives in the crate name `vcl-total`
+and the Idris namespace `VclTotal`; renaming those is a separate, invasive
+change and is deliberately not bundled here.
 
 [.lead]
 **VeriSimDB does not merely store records. It maintains identity consonance across modal witnesses and federation boundaries. VCL expresses propositions and epistemic requests over that consonance state. VCL-UT validates whether proposed identity transitions are admissible.**
@@ -32,25 +33,32 @@ invasive change and is deliberately not bundled here.
 
 VCL-UT is the next-generation interaction language for
 https://github.com/hyperpolymath/verisimdb[Verisim] (engine formerly known
-in discussion as VeriSimDB), designed to satisfy **eleven levels of type
-safety, L0–L10** — the 6 established IO-covered forms, the 4 additional forms
-identified through our research, and L10 `EpistemicSafe`, the consonance
-level, which is not a query-safety property at all but a *warrant* property.
+in discussion as VeriSimDB), designed around **eleven safety tags, L0–L10**.
+L10 is named `EpistemicSafe`; its proved checker predicate tests the structure
+of an epistemic clause over an existing `Statement`. It is not by itself a
+factive warrant or a connection to a deployment-level choreography system.
 See link:docs/THE-10-LEVELS-EXPLAINED.adoc[the level walkthrough].
 
 [IMPORTANT]
 ====
-Two honest qualifications, both measured on 2026-07-21:
+Two honest qualifications:
 
 * The ladder is *eleven* levels (L0–L10), not ten. Older prose says ten and
   numbers them 1–10; the code numbers them 0–10 and the code is canonical,
   because those numbers are wire tags.
-* Eleven levels are specified and proved; **six are expressible**. The parser
-  cannot yet populate the clauses that L7–L10 are inferred from, so the
-  highest level reachable from VCL source text is L6 `CardinalitySafe`. The
-  gap is fail-closed and disclosed (issue #25) — unsupported clauses are
-  rejected, never silently ignored — but it is a gap, and closing it is the
-  top outstanding item on the language surface.
+* The L0–L10 predicates and certificates are specified/proved over an
+  already-constructed `Statement`; that does not mean all levels are
+  expressible from source or that the predicates establish a deployment
+  dependency. **The highest level expressible from VCL source today is L6.**
+  The Rust parser leaves the L7–L10 extension fields empty and rejects their
+  source clauses fail-closed. The
+  missing work is parser syntax and clause elaboration/binding, not a missing
+  proof of a K-CUT deployment requirement. Under the estate policy, the
+  existing Idris2 corpus remains engineering-proof evidence, not Mathesis
+  Grade 3; the Agda port plan is
+  link:verification/proofs/AGDA-GRADE3-PORT-PLAN.adoc[here]. See also
+  link:docs/audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc[the K-CUT and
+  levels audit].
 ====
 
 The goal is production-worthy VCL that is provably correct at every layer,
@@ -131,10 +139,11 @@ IdentityState_before
 VeriSimDB maintains continuously-maintained identity claims across an octad of
 modal witnesses: graph, vector, tensor, semantic, document, temporal,
 provenance, and spatial. VCL is the production language for interacting with
-that consonance engine; VCL-UT is the fully-typed validation layer behind
-it. Simple statements short-circuit at the early safety levels; proof-bearing
-statements and high-risk lifecycle transitions go through the deeper proof,
-effect, resource, and cross-cutting checks (L9-L10).
+that consonance engine; VCL-UT is the typed validation layer behind it. The
+current trusted source parser reaches only through L6 `CardinalitySafe`.
+L7–L10 predicates can check populated AST fields, but their extension clauses
+are not yet expressible or elaborated from source; the parser fails closed on
+them.
 
 [NOTE]
 ====
@@ -221,23 +230,20 @@ TypeLL (type theory core — defines the 10 levels)
 
 | **VCL**
 | The consonance language
-| Parser (ReScript) → AST → execution. What users write to propose, inspect, or verify.
+| Surface language for proposing, inspecting, or verifying identity-state changes.
 
 | **VCL-UT**
-| The safety pipeline
-| 10 progressive levels. Sits behind VCL, applies automatically. Simple statements
-  short-circuit at L1-L2. Proof-carrying statements (with `PROOF` clause) go
-  through L9-L10. Invisible to the user except when they add a `PROOF` clause.
+| The proof-bearing safety pipeline
+| Canonical safety tags L0–L10. The trusted Rust parser currently reaches L6;
+  L7–L10 AST predicates are not yet reachable through their source clauses.
 |===
 
-NOTE: The dependent-types variant was originally labelled with the suffix
-"-DT" (Dependent Types) as the proof-bearing execution mode (statements
-with `PROOF` clauses). It is not a separate product — it is folded into
-VCL-UT's L9 (Proof Attachment) and L10 (Cross-Cutting) levels.
-
-The 6 proof types (EXISTENCE, INTEGRITY, CONSISTENCY, PROVENANCE,
-FRESHNESS, AUTHORIZATION) remain — they are activated by VCL's `PROOF`
-clause and validated by VCL-UT levels L9-L10.
+NOTE: Historical VCL-DT / `PROOF`-clause descriptions do not map to the
+canonical L9 `LinearSafe` and L10 `EpistemicSafe` tags. The current Rust
+parser rejects `PROOF` and the other unsupported extension clauses; do not
+claim proof-type validation or automatic L9/L10 execution from that syntax.
+See the level walkthrough and the
+link:docs/audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc[parser and K-CUT audit].
 
 === Adoption Strategy
 

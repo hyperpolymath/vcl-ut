@@ -658,16 +658,13 @@ held indefinitely.
 
 == Level 10: Epistemic Safety
 
-This is the consonance level, and it is the one level that is not about the
-statement at all. Levels 0-9 ask *"will this statement behave?"*. Level 10 asks
-*"is the engine entitled to believe the answer?"*.
-
-That question only arises because VCL-UT does not address a passive store. It
-addresses a consonance engine holding eight modal witnesses -- graph, vector,
-tensor, semantic, document, temporal, provenance, spatial -- which can
-disagree. A result assembled from disagreeing witnesses is not wrong in the
-way a type error is wrong; it is *unwarranted*. No amount of levels 0-9 will
-detect it, because every individual step was well-typed.
+L10 `EpistemicSafe` is the epistemic-labelled predicate over a `Statement`;
+it is not a proof that the engine is entitled to believe an answer. The current
+checker validates the structure of a populated epistemic clause (agent
+declarations and entailment-cycle conditions). It does not run the standalone
+Kripke semantics, establish factivity for `Knows`, or prove that modal
+witnesses agree. Do not infer any of those properties, or a K-CUT deployment
+dependency, from the level name.
 
 === What It Checks
 
@@ -692,99 +689,89 @@ forms (`ast.rs`, mirroring `Grammar.idr`):
 | Agent `a`'s warrant for `p` derives from agent `b`'s.
 |===
 
-The certificate `L10_EpistemicSafe` is witnessed by
+The Idris certificate `L10_EpistemicSafe` is witnessed by
 `Decide.epistemicConsistentStmt stmt = True`, which requires:
 
 . an epistemic clause is present;
 . at least one agent is declared;
 . every agent referenced by a requirement is among the declared agents;
-. there is no direct `ENTAILS` cycle -- no pair with both `a ⊨ b` and `b ⊨ a`.
+. the `ENTAILS` graph is acyclic (including transitive cycles).
 
-Condition (4) is the substantive one. A mutual entailment is a citation loop:
-two witnesses each grounding their warrant in the other, with nothing outside
-the pair supporting either. That is exactly how a federation manufactures
-false confidence, and it is invisible to every lower level.
+The Idris proof corpus now checks transitive cycles using
+`Decide.hasTransitiveCycle`, and `Checker.checkLevel10Sound` proves soundness
+for that implemented structural predicate. This is not semantic soundness of
+the standalone Kripke model, and not a factive-warrant theorem.
 
-=== Disclosed Residual -- Read This
+=== Disclosed Residual
 
-Two obligations are *owed, not discharged*, and are recorded as such in
-`verification/proofs/VERIFICATION-STANCE.adoc`:
+* **Proposition well-typedness.** The `Expr` carried by an epistemic
+  requirement is not yet checked against the schema.
+* **Rust/Idris cycle-check alignment.** The Idris predicate detects
+  transitive cycles; the Rust mirror in `src/interface/parse/src/decider.rs`
+  currently detects direct reciprocal `ENTAILS` pairs only. Preserve this
+  cross-implementation difference when describing the certified path; it
+  does not change the fact that source syntax cannot currently request L10.
 
-* **Transitive `ENTAILS`-cycle detection.** Only the *direct* two-party
-  symmetry violation is checked. A three-party loop (`a ⊨ b`, `b ⊨ c`,
-  `c ⊨ a`) passes today.
-* **Proposition well-typedness.** The `Expr` carried by a requirement is not
-  checked against the schema.
+The L10 soundness theorem is real but has a defined scope: it proves the
+Idris checker agrees with the Idris structural predicate, not that an agent
+knows a proposition or that another system is a deployment prerequisite.
 
-These are stated here because a safety level that quietly overstates itself is
-worse than no level at all. The decider and the Idris checker agree exactly
-(`Checker.checkLevel10Sound`); what they agree on is a *partial* condition.
-
-=== Implementation Status -- No Surface Syntax Yet
+=== Implementation Status -- L7–L10 Source Gap
 
 [WARNING]
 ====
-As of 2026-07-21, *L10 cannot be requested from VCL source text*, and neither
-can L7, L8 or L9.
+The Idris proof predicates cover L0–L10 for already-constructed `Statement`
+values. The trusted Rust parser reaches at most L6 `CardinalitySafe`; L7, L8,
+L9 and L10 cannot currently be requested from VCL source.
 
-`parse_statement` in `src/interface/parse/src/parser.rs` constructs every
-`Statement` with `proof_clause`, `effect_decl`, `version_const`,
-`linear_annot` and `epistemic_clause` all fixed at `None`.
-`infer_requested_level` awards L7-L10 on precisely those fields, so no parsed
-statement can ever reach them. Measured ceiling:
+`parse_statement` in `src/interface/parse/src/parser.rs` initializes
+`proof_clause`, `effect_decl`, `version_const`, `linear_annot` and
+`epistemic_clause` to `None`. `infer_requested_level` awards L7–L10 only when
+the corresponding extension fields are populated. The AST's epistemic
+constructors describe intended meanings; L10 does not validate them against
+the Kripke model. The parser rejects
+`PROOF`, `EFFECTS`, `AT`, `CONSUME`, `USAGE` and `EPISTEMIC` clauses, as well
+as modal expressions `KNOWS`, `BELIEVES`, `ANNOUNCE` and `COMMON`.
 
-[cols="1,3"]
+[cols="1,2,3"]
 |===
-| Reached | Input
+| Level | Intended AST field | Source path today
 
-| L1 | `SELECT * FROM STORE a`
-| L4 | `SELECT * FROM STORE a WHERE GRAPH.x > 1`
-| L6 | `SELECT * FROM STORE a LIMIT 10`
-| -- | `... EFFECTS { Read }` -- rejected, "not yet supported by the P5a parser slice"
-| -- | `... AS OF NOW - 5 SECONDS` -- rejected
-| -- | `... USE ONCE` -- rejected
-| -- | `AGENTS { ... } KNOWS ...` -- rejected
+| L7 `EffectTracked` | `effect_decl` | `EFFECTS` rejected
+| L8 `TemporalSafe` | `version_const` | `AT VERSION` rejected
+| L9 `LinearSafe` | `linear_annot` | `CONSUME` / `USAGE` rejected
+| L10 `EpistemicSafe` | `epistemic_clause` | `EPISTEMIC` and modal expressions rejected
 |===
 
-This is a *disclosed, fail-closed* gap, not a silent one: the parser rejects
-`EFFECTS` with an explicit message naming the P5a slice and issue #25, rather
-than accepting the clause and ignoring it. Fail-closed is the correct
-behaviour. But it does mean the upper ladder is, for now, reachable only by
-constructing a `Statement` programmatically or by decoding one off the wire --
-not by writing VCL.
+This is a *disclosed, fail-closed* gap: unsupported syntax returns a typed
+error rather than being accepted and ignored. Ordinary schema binding for
+field references exists; the missing work is source grammar and elaboration /
+binding of these extension fields. A programmatically constructed or
+wire-decoded `Statement` can carry them, but that does not make them
+expressible from source. Issue #25 concerned parser/corpus-boundary work and
+is closed; it does not establish a K-CUT dependency. See
+link:audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc[the audit].
 
-Closing this is the single highest-value piece of work outstanding on the
-language surface. Until it is closed, the honest claim is: *eleven levels are
-specified and proved; six are expressible.*
+The language-surface status is: the proof predicates and certificates are
+specified over Idris `Statement` values; VCL source currently reaches only
+through L6 `CardinalitySafe`. See the
+link:audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc[audit] for the parser
+and clause-elaboration gap.
 ====
 
-== How TypeLL Provides the Foundation
+== Cross-Project Type-Theory Relationship
 
-All 10 levels are defined in **TypeLL**, the core type theory. VCL-total
-_inherits_ these levels rather than inventing them. This means:
+No one-to-one mapping between VCL-UT safety levels and TypeLL or PanLL levels
+is established by this repository's imports, proof corpus, or a versioned
+interface contract. Shared names, numbers, or type-theoretic vocabulary are
+not evidence that the same theorem is implemented in each project. Any
+cross-project correspondence needs an explicit mapping of the constructs,
+assumptions, and proved propositions.
 
-----
-TypeLL (core type theory)
-   │
-   │  Defines: the levels of type safety as formal constructs
-   │
-   ├──→ PanLL (panel framework)
-   │       Uses L0-L9 for UI component safety
-   │
-   └──→ VCL-UT (consonance statements)
-           Uses L0-L9 for statement safety, and adds L10
-----
-
-The same mathematical proofs that ensure a PanLL UI panel cannot render invalid
-state also ensure a VCL-UT statement cannot execute an invalid operation. The
-theory is shared; only the application domain differs.
-
-L10 is the exception, and the asymmetry is informative. `EpistemicSafe` is
-*not* inherited from TypeLL: a UI panel has no federation of disagreeing
-witnesses and therefore no warrant question to answer. L10 originates in
-VCL-UT, in the shift from querying a store to addressing a consonance engine.
-It is the first level in this family that the domain contributed back to the
-theory rather than receiving from it.
+L10 `EpistemicSafe` is a local structural predicate over the `Statement` AST;
+it is not inferred from another project's level name, and does not establish a
+K-CUT deployment requirement. See the
+link:audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc[audit].
 
 == Summary: What Each Level Prevents
 

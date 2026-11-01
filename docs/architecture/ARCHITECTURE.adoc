@@ -1,622 +1,224 @@
 // SPDX-License-Identifier: CC-BY-SA-4.0
 // Copyright (c) 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-= VCL-total Architecture
+= VCL-UT Architecture
 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
-:date: 2026-03-16
+:date: 2026-11-01
 :toc: macro
 :toclevels: 3
 :icons: font
-:description: Comprehensive architecture document for VCL-total (Verified Query Language — Unified Types)
+:description: Current architecture and proof boundaries for VCL-UT
 
 toc::[]
 
 == System Overview
 
-VCL-total (Verified Query Language — Unified Types) is a dependently-typed query
-language compiler that produces machine-checkable proofs of query safety. It
-extends VCL-dt (VeriSimDB's existing dependent type system, ~35% wired) to
-cover the full spectrum of safety properties through 10 formally verified
-levels.
+VCL-UT is a dependently typed safety checker for VCL. Its canonical ladder has
+eleven tags, L0–L10. The Idris proof predicates and dependent certificates
+apply to already-constructed `Statement` values; the trusted Rust source parser
+currently reaches only through L6 `CardinalitySafe`. The external gate does not
+transport the Idris dependent certificate as a re-checkable proof object.
 
-Every query entering VCL-total passes through a six-stage pipeline. Each stage
-is responsible for enforcing one or more of the 10 safety levels. The pipeline
-output is not merely a compiled query — it is a *proof certificate* attesting
-that every safety property holds.
+[WARNING]
+====
+This architecture document previously contained pipeline diagrams and
+implementation descriptions that predated the canonical L0–L10 ladder and the
+current parser / gate boundary. The sections below have been narrowed to the
+implemented scope. Treat the level table and the 2026-11-01 audit as authoritative
+for level names, proof scope, and source expressibility.
+====
 
-=== Pipeline: Parse → Bind → Check → Analyse → Compile → Execute
+=== Implemented Pipeline Boundary
 
 [source]
 ----
-                          VCL-total PIPELINE
-                          ═══════════════
-
-  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-  │   1. PARSE   │───▶│   2. BIND    │───▶│   3. CHECK   │
-  │              │    │              │    │              │
-  │ ReScript     │    │ Idris2       │    │ Idris2       │
-  │ Tokenise &   │    │ Resolve      │    │ Type-check   │
-  │ parse VCL-total │    │ names &      │    │ all 10       │
-  │ surface      │    │ schema refs  │    │ safety       │
-  │ syntax       │    │              │    │ levels       │
-  └──────────────┘    └──────────────┘    └──────────────┘
-         │                   │                   │
-         │ AST               │ Bound AST         │ Typed AST +
-         │                   │                   │ Obligations
-         ▼                   ▼                   ▼
-  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-  │  4. ANALYSE  │───▶│  5. COMPILE  │───▶│  6. EXECUTE  │
-  │              │    │              │    │              │
-  │ Idris2       │    │ Zig          │    │ Elixir       │
-  │ Discharge    │    │ Generate     │    │ Dispatch to  │
-  │ proof        │    │ optimised    │    │ VeriSimDB    │
-  │ obligations  │    │ query plan   │    │ engine       │
-  │              │    │ via C ABI    │    │              │
-  └──────────────┘    └──────────────┘    └──────────────┘
-         │                   │                   │
-         │ Proof             │ Native            │ Result +
-         │ Certificate       │ Query Plan        │ Certificate
-         ▼                   ▼                   ▼
-  ┌─────────────────────────────────────────────────────┐
-  │              PROOF CERTIFICATE OUTPUT                │
-  │                                                     │
-  │  Machine-checkable evidence that the query passed   │
-  │  all 10 safety levels. Independently verifiable.    │
-  └─────────────────────────────────────────────────────┘
+VCL source -> Rust lexer/parser -> AST -> Rust decider / Idris proof corpus
+                                      -> gate verdict (not a transported proof)
 ----
+
+The source parser is syntax-only and fail-closed on unsupported L7–L10
+clauses. Schema resolution happens in the decider for ordinary field refs.
+The VeriSimDB consumer-side gate integration is a separate outstanding item;
+this repository does not currently establish a full parse-to-execution path.
 
 == The 11 Safety Levels
 
-VCL-total enforces 11 distinct safety levels (L0–L10), each targeting a specific
-class of bug. The levels are cumulative — a query at Level N has passed all
-checks from Levels 0 through N.
+The proof corpus defines eleven predicates and dependent certificates,
+`ParseSafe` through `EpistemicSafe` (L0–L10), over the `Statement` AST. A
+certificate at Level N includes the lower-level obligations; source
+expressibility remains bounded by the parser's L6 ceiling.
 
 [cols="1,2,3,2,2"]
 |===
-|Level |Name |What It Prevents |Idris2 Module |Pipeline Stage
+|Level |Canonical name |Current predicate scope |Idris2 source |Pipeline stage
+
+|L0
+|`ParseSafe`
+|Statement is in the represented AST
+|`Core.Grammar`, `Core.Levels`
+|AST / certification
 
 |L1
-|Construction Safety
-|SQL/VCL injection attacks
-|`Injection.idr`
-|Parse + Bind
+|`SchemaBound`
+|Ordinary field references resolve against `OctadSchema`
+|`Core.Decide`, `Core.Checker`
+|Schema check
 
 |L2
-|Schema Pinning
-|Schema drift (query vs database mismatch)
-|`SchemaEvol.idr`
-|Bind
+|`TypeCompat`
+|Compared expression types are compatible
+|`Core.Decide`, `Core.Checker`
+|Type check
 
 |L3
-|Resource Linearity
-|Connection leaks, double-use bugs
-|`Linear.idr`
+|`NullSafe`
+|Implemented null-safety predicate holds
+|`Core.Decide`, `Core.Checker`
 |Check
 
 |L4
-|Session Protocols
-|Use-after-commit, auth bypass, double-close
-|`Session.idr`
+|`InjectionProof`
+|Implemented raw-string-literal predicate holds
+|`Core.Decide`, `Core.Checker`
 |Check
 
 |L5
-|Effect Tracking
-|Undeclared side effects (writes in read-only context)
-|`Effects.idr`
-|Check
+|`ResultTyped`
+|Selected result expressions satisfy the type predicate
+|`Core.Decide`, `Core.Checker`
+|Result check
 
 |L6
-|Scope Isolation
-|Cross-transaction data leaks
-|`Modal.idr`
+|`CardinalitySafe`
+|A `LIMIT` is present
+|`Core.Decide`, `Core.Checker`
 |Check
 
 |L7
-|Information Flow
-|Security classification violations (secret → public)
-|`InfoFlow.idr`
-|Check + Analyse
+|`EffectTracked`
+|An effect declaration is present
+|`Core.Decide`, `Core.Checker`
+|Check
 
 |L8
-|Quantitative Bounds
-|Resource overuse beyond declared limits
-|`Quantitative.idr`
+|`TemporalSafe`
+|A version constraint is present
+|`Core.Decide`, `Core.Checker`
 |Check
 
 |L9
-|Proof Attachment
-|Unverified claims about query results
-|`ProofCarrying.idr`
-|Analyse
+|`LinearSafe`
+|A `UseOnce` or bounded linear annotation is present
+|`Core.Decide`, `Core.Checker`
+|Check
 
 |L10
-|Cross-Cutting Invariants
-|Violations of compositional properties
-|`Proofs.idr`
-|Analyse
-
-|L11
-|Epistemic Safety
-|Inconsistent knowledge states across federated agents; unverified claims treated as knowledge; circular epistemic dependencies
-|`Epistemic.idr`
+|`EpistemicSafe`
+|Epistemic clause has declared agents and passes the implemented `ENTAILS`-cycle condition
+|`Core.Decide`, `Core.Checker`, `Core.Levels`
 |Check
 |===
 
-NOTE: Level 11 (Epistemic Safety) uses S5 modal logic with Kripke frame
-semantics embedded in the Idris2 type system. The EPISTEMIC clause specifies
-agents, their knowledge/belief requirements, and common knowledge properties.
-The type checker becomes the epistemic model checker — a term of type
-`Knows a P` is constructive evidence that agent `a` knows `P`.
+NOTE: These are the canonical L0–L10 tags, not the obsolete L1–L11 ladder
+in older architecture prose. The proof predicates apply to an already-built
+`Statement`; VCL source reaches only through L6 today. L10's current checker
+is structural and does not invoke the standalone
+Kripke-style S5 formalisation in `Core.Epistemic`. See
+link:../audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc[the audit] for the
+parser/binder gap and the boundary of the L10 claim.
 
 === Level Detail
 
-==== L1: Construction Safety (Injection.idr)
+The canonical level names and actual predicate scopes are listed in the table
+above. Implementation anchors are `src/core/Levels.idr`,
+`src/core/Decide.idr`, and `src/core/Checker.idr`; the source parser and its
+fail-closed L7–L10 gap are in `src/interface/parse/src/parser.rs`. Do not use
+the historical L1–L11 names or module mappings from earlier versions of this
+architecture as a description of the current implementation.
 
-Queries are unforgeable by construction. The `SafeQuery` type is an opaque AST
-indexed by a parameter schema. There is no function `String -> SafeQuery` — user
-input can only appear in typed parameter slots, never in query structure
-positions. Injection is impossible because the path from untrusted input to
-query structure simply does not exist in the type system.
+== Implemented Components
 
-==== L2: Schema Pinning (SchemaEvol.idr)
-
-Every query is indexed by the schema version it was validated against. A
-`SchemaQuery v` can only execute against a database at version `v`. Schema
-migrations produce `Migration from to` proofs, and queries must be explicitly
-re-validated via `migrateQuery` with evidence that all referenced columns
-survive the migration.
-
-==== L3: Resource Linearity (Linear.idr)
-
-Database connections carry a usage count at the type level. A `LinConn (S n)`
-must be consumed exactly once per scope — the Idris2 compiler enforces this
-via QTT quantity `1`. Dropped connections are compile-time errors. Double-use
-is impossible.
-
-==== L4: Session Protocols (Session.idr)
-
-Sessions are state machines indexed by their protocol state. The type
-`Session : SessionState -> Type` ensures transitions follow the protocol:
-`Fresh → Authenticated → InTransaction → Committed → Closed`. Querying after
-commit, committing without a transaction, and closing twice are all type errors.
-
-==== L5: Effect Tracking (Effects.idr)
-
-Each query declares its effects (`Read`, `Write`, `Cite`, `Audit`, `Transform`,
-`Federate`). The `Subsumes` proof verifies that actual operations are a subset
-of declared effects. A query declared `EFFECTS { Read }` that attempts a write
-is rejected at compile time.
-
-==== L6: Scope Isolation (Modal.idr)
-
-Data accessed in one transaction scope is wrapped in `Box w a`, where `w` is a
-world tag representing the scope. Extracting data requires proof of being in the
-same scope (`InScope w`). Cross-scope data flow requires explicit `marshal`
-calls, making all boundary crossings visible in the type signature.
-
-==== L7: Information Flow (InfoFlow.idr)
-
-Data carries security classifications (`Public`, `Internal`, `Confidential`,
-`Secret`, `TopSecret`) forming a lattice. The `FlowsTo` relation ensures data
-can only move upward in classification. Reading a `Secret` value requires
-`HasClearance Secret` evidence and a `FlowsTo Secret readerLevel` proof.
-Downward flows are impossible — the constructor does not exist.
-
-==== L8: Quantitative Bounds (Quantitative.idr)
-
-Generalises linearity from "exactly once" to "at most N". A
-`BoundedResource n a` can be consumed `n` times before depletion. Parallel
-query branches can split a resource budget via `merge`/`split`. This enforces
-API rate limits, connection pool bounds, and quota compliance at compile time.
-
-==== L9: Proof Attachment (ProofCarrying.idr)
-
-Query results carry formal theorems as dependent pairs:
-`ProvedResult a thm` bundles data with a proof of integrity, freshness,
-provenance, or consistency. The proof can be independently verified via
-`verify`, which returns `Either VerifyError (result : a ** Holds thm result)`.
-
-==== L10: Cross-Cutting Invariants (Proofs.idr)
-
-Compositional properties that span multiple levels: subset transitivity,
-subsumption monotonicity, flow lattice transitivity. These proofs ensure that
-the safety levels compose correctly — e.g., adding effects never breaks
-existing subsumption proofs, and chained migrations preserve column survival.
-
-== Technology Stack
-
-[cols="1,2,3"]
+[cols="1,2"]
 |===
-|Technology |Role |Rationale
+|Component |Current role
 
-|**Idris2**
-|ABI definitions, type kernel, proof obligations
-|Native QTT (quantity `0`/`1`/`ω`) makes linear types and resource tracking
-first-class. Dependent types enable schema-indexed queries. `%default total`
-with zero `believe_me` guarantees all proofs are real.
+|Rust (`src/interface/parse`)
+|Trusted, panic-free source parser, AST/wire codec, independent decider,
+  and `vclt-gate` producer. Source support currently reaches L6.
 
-|**Zig**
-|FFI bridge, native codegen
-|C-ABI compatible without overhead. Cross-compilation built-in. Zero runtime
-dependencies. Exports the type checker's validation functions to non-Idris2
-consumers via the hyperpolymath ABI/FFI standard.
+|Idris2 (`src/core`, `verification/proofs`)
+|Total proof corpus for the represented AST, including L0–L10 predicates,
+  soundness and dependent `SafetyCertificate` values.
 
-|**ReScript**
-|Surface syntax parser
-|Consistent with existing VCL parser patterns in VeriSimDB. Compiles to
-JavaScript for browser-based tooling. Extends the VCL v3.0 grammar with 6
-new optional clauses.
+|VeriSimDB consumer integration
+|The gate producer contract exists; the consumer does not yet invoke it.
 
-|**zig**
-|HTTP API gateway
-|Exposes VCL-total as a REST API for external consumers. Fast compilation,
-minimal runtime. Follows the hyperpolymath zig API triple pattern.
-
-|**Elixir**
-|VeriSimDB integration, query orchestration
-|BEAM runtime for distributed query dispatch. Phoenix for real-time feedback.
-Zig NIFs for performance-critical paths. Native supervision trees for fault
-tolerance.
+|External proof transport
+|The dependent Idris proof object is not transported as a re-checkable proof.
 |===
 
-=== Technology Interaction
+== Cross-Project Relationship
 
-[source]
-----
-  ┌──────────────────────────────────────────────────────────┐
-  │                     CLIENT (Browser/CLI)                  │
-  └──────────────────────┬───────────────────────────────────┘
-                         │ HTTP/WebSocket
-                         ▼
-  ┌──────────────────────────────────────────────────────────┐
-  │               zig API GATEWAY (v-api/)                │
-  │  Routes: POST /check, POST /compile, GET /levels/:id     │
-  └──────────────────────┬───────────────────────────────────┘
-                         │ FFI (C ABI)
-                         ▼
-  ┌──────────────────────────────────────────────────────────┐
-  │               ZIG FFI BRIDGE (ffi/zig/)                   │
-  │  Exports: vqlut_parse, vqlut_check, vqlut_compile         │
-  │  Generates: C headers (generated/abi/*.h)                 │
-  └──────┬──────────────────────────────┬────────────────────┘
-         │ Parse                         │ Check + Compile
-         ▼                               ▼
-  ┌────────────────┐          ┌─────────────────────────────┐
-  │ RESCRIPT PARSER │          │ IDRIS2 TYPE KERNEL          │
-  │ (src/parser/)   │          │ (src/abi/)                  │
-  │                 │          │                             │
-  │ Tokenise        │          │ 12 modules:                 │
-  │ Parse           │──AST──▶  │ Core + 10 safety levels +   │
-  │ Surface check   │          │ Checker (unified validator) │
-  └─────────────────┘          └──────────────┬──────────────┘
-                                              │ Proof Certificate
-                                              ▼
-                               ┌─────────────────────────────┐
-                               │ ELIXIR ORCHESTRATION         │
-                               │ (elixir/)                    │
-                               │                              │
-                               │ Dispatch to VeriSimDB engine │
-                               │ Real-time feedback via       │
-                               │ Phoenix Channels             │
-                               │ Zig NIFs for hot paths       │
-                               └──────────────────────────────┘
-----
+Earlier versions of this document claimed a 1:1 mapping between VCL-UT levels
+and TypeLL levels. That mapping is not established by the VCL-UT source or proof
+corpus and is withdrawn here. Shared terminology, a level number, or a similar
+type name is not an interface contract or a proof of dependency. Any
+cross-project dependency must cite an explicit versioned artefact, import,
+enforced build/deployment rule, or local theorem.
 
-== The TypeLL Connection
-
-VCL-total's 10 safety levels map 1:1 to TypeLL's 10 type theory levels. This is
-not a coincidence — VCL-total is the *database specialisation* of TypeLL's
-general-purpose type system.
-
-[cols="1,2,2,2"]
-|===
-|Level |TypeLL Concept |VCL-total Instantiation |Module
-
-|1
-|Construction Types
-|Unforgeable query ASTs
-|`Injection.idr`
-
-|2
-|Indexed Types
-|Schema-versioned queries
-|`SchemaEvol.idr`
-
-|3
-|Linear Types
-|Resource-counted connections
-|`Linear.idr`
-
-|4
-|Session Types
-|Database protocol state machines
-|`Session.idr`
-
-|5
-|Effect Types
-|Declared vs actual effect sets
-|`Effects.idr`
-
-|6
-|Modal Types
-|Transaction scope isolation
-|`Modal.idr`
-
-|7
-|Information Flow Types
-|Security classification lattice
-|`InfoFlow.idr`
-
-|8
-|Quantitative Types
-|Bounded resource accounting
-|`Quantitative.idr`
-
-|9
-|Proof-Relevant Types
-|Theorem-carrying query results
-|`ProofCarrying.idr`
-
-|10
-|Metatheoretic Types
-|Cross-cutting compositional invariants
-|`Proofs.idr`
-|===
-
-TypeLL provides the *theory*; VCL-total provides the *practice*. Every TypeLL level
-has a concrete, tested implementation in VCL-total's Idris2 kernel. This makes
-VCL-total both a useful tool and a validation of TypeLL's design.
+The same rule applies to choreographic K-CUT: no local artifact establishes it
+as a VCL-UT deployment blocker. See
+link:../audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc[the relationship audit].
 
 == Data Flow
 
-=== Parse Stage
+The current implemented boundary is intentionally narrower than the historical
+diagram that previously appeared here:
 
 [source]
 ----
-  VCL-total Source Text
-  ─────────────────
-  "SELECT GRAPH, DOCUMENT
-   FROM HEXAD 550e8400-...
-   WHERE FULLTEXT CONTAINS $query
-   CONSUME AFTER 1 USE
-   EFFECTS { Read, Cite }
-   PROOF ATTACHED IntegrityTheorem"
-
-          │
-          │ ReScript Tokeniser
-          ▼
-
-  Token Stream
-  ────────────
-  [SELECT, GRAPH, COMMA, DOCUMENT, FROM, HEXAD, UUID(...),
-   WHERE, FULLTEXT, CONTAINS, PARAM("query"),
-   CONSUME, AFTER, INT(1), USE,
-   EFFECTS, LBRACE, READ, COMMA, CITE, RBRACE,
-   PROOF, ATTACHED, IDENT("IntegrityTheorem")]
-
-          │
-          │ ReScript Parser
-          ▼
-
-  Untyped AST (TQLAst.res)
-  ─────────────────────────
-  Select {
-    modalities: [Graph, Document],
-    source: Hexad("550e8400-..."),
-    where: Fulltext(ParamRef("query")),
-    extensions: [
-      ConsumeAfter(1),
-      Effects([Read, Cite]),
-      ProofAttached("IntegrityTheorem")
-    ]
-  }
+VCL source text
+  -> Rust lexer/parser (`src/interface/parse`)
+  -> syntax AST (`Statement` / `VclOp`)
+  -> versioned wire representation / gate request
+  -> safety decider and Idris proof corpus
+  -> verdict / certificate status
 ----
 
-=== Bind Stage
+The parser establishes syntax, not schema-bound types or a full certificate.
+It rejects `PROOF`, `EFFECTS`, `AT`, `CONSUME`, `USAGE`, `EPISTEMIC`, and modal
+expressions fail-closed. Consequently source reaches only through L6. The AST
+and wire format contain extension fields, so constructed or wire-decoded
+statements may carry L7–L10 data; that is distinct from source expressibility.
+Ordinary field-reference resolution against `OctadSchema` occurs in the
+decider.
 
-[source]
-----
-  Untyped AST + Schema v3
-  ─────────────────────────
+The gate consumer is not yet wired into VeriSimDB. The Idris dependent
+`SafetyCertificate` is not transported as a re-checkable proof object across
+the external boundary; see `verification/proofs/VERIFICATION-STANCE.adoc` and
+`docs/vclt-gate-contract.adoc` for the exact current contract.
 
-          │
-          │ Idris2 Schema Resolution
-          │ (SchemaEvol.idr)
-          ▼
+== Gate Verdict and Proof Boundary
 
-  Bound AST
-  ──────────
-  SchemaQuery 3 {
-    select: SafeSelect [Graph, Document] hexadRef,
-    params: [MkTypedParam "query" PString],
-    schema: schemaV3
-  }
+The Rust parser returns a typed `ParseError` and fails closed on unsupported
+syntax. `vclt-gate` reports a schema-versioned JSON verdict with `requested_level`,
+`certified_level`, per-level results, and reason categories; see
+`docs/vclt-gate-contract.adoc` for the normative wire schema. A `certified_level`
+tag is a verdict from the gate, not a serialized Idris proof object.
 
-  + ColumnExists proofs for each referenced column
-  + SchemaQuery indexed by version 3
-----
+The Idris corpus contains dependent `SafetyCertificate` constructors and
+soundness lemmas over `Statement`. That proof object is not transported across
+the external boundary. Consumers must not treat the numeric level alone as a
+re-checkable proof or as evidence of properties outside the corresponding local
+predicate. See `verification/proofs/VERIFICATION-STANCE.adoc`.
 
-=== Check Stage
+== Certificate Scope
 
-[source]
-----
-  Bound AST
-  ──────────
-
-          │
-          │ 10 Safety Level Checks (Idris2)
-          ▼
-
-  Typed AST + Proof Obligations
-  ─────────────────────────────
-  L1:  SafeQuery searchSchema          ✓ (construction safety)
-  L2:  SchemaQuery 3                    ✓ (schema pinning)
-  L3:  LinConn 1                        ✓ (single use)
-  L4:  Session InTransaction            ✓ (protocol state)
-  L5:  Subsumes [Read,Cite] [Read,Cite] ✓ (effects subset)
-  L6:  Box txWorld result               ✓ (scope isolation)
-  L7:  Labeled Public result            ✓ (classification)
-  L8:  BoundedResource 1 conn          ✓ (quantitative)
-  L9:  ProvedResult a IntegrityThm      ○ (obligation: prove integrity)
-  L10: flowTransitive, subsetTransitive ✓ (compositional)
-
-  Outstanding obligations: [IntegrityTheorem discharge]
-----
-
-=== Analyse Stage
-
-[source]
-----
-  Typed AST + Obligations
-  ────────────────────────
-
-          │
-          │ Proof Discharge (Idris2)
-          ▼
-
-  Proof Certificate
-  ─────────────────
-  Certificate {
-    query_hash: "sha256:abc123...",
-    safety_levels: [L1..L10],
-    each_level: PASS,
-    proofs_discharged: [IntegrityTheorem],
-    verified_at: "2026-03-16T10:30:00Z",
-    schema_version: 3,
-    idris2_version: "0.8.0"
-  }
-----
-
-=== Compile + Execute Stages
-
-[source]
-----
-  Proof Certificate + Typed AST
-  ──────────────────────────────
-
-          │
-          │ Zig Codegen (ffi/zig/)
-          ▼
-
-  Native Query Plan
-  ─────────────────
-  Optimised execution plan with:
-  - Parameter binding slots
-  - Modality access pattern
-  - Resource budget annotations
-
-          │
-          │ Elixir Dispatch
-          ▼
-
-  VeriSimDB Engine
-  ────────────────
-  Execute query plan, return result + certificate
-----
-
-== Error Propagation
-
-Each safety level produces typed errors that propagate through the pipeline:
-
-[cols="1,2,3"]
-|===
-|Level |Error Type |Example
-
-|L1
-|`InjectionError`
-|"Untrusted string in query structure position"
-
-|L2
-|`SchemaMismatch`
-|"Column 'age' does not exist at schema version 2"
-
-|L3
-|`LinearityViolation`
-|"Connection used twice in linear context"
-
-|L4
-|`ProtocolViolation`
-|"Cannot query in state Committed"
-
-|L5
-|`EffectViolation`
-|"Write effect not declared (declared: [Read])"
-
-|L6
-|`ScopeEscape`
-|"Data from transaction scope 'tx1' leaked to 'tx2'"
-
-|L7
-|`ClassificationViolation`
-|"Secret data cannot flow to Public context"
-
-|L8
-|`ResourceExhausted`
-|"Resource limit 5 exceeded (attempted 6 uses)"
-
-|L9
-|`ProofFailure`
-|"IntegrityTheorem could not be discharged"
-
-|L10
-|`CompositionError`
-|"Subsumption monotonicity violated after effect addition"
-|===
-
-Errors are *structured*, not string messages. Each error carries the evidence
-needed to understand and fix the problem — including the safety level, the
-specific obligation that failed, and the source location.
-
-== The Proof Certificate Concept
-
-A proof certificate is a machine-checkable artefact produced by VCL-total's
-pipeline. It attests that a query has passed all applicable safety levels.
-
-Properties of a proof certificate:
-
-1. **Independently verifiable**: Any party with the Idris2 type kernel can
-   re-check the certificate without trusting VCL-total's implementation.
-
-2. **Tamper-evident**: The certificate includes a SHA-256 hash of the query
-   AST. Modifying the query invalidates the certificate.
-
-3. **Level-granular**: The certificate reports each safety level individually.
-   A query might pass L1–L8 but fail L9 (proof attachment). This granularity
-   enables graduated deployment.
-
-4. **Composable**: Certificates for sub-queries compose into certificates for
-   compound queries, subject to L10 (cross-cutting invariant) checks.
-
-5. **Versioned**: Certificates are pinned to schema version, Idris2 kernel
-   version, and VCL-total grammar version. Version mismatches require
-   re-certification.
-
-=== Certificate Format
-
-[source,json]
-----
-{
-  "version": "1.0.0",
-  "query_hash": "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-  "schema_version": 3,
-  "certified_at": "2026-03-16T10:30:00Z",
-  "kernel_version": "vcl-total-0.1.0",
-  "idris2_version": "0.8.0",
-  "levels": {
-    "L1_construction":  { "status": "pass", "module": "Injection.idr" },
-    "L2_schema":        { "status": "pass", "module": "SchemaEvol.idr" },
-    "L3_linearity":     { "status": "pass", "module": "Linear.idr" },
-    "L4_session":       { "status": "pass", "module": "Session.idr" },
-    "L5_effects":       { "status": "pass", "module": "Effects.idr" },
-    "L6_modal":         { "status": "pass", "module": "Modal.idr" },
-    "L7_infoflow":      { "status": "pass", "module": "InfoFlow.idr" },
-    "L8_quantitative":  { "status": "pass", "module": "Quantitative.idr" },
-    "L9_proof":         { "status": "pass", "module": "ProofCarrying.idr" },
-    "L10_metatheory":   { "status": "pass", "module": "Proofs.idr" }
-  },
-  "obligations_discharged": ["IntegrityTheorem", "FreshnessTheorem"],
-  "signature": "ed25519:..."
-}
-----
+The term *certificate* is used for the dependent Idris value assembled by
+`Checker.certifyAt` / `certifyRequested` inside the proof corpus. It does not
+mean the current Rust gate emits a serialized dependent proof. Keep three
+claims distinct: the predicates and certificates are specified/proved over an
+AST; the source parser reaches only through L6; and no external deployment
+dependency follows from those proofs without an explicit bridge artefact.
 
 == Licence
 
