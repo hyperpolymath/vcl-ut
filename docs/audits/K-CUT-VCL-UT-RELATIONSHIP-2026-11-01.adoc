@@ -4,8 +4,10 @@
 
 == Finding
 
-No exact local design document, issue, import, build/runtime dependency, or
-machine-checked theorem makes choreographic K-CUT a VCL-UT deployment blocker.
+No pre-existing or independently enforced artefact establishes choreographic
+K-CUT as a VCL-UT deployment dependency. This audit names K-CUT only to record
+that repository-scoped finding; it is not itself a design reference, import,
+build/runtime dependency, or machine-checked theorem establishing a blocker.
 Do not infer such a dependency from shared terms such as *epistemic*,
 *choreographic*, *Kripke*, or from level names.
 
@@ -17,8 +19,10 @@ the dependency).
 
 == Evidence and limits
 
-* The repository has no `K-CUT`/`K-Cut`/`KCut` design reference, import, or
-  deployment rule. The local issue inventory contains no K-CUT issue.
+* Apart from this audit, the repository has no pre-existing
+  `K-CUT`/`K-Cut`/`KCut` design reference, import, or deployment rule. This
+  audit is descriptive, not an independently enforced dependency. The local
+  issue inventory contains no K-CUT issue.
 * Issue
   https://github.com/hyperpolymath/vcl-ut/issues/25[#25] is about the VCL
   parser / verified-corpus boundary. It is not a K-CUT dependency. It is now

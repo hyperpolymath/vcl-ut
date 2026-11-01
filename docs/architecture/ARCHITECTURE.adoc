@@ -31,14 +31,20 @@ for level names, proof scope, and source expressibility.
 
 [source]
 ----
-VCL source -> Rust lexer/parser -> AST -> Rust decider / Idris proof corpus
-                                      -> gate verdict (not a transported proof)
+Runtime gate:
+  VCL source -> Rust lexer/parser -> AST -> Rust `certified_level` -> verdict
+
+Offline verification:
+  Idris proof corpus checks corresponding predicates over the mirrored AST
 ----
 
 The source parser is syntax-only and fail-closed on unsupported L7–L10
-clauses. Schema resolution happens in the decider for ordinary field refs.
-The VeriSimDB consumer-side gate integration is a separate outstanding item;
-this repository does not currently establish a full parse-to-execution path.
+clauses. Schema resolution happens in the Rust decider for ordinary field
+references. The runtime `vclt-gate` calls the Rust `certified_level` decider;
+it does not invoke or link the Idris proof corpus. Idris checks the corresponding
+predicate and certificate claims offline over the mirrored AST. The VeriSimDB
+consumer-side gate integration is a separate outstanding item; this repository
+does not currently establish a full parse-to-execution path.
 
 == The 11 Safety Levels
 
@@ -180,8 +186,11 @@ VCL source text
   -> Rust lexer/parser (`src/interface/parse`)
   -> syntax AST (`Statement` / `VclOp`)
   -> versioned wire representation / gate request
-  -> safety decider and Idris proof corpus
-  -> verdict / certificate status
+  -> Rust `certified_level` decider
+  -> runtime gate verdict
+
+Separately, the Idris proof corpus checks corresponding predicates over the
+mirrored AST offline; it does not feed the runtime gate verdict.
 ----
 
 The parser establishes syntax, not schema-bound types or a full certificate.

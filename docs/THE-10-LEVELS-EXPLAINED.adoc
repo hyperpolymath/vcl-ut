@@ -65,14 +65,13 @@ in various real-world systems (though rarely all six together).
 They address real failure modes that levels 0-5 leave uncovered. These levels
 use TypeQL-Experimental extension mechanisms.
 
-**Level 10, Epistemic Safety, is different in kind from all the others.**
-Levels 0-9 ask whether a statement is *well-formed* — whether it will do what
-it says without crashing, leaking or corrupting. Level 10 asks whether the
-engine is entitled to *believe* the result: whether the modalities consulted
-agree, whether the authority answering is competent for the question, and
-whether a disagreement between witnesses has been resolved rather than
-silently averaged. That is not a query-safety property. It is a consonance
-property, and it is the reason this ladder has eleven rungs and not ten.
+**Level 10, `EpistemicSafe`, is a separate structural predicate over a
+`Statement`.** The current predicate requires a populated epistemic clause,
+declared agents, references only to declared agents, and an acyclic `ENTAILS`
+graph. It does not establish whether the engine is entitled to believe or give
+an answer, whether modalities agree, or whether an authority is competent. That
+scope is distinct from the structural and operational checks at Levels 0-9; it
+is the reason this ladder has eleven rungs and not ten.
 
 == The Progression at a Glance
 
@@ -427,6 +426,12 @@ processes only the first of many results, silently ignoring the rest.
 
 == Level 7: Effect-Tracking Safety
 
+[NOTE]
+====
+The `EFFECTS` forms shown in this section are illustrative design syntax and
+are not accepted by the current VCL-UT source parser.
+====
+
 === What It Checks
 
 Every query is classified by its effects:
@@ -491,6 +496,12 @@ triggers a write. An analytics query modifies production data.
 ---
 
 == Level 8: Temporal Safety
+
+[NOTE]
+====
+The `AS OF` forms shown in this section are illustrative design syntax and are
+not accepted by the current VCL-UT source parser.
+====
 
 === What It Checks
 
@@ -562,6 +573,12 @@ list instead of the current one.
 ---
 
 == Level 9: Linearity Safety
+
+[NOTE]
+====
+The `CONSUME` and `USAGE` forms shown in this section are illustrative design
+syntax and are not accepted by the current VCL-UT source parser.
+====
 
 === What It Checks
 
@@ -810,21 +827,18 @@ link:audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc[audit].
 | Connection leaks, use-after-close, double-commit
 
 | 10 -- Epistemic
-| Unwarranted answers: disagreeing modal witnesses silently reconciled,
-  circular warrant, an authority answering outside its competence
+| A populated epistemic clause with declared agents and no `ENTAILS` cycles
 |===
 
 Levels 0-9 cover the vast majority of database bugs that have caused
 real-world catastrophes, and the goal is to eliminate them at compile time
 with zero runtime overhead.
 
-Level 10 is doing something else, and it is worth being precise about the
-difference. Levels 0-9 are *safety* properties in the ordinary sense: they
-rule out executions that go wrong. Level 10 is a *warrant* property: it rules
-out answers the engine is not entitled to give, even though every step that
-produced them was well-typed. A query engine over a passive store has no need
-of such a level, because a passive store has exactly one witness and it cannot
-disagree with itself. A consonance engine over eight modal witnesses does.
-
-That is why the ladder has eleven rungs, and why the eleventh is not simply
-"one more safety level".
+Level 10 is a separate *structural* predicate over an already-constructed
+`Statement`. It requires a populated epistemic clause, at least one declared
+agent, references only to declared agents, and an acyclic `ENTAILS` graph. It
+does not establish whether the engine is entitled to believe or give an answer;
+in particular, it does not prove modal witnesses agree or an authority is
+competent. The Idris predicate is proved over the AST, while the Rust mirror
+currently checks direct reciprocal entailment pairs only. The ladder therefore
+has eleven distinct predicates, not a theorem of epistemic warrant.
