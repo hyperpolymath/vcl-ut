@@ -1,0 +1,178 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= VCL-UT L0–L10 Agda Grade 3 Port Plan
+:revdate: 2026-11-01
+:status: proposed, not proof evidence
+
+== Purpose and status
+
+Plan to formulate the current language-independent L0–L10 predicate and
+certificate claims in Agda, targeting Mathesis **Grade 3** theorem-by-theorem.
+This document is a work plan only: it contains no Agda proof, no CI receipt,
+and grants no Grade 3 status. No `.agda` proof source is present in this
+checkout, and the Agda compiler is unavailable in the current environment.
+
+The current proof corpus is Idris2 engineering/formalisation evidence over the
+repository's `Statement` AST. Under the Standards proof policy, repository
+interfaces and engineering obligations stay in Idris2; first-party Rust code
+belongs in the Creusot lane. Grade 3 is not a label for an Idris2 build: the
+Mathesis architecture defines it as a locally type-checked Agda formulation
+not yet translated to an independent foundational system. Do not replace or
+downgrade existing Idris2 proof status by relabelling it.
+
+== Normative policy and source baseline
+
+* Mathesis estate mathematics architecture, exact reviewed source revision:
+  [mathesis `estate-mathematical-architecture`](https://github.com/hyperpolymath/mathesis/blob/50a012dba57fe90c9aca8d57241690c133ab117c/estate-mathematical-architecture).
+* Estate verifier mapping and rechecking policy, exact reviewed source
+  revision: [Standards `PROOF-POLICY.adoc`](https://github.com/metadatastician/standards/blob/46ee18323305d5b36e2eef936e47dd54c39ea736/3-practice/PROOF-POLICY.adoc).
+* Current theorem statements, premises, residues, and proof-corpus status:
+  `VERIFICATION-STANCE.adoc` (authoritative local ledger).
+* Current definitions and implementations: `src/core/{Grammar,Schema,Decide,
+  Levels,Checker,Composition}.idr`.
+* K-CUT relationship and L7–L10 source boundary:
+  `../../docs/audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc`.
+
+Standards' canonical Agda entrypoint is:
+
+[source,shell]
+----
+agda --safe --without-K --cubical-compatible <module.agda>
+----
+
+Pin and record the Agda and standard-library versions. The requested
+installation target includes full Cubical Agda, separate from the estate
+default profile; Creusot is to use its repository-pinned nightly alongside
+latest stable Rust for VCL-UT. Full Cubical use in theorem source still needs
+a separately reviewed proof profile with a theorem-specific rationale,
+exact flags, and pinned versions. The current L0–L10 AST predicates do not by
+themselves demonstrate a need for Cubical semantics. Failed or unavailable
+tools leave the obligation open; flags must not be weakened to make a check
+pass.
+
+== Port inventory
+
+The Agda theorem must preserve the *current proved predicate*, not strengthen
+a safety-level name into a stronger semantic guarantee. The initial scope is
+the Idris checker-acceptance implication and the dependent level/certificate
+structure. Every row needs a side-by-side statement and assumption review
+before implementation.
+
+[cols="1,2,3,3",options="header"]
+|===
+|Level |Current Idris predicate |Agda Grade 3 target |Explicit boundary / non-claim
+|L0 `ParseSafe` |AST membership is true by construction (`MkL0`); not a parser theorem. |Represented `Statement` values inhabit the L0 witness; prove only the construction-level fact. |Does not prove Rust parser correctness, grammar unambiguity, or source-to-AST refinement.
+|L1 `SchemaBound` |Every extracted field reference resolves in the supplied `OctadSchema`; `checkLevel1Sound` constructs `AllFieldsBound`. |Formalise schema, reference extraction, resolution, and acceptance implies all referenced fields are bound. |Does not authenticate runtime schema metadata or prove schema matches the deployed database.
+|L2 `TypeCompat` |WHERE comparison operands satisfy the implemented schema-aware compatibility predicate; `checkLevel2Sound`. |Formalise the exact VQL type relation and prove checker acceptance implies the predicate. |Do not extend to HAVING, subquery scoping, or general language type safety unless separately specified and proved.
+|L3 `NullSafe` |The implemented null-guard predicate holds over covered WHERE/HAVING structure; `checkLevel3Sound`. |Formalise the exact structural guard recogniser and its acceptance theorem. |Does not imply general branch-sensitive null-flow analysis or resolve documented subquery/scoping limits.
+|L4 `InjectionProof` |WHERE has no embedded string literal under `whereHasStringLit`; `checkLevel4Sound` and `noRawUserInputCompose`. |Formalise the AST predicate, checker soundness, and existing join-closure claim. |Does not prove arbitrary execution is injection-free, source parser refinement, or runtime parameter binding.
+|L5 `ResultTyped` |Every selected item resolves to the implemented non-`TAny` result type; `checkLevel5Sound`. |Formalise selected-item typing against `OctadSchema` and checker acceptance. |Does not establish runtime result representation or universal typing of clauses not covered by the predicate.
+|L6 `CardinalitySafe` |A `LIMIT` value is present; `checkLevel6Sound`. |Formalise the exact presence predicate and acceptance theorem. |Does not prove a numeric bound on actual returned rows, engine compliance, or resource cost.
+|L7 `EffectTracked` |`effectDecl` is present; `checkLevel7Sound`. |Formalise the exact AST field and presence predicate. |Presence is not effect correctness or proof execution stays within the declaration; no source syntax currently populates it.
+|L8 `TemporalSafe` |`versionConst` is present; `checkLevel8Sound`. |Formalise the exact AST field and presence predicate. |Presence is not freshness, clock correctness, or snapshot fidelity; no source syntax currently populates it.
+|L9 `LinearSafe` |`LinUseOnce` or `LinBounded`; `LinUnlimited` and absence fail; `checkLevel9Sound`. |Formalise the annotation datatype, enforcement predicate, and acceptance theorem. |Does not prove runtime resource use or affine behavior of an external handle; no source syntax currently populates it.
+|L10 `EpistemicSafe` |A populated clause has a declared agent set, all referenced agents declared, and no cycle reported by the current finite-fuel `ENTAILS` detector; `checkLevel10Sound` proves checker acceptance implies this Boolean predicate. |Formalise the exact implemented predicate and acceptance theorem; separately prove whether the finite-fuel detector is equivalent to a stated graph-reachability/acyclicity definition. |Does not establish graph-theoretic cycle-detector correctness, factivity, proposition typing, Kripke-model soundness, real-world truth, or a K-CUT/deployment dependency. Rust currently checks direct reciprocal cycles only.
+|===
+
+== Stages and gates
+
+=== Stage 0 — Freeze the statement inventory
+
+For each `checkLevelNSound`, level witness, certificate constructor,
+`CanWeaken` rule, and composition-preservation lemma:
+
+. copy its exact type and referenced predicate from the current Idris source;
+. list all explicit and implicit premises, schema inputs, and universe/type
+  assumptions;
+. map every constructor and predicate to its Agda counterpart;
+. mark unresolved or excluded behavior; and
+. record the VCL-UT source commit and the source files reviewed.
+
+Acceptance: a reviewer can compare Idris and Agda propositions line-by-line.
+No theorem is represented by a matching name alone.
+
+=== Stage 1 — Agda core model and L0–L1
+
+Define the minimal statement/field/schema model needed for the first two
+predicates. Keep the model independent of parser implementation details.
+Prove the construction-level L0 fact and L1 field-resolution acceptance
+implication. Pin the Agda toolchain/profile and run the real command in CI.
+
+Acceptance: the proof and its assumptions type-check under the normative
+profile; no `postulate`, unsafe option, or unreviewed foreign axiom discharges
+the target theorem.
+
+=== Stage 2 — L2–L5 typing, null, and injection predicates
+
+Port the exact current comparison compatibility, null-guard, no-string-literal,
+and selected-result predicates. Add acceptance-implies-predicate theorems for
+each level. Port join-closure only where the current Idris theorem states it;
+write separate counterexamples or explicit limitations for unproved stronger
+claims.
+
+Acceptance: positive and negative fixtures exercise each exact predicate, and
+the Agda proposition is reviewed against the Idris source—not merely against
+the level label.
+
+=== Stage 3 — L6–L10 upper-level predicates
+
+Port cardinality/effect/version presence, the enforced linear annotation, and
+the structural epistemic predicate. For L10, prove finite transitive cycle
+closure correctness and acceptance implies the specified structural
+acyclicity. Keep proposition typing and Kripke semantics out of scope unless
+separately formulated as additional theorems with explicit premises.
+
+Acceptance: each predicate's intentional weakness is recorded; unsupported
+source syntax remains a parser obligation and cannot be claimed as covered by
+the Agda AST proof.
+
+=== Stage 4 — Certificates, ordering, and composition
+
+Port the dependent `SafetyCertificate` cases, `certifyAt` / `certifyRequested`
+behavior, `CanWeaken` rules, and `compositionPreservation` obligations. Preserve
+L10's non-join-closed cycle condition as an explicit side-condition; do not
+weaken it to obtain a spurious unconditional composition result.
+
+Acceptance: every certificate constructor is tied to its level predicate and
+lower-level premises; every composition hypothesis appears in the Agda theorem
+type. State separately what is not closed under composition.
+
+=== Stage 5 — Grade 3 receipt and subsequent verification
+
+For each theorem—not just for the package—retain: proposition, assumptions,
+Agda source hash, VCL-UT source revision, Agda and library versions, exact
+invocation, CI job/run URL, result, and reviewer comparison notes. Record a
+Mathesis Grade 3 status only for the theorem with a successful local Agda
+receipt and no missing assumption disclosure. Partial work remains theorem-
+scoped; no umbrella Grade 3 claim for L0–L10 is allowed until every in-scope
+row passes.
+
+Grade 3 is the initial target, not the end of the Standards policy. Reconcile
+theory statements with Rocq and Lean according to `PROOF-POLICY.adoc`; record
+whether each leg was transported or re-proved and how proposition correspondence
+was checked. Never infer cross-prover identity from filenames or theorem names.
+
+== Separate engineering obligations
+
+This Agda plan does not discharge these distinct obligations:
+
+* Rust parser/decider implementation correctness: Rust verification lane
+  (Creusot under the Standards policy), plus tests and explicit conformance
+  evidence.
+* Rust–Idris/Agda wire and predicate correspondence: exact schema/AST mapping,
+  golden-vector evidence, and explicit refinement or conformance proofs.
+* Parser source reachability: implement and bind L7–L10 syntax before claiming
+  those levels are expressible from VCL source.
+* Runtime schema, identity, evidence authenticity, clocks, resource behavior,
+  database commits, and deployment integration: external assumptions and
+  consumer-side evidence; not proved by AST theorems.
+* Choreographic K-CUT dependency: no claim until a concrete interface,
+  deployment rule, import, or theorem makes the dependency explicit.
+
+== Current decision
+
+**No Grade 3 claim is assigned by this plan.** The L0–L10 proof corpus remains
+reported Idris2 evidence under `VERIFICATION-STANCE.adoc`; Rust source claims
+remain in their implementation lane. The plan establishes how to begin an
+Agda Grade 3 formulation and prevents that future work from being confused
+with source expressibility, implementation correctness, or deployment
+requirements.

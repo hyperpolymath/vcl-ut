@@ -18,9 +18,11 @@ a `schema_version` bump and an update here.
 Owners:
 
 * *Producer* (this repo): the `vclt-gate` binary — a thin, pure wrapper over
-  `vcltotal-parse`'s lexer/parser + `decider::certified_level`.
+  `vcltotal-parse`'s `parse_op`, routing query statements to
+  `decider::certified_level` and transitions to
+  `decider::certified_transition_level`.
 * *Consumer* (VeriSimDB): invokes the binary on the VCL execute path before
-  a statement is allowed to affect live consonance state.
+  a query or transition is allowed to affect live consonance state.
 
 == Why a CLI subprocess (and not FFI / a library / a network call)
 
@@ -40,19 +42,29 @@ defined here so the verdict semantics are unchanged.
 
 == What the gate decides (and what it does NOT)
 
-The gate answers one question:
+The gate handles two variants of parsed VCL operations:
 
-____
-Is this VCL statement *admissible up to its declared static safety level*?
-____
+* A query (`VclOp::Query`) is admissible up to its declared static safety
+  level, using `decider::certified_level(stmt, schema)`.
+* A consonance transition (`VclOp::Transit`) is checked by
+  `decider::certified_transition_level(transition, schema)`. Its response has
+  a single L4 `InjectionProof` entry; transitions do not use the query ladder
+  above L4. The current transition predicate checks required subject
+  distinctness, absence of raw string literals in optional evidence, and
+  evidence-comparison type compatibility. It does not establish provenance
+  descent, engine liveness, modality presence, or identity-versus-location.
 
-It computes the *recompute-tier verdict* `decider::certified_level(stmt,
-schema)` — an independent re-establishment of the corpus-proved safety
-predicate `checkLevelNSound` (machine-checked once in
-`verification/proofs/corpus/VclTotal/Core/Checker.idr`). The ten levels
-are structurally decidable from the parsed statement + schema alone (see
-§"Safety levels"), so the gate needs *no* theorem prover and *no* engine
-state.
+For query statements, the Rust decider is the runtime recompute tier. The
+Idris `checkLevelNSound` lemmas separately establish checker acceptance
+implies the Idris-side Boolean predicates over `Statement` values
+(machine-checked in `verification/proofs/corpus/VclTotal/Core/Checker.idr`).
+The runtime binary does not invoke or link that corpus; these lemmas do not by
+themselves prove Rust correctness or Rust/Idris refinement. In particular,
+Idris uses a finite-fuel transitive L10 cycle detector, while Rust currently
+checks direct reciprocal `ENTAILS` pairs only. No theorem proves the Idris
+detector equivalent to formal graph acyclicity. Both runtime variants are
+structurally decided from parsed input and schema; the gate needs *no* theorem
+prover and *no* live engine state.
 
 The gate explicitly does **NOT**:
 
@@ -62,8 +74,8 @@ The gate explicitly does **NOT**:
   downstream.
 * Touch live consonance state, the network, the filesystem (beyond its own
   stdin/stdout and an `--input` request file), or any clock. It is a pure function of its input (§"Purity").
-* Maintain state between invocations. One statement per call (batching is a
-  reserved future `schema_version`).
+* Maintain state between invocations. One parsed operation per call (batching
+  is a reserved future `schema_version`).
 
 == Transport
 
@@ -106,15 +118,9 @@ The gate explicitly does **NOT**:
 |`schema_version` |yes |Integer. The binary MUST reject a version it does
 not understand with exit code 2 and `error.kind = "unsupported_version"`.
 
-|`statement` |yes |The VCL statement *text*. The binary lexes + parses it;
-a parse failure is a verdict (`certified_level = -1`, reason category
-`syntactic`), *not* a gate error.
+|`statement` |yes |VCL query or transition *source text*. The binary lexes and parses it with `parse_op`; a parse failure is rendered as an inadmissible parse verdict (L0 `ParseSafe`), *not* a gate error. Parsed queries and transitions follow their separate verdict variants below.
 
-|`schema` |no |The octad schema the schema-dependent levels (L1/L2/L3/L5)
-recompute against, in the JSON form of §"Schema payload". If omitted, the
-binary uses the empty schema; schema-dependent levels then fail closed
-(an unknown field cannot be certified type-compatible). Statements whose
-requested level is schema-independent (L4, L6–L10) are unaffected.
+|`schema` |no |The octad schema used by schema-dependent query predicates (L1/L2/L3/L5), in the JSON form of §"Schema payload". If omitted, the binary uses the empty schema and unknown fields fail closed. Although the individual L4 and L6–L10 query predicates do not inspect the schema, certification at a requested level still evaluates every preceding level; missing schema metadata can therefore make the overall verdict inadmissible at an earlier level. Transition verdicts also use the schema for evidence type compatibility, so omitting it can affect that verdict too.
 |===
 
 Unknown request fields MUST be ignored (forward-compat).
@@ -145,20 +151,13 @@ Unknown request fields MUST be ignored (forward-compat).
 |===
 |Field |Meaning
 
-|`admissible` |`true` iff `certified_level == requested_level` (i.e.
-`certified_level != -1`). This is the single boolean the consumer gates on.
+|`admissible` |`true` iff `certified_level == requested_level` (i.e. `certified_level != -1`). This is the single boolean the consumer gates on for either response variant.
 
-|`requested_level` |Integer 0–10: the level the statement declares
-(`Statement.requested_level`, the `SafetyLevel` tag).
+|`requested_level` |For a query, integer 0–10 from `Statement.requested_level`. For a transition, fixed at 4 (`InjectionProof`).
 
-|`certified_level` |Integer. `-1` if the statement fails any level `1..k`
-(where `k = requested_level`); otherwise `k`. Faithful return of
-`decider::certified_level`.
+|`certified_level` |For a query, `-1` if any level `1..k` fails, otherwise `k`, faithfully returned by `decider::certified_level`. For a transition, `-1` on failure or `4` on success, returned by `decider::certified_transition_level`.
 
-|`levels` |Per-level breakdown for `1..k`. `status ∈ {pass, fail}`. The
-binary SHOULD evaluate all of `1..k` (not just up to the first failure) so
-the array is a complete diagnostic; `certified_level` still reflects the
-short-circuit semantics. A failing level SHOULD carry a human `reason`.
+|`levels` |For a query, per-level breakdown for `1..k`. For a transition, one entry for L4 `InjectionProof`; transitions have no L5+ result-set ladder. Each entry has `status ∈ {pass, fail}`. A failing query entry SHOULD carry a human `reason`; a transition rejection carries its reason in the top-level `reasons` array.
 
 |`reasons` |Flat list of human-readable rejection reasons (empty when
 admissible). Stable enough to surface to an API caller.
@@ -167,11 +166,47 @@ admissible). Stable enough to surface to an API caller.
 A `syntactic` (parse) failure renders as `certified_level: -1`, an empty or
 single-entry `levels` array, and a `reasons` entry prefixed `L0 ParseSafe:`.
 
+=== Transition response variant (`schema_version: 1`)
+
+`parse_op` routes `MERGE`, `SPLIT`, and `NORMALISE` to the transition decider.
+These responses use the same v1 request and exit-code conventions, but a
+transition-specific response body:
+
+[source,json]
+----
+{
+  "schema_version": 1,
+  "kind": "transition",
+  "verb": "MERGE",
+  "subjects": ["left", "right", "out"],
+  "admissible": true,
+  "requested_level": 4,
+  "certified_level": 4,
+  "levels": [
+    { "level": 4, "name": "InjectionProof", "status": "pass" }
+  ],
+  "reasons": []
+}
+----
+
+For this variant, `kind` is exactly `"transition"`; query responses retain
+the response shape above without a `kind` field. `verb` is `MERGE`, `SPLIT`,
+or `NORMALISE`; `subjects` contains the transition's subject handles in
+constructor order. `requested_level` is fixed at L4. The transition
+decider returns `certified_level` 4 on acceptance or -1 on rejection, and the
+`levels` array contains the single L4 entry with `status: "pass"` or
+`"fail"`. A rejection puts the current generic reason in the top-level
+`reasons` array: `transition inadmissible: self-merge / non-distinct outputs,
+or evidence carries a raw string literal / type-incompatible comparison`.
+Exit codes remain 0 (admissible) and 1 (inadmissible). This is the transition
+response already emitted by the v1 producer, not a change to its wire shape.
+
 == Safety levels (authoritative)
 
-The level vocabulary is owned by `src/interface/parse/src/ast.rs`
-(`enum SafetyLevel`, tags 0–10) and `decider::check_level`. The gate MUST
-use these names and numbers verbatim:
+The query-level vocabulary is owned by `src/interface/parse/src/ast.rs`
+(`enum SafetyLevel`, tags 0–10) and `decider::check_level`. This table
+covers the query ladder; transitions use the separate L4 verdict variant
+documented above. The gate MUST use these names and numbers verbatim:
 
 [cols="1,2,4"]
 |===
@@ -187,16 +222,25 @@ use these names and numbers verbatim:
 |7 |EffectTracked |`effect_decl.is_some()` — an effect declaration is present
 |8 |TemporalSafe |`version_const.is_some()` — a version constraint is present
 |9 |LinearSafe |`linear_enforced` — linear-resource annotation satisfied
-|10 |EpistemicSafe |`epistemic_consistent_stmt` — epistemic clause well-formed + acyclic
+|10 |EpistemicSafe |Rust `epistemic_consistent_stmt` — populated clause, declared agents, and no direct reciprocal `ENTAILS` pair; not a general transitive-cycle check
 |===
 
-*Subsumption* (proved in `Core/Levels.idr`): certification at level N implies
-levels `1..N` all pass. The consumer therefore needs only `admissible` +
-`certified_level`; the `levels` array is diagnostic.
+*Subsumption* (proved in `Core/Levels.idr`): a query certificate at level N
+requires levels `1..N` to pass. The consumer therefore needs only
+`admissible` + `certified_level`; the `levels` array is diagnostic.
 
-The producer binary MUST obtain its verdict by calling
-`decider::certified_level`, never by re-implementing the predicates, so the
-corpus soundness proof carries through to the gate.
+The Idris `checkLevel10Sound` theorem proves Idris checker acceptance implies
+its Boolean `epistemicConsistentStmt` predicate, whose implementation uses a
+finite-fuel transitive cycle detector. It does not prove that detector
+is equivalent to a formal graph-reachability/acyclicity definition. The Rust
+gate implementation differs: it rejects direct reciprocal `ENTAILS` pairs
+only, and no theorem here proves Rust/Idris alignment.
+
+The producer binary MUST obtain query verdicts by calling
+`decider::certified_level` and transition verdicts by calling
+`decider::certified_transition_level`, never by re-implementing their
+predicates. The Idris checker soundness proofs apply to their stated Boolean
+predicates, not to unstated semantic guarantees.
 
 == Schema payload
 
@@ -271,28 +315,27 @@ the safety-level predicates or their tags. Consumers that omitted
 |Code |Meaning |Consumer action
 
 |0 |Admissible (`certified_level == requested_level`) |Proceed; the
-statement may affect live state.
+query or transition may affect live state.
 |1 |Inadmissible — verdict rendered (`certified_level == -1`) |Reject the
-statement; surface `reasons` to the caller (e.g. HTTP 422).
+query or transition; surface `reasons` to the caller (e.g. HTTP 422).
 |2 |Gate error — no verdict (bad request JSON, unsupported version,
 internal guard) |Treat as gate-unavailable; apply the fail policy (§Consumer).
 |===
 
-The binary MUST NOT exit non-zero-2 for an *inadmissible* statement: a
-rejection is a successful decision (exit 1), distinct from a gate fault
+The binary MUST NOT exit non-zero-2 for an *inadmissible* query or transition:
+a rejection is a successful decision (exit 1), distinct from a gate fault
 (exit 2). On exit 2 it SHOULD still emit a JSON object with an `error`
 field (`{ "schema_version": 1, "error": { "kind": "...", "message": "..." } }`).
 
 == Purity guarantee (producer)
 
-The binary is a pure function of (`statement`, `schema`): no network, no
-filesystem access beyond stdin/stdout and the request file named by
+The binary is a pure function of the parsed operation and schema: no network,
+no filesystem access beyond stdin/stdout and the request file named by
 `--input` (which is the request itself, read once, not ambient state), no
-clock, no environment-dependent
-behaviour, no randomness, deterministic for identical input. This is what
-makes it safe to call synchronously on the consumer's write path.
-`decider::certified_level` already satisfies this; the wrapper MUST NOT add
-impurity.
+clock, no environment-dependent behaviour, no randomness, deterministic for
+identical input. This is what makes it safe to call synchronously on the
+consumer's write path. Both deciders already satisfy this; the wrapper MUST
+NOT add impurity.
 
 == Consumer integration (VeriSimDB)
 
@@ -348,9 +391,11 @@ treat a timeout as exit 2.
   nor the response shape, so no `schema_version` bump; stdin remains the
   default and every existing consumer is unaffected. Covered by
   `src/interface/parse/tests/gate_transport.rs`.
-* The L5–L10 predicates already evaluate today; no part of this contract is
-  blocked on the echidna proof tier. The proof tier, when wired, is a
-  *separate* downstream check, not a change to this gate.
+* The Idris/Rust AST-level predicates L5–L10 are implemented, but the current
+  Rust source parser does not yet expose the extension syntax needed to express
+  L7–L10 through this text request path. This contract does not depend on the
+  echidna proof tier; proof discharge, when wired, remains a *separate*
+  downstream check, not a change to this gate.
 
 == Worked examples
 
@@ -403,12 +448,14 @@ Response (exit 1):
 
 *Producer (this repo) — the `vclt-gate` binary:*
 
-. New bin crate (or `[[bin]]` on `vcltotal-parse`) reading the request JSON,
-  calling the existing lexer/parser then `decider::certified_level`.
-. Serialise the response per §"Response schema"; map verdict to exit codes.
-. Implement `OctadSchema` JSON (de)serialisation consistent with `wire.rs`.
-. Conformance tests from fixture request/response pairs (the two worked
-  examples are the first two fixtures).
+. Read request JSON, call `parse_op`, and route queries to
+  `decider::certified_level` and transitions to
+  `decider::certified_transition_level`.
+. Serialise the matching response variant per §"Response schema" and map the
+  verdict to the exit codes.
+. Keep `OctadSchema` JSON (de)serialisation consistent with `wire.rs`.
+. Maintain conformance fixtures for admitted/rejected queries and transition
+  verdicts.
 
 *Consumer (VeriSimDB):*
 
@@ -417,6 +464,5 @@ Response (exit 1):
 . Build the request (`statement` text + `schema` from `SchemaRegistry`,
   or omit `schema` for the conservative default).
 . Branch on exit code per §"Fail policy"; surface `reasons` on rejection.
-. An integration test: admitted statement proceeds; injection statement is
-  rejected with the gate's reason — the executable form of the README's
-  engine / VCL / VCL-total triad.
+. Integration tests: an admitted query proceeds; an inadmissible query and
+  transition are rejected before any write, with the gate's reasons surfaced.

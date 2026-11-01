@@ -10,6 +10,17 @@ Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 
 toc::[]
 
+[WARNING]
+====
+This March 2026 quickstart is historical, not a current executable guide.
+Its parser/toolchain instructions and sample reports predate the trusted Rust
+parser and the canonical L0–L10 names. In particular, its claim that L9 is
+Proof Attachment and L10 is Cross-Cutting is false; source currently reaches
+only through L6 `CardinalitySafe`. Do not treat the sample PASS report as a
+runtime test or proof receipt. See `README.adoc`, `ROADMAP.adoc`, and the
+link:audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc[audit] for current scope.
+====
+
 == Prerequisites
 
 VCL-total requires the following tools. All can be managed via

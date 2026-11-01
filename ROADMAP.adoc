@@ -50,30 +50,49 @@ What exists, measured:
 | 150 across all workspace roots.
 |===
 
-The single most important qualification: *eleven levels are specified and
-proved; six are expressible.* `parse_statement` fixes `proof_clause`,
+The single most important qualification: *the L0–L10 predicates and
+certificates are specified/proved over `Statement` values; VCL source reaches
+at most L6.* `parse_statement` fixes `proof_clause`,
 `effect_decl`, `version_const`, `linear_annot` and `epistemic_clause` at
-`None`, and `infer_requested_level` awards L7-L10 on exactly those fields, so
-the highest level reachable from VCL source text is *L6 `CardinalitySafe`*.
-The gap is fail-closed and disclosed (unsupported clauses are rejected with an
-explicit message, never silently ignored) — but it is the gap that matters
-most.
+`None`, and `infer_requested_level` awards L7–L10 on exactly those fields, so
+the highest level reachable from source text is *L6 `CardinalitySafe`*. The
+parser also fail-closes on modal expressions (`KNOWS`, `BELIEVES`,
+`ANNOUNCE`, `COMMON`). The missing work is L7–L10 source grammar and
+parse-to-AST elaboration/binding; ordinary schema binding of field references
+already exists. Issue #25 concerned parser/corpus-boundary work, not K-CUT,
+and is closed. See the
+link:docs/audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc[relationship and
+source-gap audit] for the exact evidence and limits.
 
 == Nearest Work
 
 These are ordered by value, not by version number.
 
-. *Surface syntax for L7-L10.* Close the gap above. Without it the upper
-  ladder — including the entire consonance level — is reachable only by
-  constructing a `Statement` programmatically or decoding one off the wire.
-  Tracked in #25.
+. *Surface syntax and elaboration for L7-L10.* Add parser support that
+  constructs and binds `effect_decl`, `version_const`, `linear_annot`, and
+  `epistemic_clause` (including the modal expression forms), then reconcile
+  level inference across the source frontends. Until then, upper-level fields
+  can only arrive through a constructed `Statement` or wire decode; they are
+  not expressible in source. Issue #25 covered the earlier parser/boundary
+  work and is closed; it did not establish a K-CUT dependency.
+. *Execute the staged Agda Grade 3 port plan.* The current Idris2 corpus is
+  engineering-proof evidence, not a Mathesis Grade 3 theorem receipt. Port the
+  exact L0–L10 predicate/certificate statements in reviewable slices, with
+  pinned Agda CI receipts and theorem-by-theorem assumption records. The plan
+  is `verification/proofs/AGDA-GRADE3-PORT-PLAN.adoc`; no Grade 3 status is
+  claimed until each in-scope theorem checks in Agda.
 . *Wire `vclt-gate` into VeriSimDB.* Contract v1 is frozen and the producer
   works; the consumer (`rust-core/verisim-api/src/vcl.rs`) does not invoke it.
   Until it does, VCL-UT proves things about statements VeriSimDB never asks
   about.
-. *Discharge the two disclosed L10 residuals.* Transitive `ENTAILS`-cycle
-  detection and proposition well-typedness, both recorded as owed in
-  `verification/proofs/VERIFICATION-STANCE.adoc`.
+. *Close the remaining L10 boundary gaps.* Proposition well-typedness of
+  requirement expressions against the schema remains owed. Also align the
+  Rust decider's direct reciprocal-cycle check with the Idris predicate's
+  transitive-cycle detection before relying on non-source (wire/programmatic)
+  L10 statements. Idris implements a finite-fuel transitive-closure check, but
+  the corpus does not prove that this helper is equivalent to a formal
+  graph-reachability/acyclicity definition; that correctness theorem remains
+  outstanding, as does Rust/Idris alignment.
 . *Optional syntax cleanup: retire the legacy `HEXAD` spelling* when all
   supported frontends can do so compatibly. The current Rust parser accepts
   both `OCTAD` and `HEXAD` as the same `Source::Octad`; this is a source-name
@@ -101,10 +120,14 @@ These are ordered by value, not by version number.
 * [x] Property-based tests (`tests/property_test.rs`, `tests/fuzz_test.rs`)
 
 === v0.3.0 — Research Levels (L6-L9)
-* [x] Cardinality annotations and inference (reachable: `LIMIT` ⇒ L6)
-* [ ] Effect system (Read/Write/DDL) — proved; *no surface syntax*
-* [ ] Temporal type annotations — proved; *no surface syntax*
-* [ ] Linear types via Idris2 QTT — proved; *no surface syntax*
+* [x] `CardinalitySafe` LIMIT-presence predicate (source reachable; no exact
+  result-count inference)
+* [x] Effect-declaration-presence predicate and proof over AST
+* [ ] `EFFECTS` source syntax/elaboration and operation enforcement
+* [x] Version-constraint-presence predicate and proof over AST
+* [ ] Temporal source syntax/elaboration and freshness validation
+* [x] L9 bounded-use annotation predicate and proof over AST
+* [ ] Linear source syntax/elaboration and runtime resource enforcement
 * [ ] Integrate TypeQL-Experimental mechanisms
 
 === v0.4.0 — Consonance Level (L10)
@@ -112,8 +135,10 @@ These are ordered by value, not by version number.
 * [x] S2 transitions MERGE / SPLIT / NORMALISE, with NORMALISE fail-closed
   without an explicit justification
 * [ ] Surface syntax for epistemic clauses
-* [ ] Transitive `ENTAILS`-cycle detection
+* [x] Finite-fuel transitive `ENTAILS`-cycle detection implemented in the Idris predicate
+* [ ] Prove the detector equivalent to a formal graph-reachability/acyclicity definition
 * [ ] Proposition well-typedness against the schema
+* [ ] Align the Rust L10 cycle check with the Idris transitive predicate
 
 === v0.5.0 — VCL-DT Supersession
 * [ ] All 6 VCL-DT PROOF types expressible in VCL-UT
@@ -128,13 +153,23 @@ These are ordered by value, not by version number.
 
 == Dependencies
 
-* **TypeLL** type theory must stabilise for L6-L9. Note that L10 does *not*
-  depend on TypeLL: `EpistemicSafe` originates here, in the shift from
-  querying a store to addressing a consonance engine.
-* **VeriSimDB** statement router must support VCL-UT as a third path alongside
-  Slipstream (VCL) and VCL-DT.
-* **ReScript evangeliser** must prove concept first — VCL-UT and AffineScript
-  are the two showcase languages that follow.
+The TypeLL item below is a historical planning assumption, not an established
+build or deployment dependency. The current repository does not contain a
+versioned interface, import, theorem, or enforced rule establishing a TypeLL
+mapping for VCL-UT L6-L9. VCL-UT's local predicates and certificates are
+specified in its Rust and Idris sources; revise this planning assumption only
+if an explicit integration artefact establishes the relationship.
+
+* **TypeLL (unverified planning assumption):** Earlier roadmap text listed
+  TypeLL stabilization as a prerequisite for L6-L9. That prerequisite is not
+  established by the current local implementation. L10 is also defined here as
+  a VCL-UT predicate; this is not a claim that it has a cross-project mapping.
+* **VeriSimDB:** The statement router is planned to support VCL-UT as a third
+  path alongside Slipstream (VCL) and VCL-DT; consumer integration remains
+  outstanding.
+* **ReScript evangeliser:** A proof of concept is listed as a planning
+  prerequisite for the proposed VCL-UT and AffineScript showcase languages;
+  this is not a VCL-UT build dependency.
 
 == Future Directions
 

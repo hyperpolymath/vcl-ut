@@ -1,0 +1,143 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= Audit: VCL-UT Levels and Choreographic K-CUT
+:revdate: 2026-11-01
+
+== Finding
+
+No pre-existing or independently enforced artefact establishes choreographic
+K-CUT as a VCL-UT deployment dependency. This audit names K-CUT only to record
+that repository-scoped finding; it is not itself a design reference, import,
+build/runtime dependency, or machine-checked theorem establishing a blocker.
+Do not infer such a dependency from shared terms such as *epistemic*,
+*choreographic*, *Kripke*, or from level names.
+
+This is a repository-scoped finding, not a claim that K-CUT can never be useful
+or required by a particular deployment. A deployment-specific requirement
+needs an explicit artefact (for example, a versioned interface contract,
+consumer import, enforced build/deployment rule, or local theorem establishing
+the dependency).
+
+== Evidence and limits
+
+* Apart from this audit, the repository has no pre-existing
+  `K-CUT`/`K-Cut`/`KCut` design reference, import, or deployment rule. This
+  audit is descriptive, not an independently enforced dependency. The local
+  issue inventory contains no K-CUT issue.
+* Issue
+  https://github.com/hyperpolymath/vcl-ut/issues/25[#25] is about the VCL
+  parser / verified-corpus boundary. It is not a K-CUT dependency. It is now
+  closed; its historical description that no parser existed is stale because
+  the Rust parser in `src/interface/parse` now exists.
+* `verification/proofs/vclut-core.ipkg` includes
+  `VclTotal.Core.Epistemic`. `src/core/Epistemic.idr` contains a standalone
+  Kripke-style S5 formalisation (frames, accessibility properties, satisfaction
+  and epistemic operators). That is real local formal content, but the
+  deployment-facing L10 checker does not import or invoke this module.
+* L10's local `Checker.checkLevel10` / `Decide.epistemicConsistentStmt` path
+  checks a populated `EpistemicClause` structurally (declared agents and the
+  implemented finite-fuel `ENTAILS`-cycle detector). The L10 soundness theorem
+  proves checker acceptance implies that Boolean predicate; it does not prove
+  the helper equivalent to formal graph reachability/acyclicity, nor establish
+  a bridge to the Kripke model, choreographic K-CUT, or any deployment
+  requirement.
+
+Therefore the Kripke module is not evidence of a K-CUT deployment dependency,
+and no such blocker should be stated absent a new explicit artefact.
+
+== Actual L7–L10 source and binding gap
+
+Keep these two statements separate:
+
+. **Specified/proved:** the L0–L10 level constructors and proof predicates
+  exist over the Idris `Statement` representation. A cumulative certificate
+  at level N requires every predicate through N to hold; satisfying only the
+  named upper-level predicate is not sufficient. The L10 predicate is the
+  structural condition described above; it is not equivalent to invoking the
+  standalone Kripke semantics.
+. **Expressible from source:** the trusted Rust source parser currently reaches
+  at most L6 `CardinalitySafe`. Its AST mirrors the extension fields, but
+  `parse_statement` initializes `proof_clause`, `effect_decl`,
+  `version_const`, `linear_annot`, and `epistemic_clause` to `None`.
+  `infer_requested_level` awards L7–L10 only when the corresponding upper-level
+  fields are populated. The unsupported source clauses and modal expressions
+  fail closed.
+
+The missing work is source syntax plus elaboration/binding for those clauses:
+
+[cols="1,2,3"]
+|===
+| Level | AST field / source feature | Current source-path gap
+
+| L7 `EffectTracked`
+| `effect_decl` / `EFFECTS`
+| Clause is rejected; no parse-to-AST elaboration or binding.
+
+| L8 `TemporalSafe`
+| `version_const` / `AT VERSION`
+| Clause is rejected; no parse-to-AST elaboration or binding.
+
+| L9 `LinearSafe`
+| `linear_annot` / `CONSUME` or `USAGE`
+| Clauses are rejected; no parse-to-AST elaboration or binding.
+
+| L10 `EpistemicSafe`
+| `epistemic_clause`; `EPISTEMIC` and modal `KNOWS` / `BELIEVES` / `ANNOUNCE` / `COMMON`
+| Clauses/expressions are rejected; no source elaboration binds the epistemic AST. Separately, proposition well-typedness against the schema remains a disclosed limitation.
+|===
+
+This is not a claim that all schema binding is absent: the existing decider
+resolves ordinary field references against `OctadSchema`. The gap is that the
+source parser does not construct/bind the L7–L10 extension data required by
+the level inference and certifier. A wire-decoded or programmatically
+constructed `Statement` can carry those fields, but that does not make them
+expressible in VCL source.
+
+== Proof grade and verifier policy
+
+Apply the estate policies without conflating the proof lanes:
+
+* The Mathesis `estate-mathematical-architecture` defines **Grade 3** as a
+  locally type-checked Agda formulation that has not yet been translated to an
+  independent foundational system. It also requires exact proof-state and
+  receipt tracking; Mathesis is an index, not an endorsement of theorem status.
+* The Standards `PROOF-POLICY.adoc` maps first-party Rust code to Creusot,
+  engineering/API/ABI properties to Idris2, and implementation-independent
+  theory to Agda with rechecks in Rocq and Lean. The policy requires theorem
+  statements, assumptions, revisions, tool versions, invocations, and observed
+  results to be recorded; a successful build alone does not establish
+  correspondence between differently stated theorems.
+* VCL-UT's current L0–L10 safety corpus is Idris2 engineering evidence over its
+  AST. It is **not Mathesis Grade 3**, because it is not an Agda formulation.
+  Preserve the local Idris2 proof status in
+  `verification/proofs/VERIFICATION-STANCE.adoc`; do not replace it with an
+  invented Grade 3 label. Rust implementation obligations belong in the Rust
+  verification lane, not in an Agda grade by association.
+* If Grade 3 is the target for a language-independent claim (for example,
+  soundness of a VCL predicate), first formulate the exact proposition and
+  assumptions in Agda, use the estate's canonical profile
+  `agda --safe --without-K --cubical-compatible <module.agda>`, pin Agda and
+  standard-library versions, and retain a reproducible CI receipt. Record it
+  as Grade 3 only after local checking. Translation and reconciliation in
+  Rocq/Lean are subsequent stages, not implied by the Idris2 corpus build.
+  This is new proof work; a prose reclassification does not achieve it.
+
+Normative references, inspected at these exact revisions:
+
+* [Mathesis estate mathematical architecture](https://github.com/hyperpolymath/mathesis/blob/50a012dba57fe90c9aca8d57241690c133ab117c/estate-mathematical-architecture) (`estate-mathematical-architecture`, blob `65c7f3f...`).
+* [Standards proof and verification policy](https://github.com/metadatastician/standards/blob/46ee18323305d5b36e2eef936e47dd54c39ea736/3-practice/PROOF-POLICY.adoc) (policy blob `49abdbd...`).
+* Local proof ledger: `verification/proofs/VERIFICATION-STANCE.adoc`.
+* Staged Agda Grade 3 port plan (not proof evidence):
+  `verification/proofs/AGDA-GRADE3-PORT-PLAN.adoc`.
+
+== Source anchors
+
+* Canonical names/tags: `src/interface/parse/src/ast.rs` and
+  `src/interface/abi/Types.idr`.
+* Fail-closed source grammar and `None` initialization:
+  `src/interface/parse/src/parser.rs` (`parse_statement`,
+  `infer_requested_level`).
+* Checker predicates: `src/core/Decide.idr`, `src/core/Checker.idr`,
+  `src/core/Levels.idr`.
+* Standalone Kripke formalisation: `src/core/Epistemic.idr`; proof package
+  membership: `verification/proofs/vclut-core.ipkg`.
+* Parser-scope issue: GitHub #25, not a K-CUT issue.

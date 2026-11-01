@@ -52,6 +52,11 @@ This directory holds the *machine-verified* proof artefacts for vcl-ut.
   Rust parser+codec, certified Idris wire decoder) and the
   precisely-scoped residual OWED items.
 
+`AGDA-GRADE3-PORT-PLAN.adoc`::
+  Proposed, staged plan for formulating exact language-independent L0–L10
+  theorem claims in Agda toward Mathesis Grade 3. It is a plan only, not a
+  proof receipt or a change to the current Idris2 engineering-proof status.
+
 == Verifying
 
 [source,sh]
