@@ -182,15 +182,16 @@ diagram that previously appeared here:
 
 [source]
 ----
-VCL source text
-  -> Rust lexer/parser (`src/interface/parse`)
-  -> syntax AST (`Statement` / `VclOp`)
-  -> versioned wire representation / gate request
+Runtime gate request (VCL source text)
+  -> Rust `parse_op` (`src/interface/parse`)
+  -> `Statement` AST
   -> Rust `certified_level` decider
   -> runtime gate verdict
 
 Separately, the Idris proof corpus checks corresponding predicates over the
-mirrored AST offline; it does not feed the runtime gate verdict.
+mirrored AST offline; it does not feed the runtime gate verdict. The versioned
+wire codec is a separate interface and is not an intermediate step in this
+`vclt-gate` runtime path.
 ----
 
 The parser establishes syntax, not schema-bound types or a full certificate.

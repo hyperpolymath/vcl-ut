@@ -61,17 +61,19 @@ floor without the second, and you cannot build the second without the first.
 **Levels 0-5** are well-established in the academic literature and implemented
 in various real-world systems (though rarely all six together).
 
-**Levels 6-9** are additional protections identified through our research.
-They address real failure modes that levels 0-5 leave uncovered. These levels
-use TypeQL-Experimental extension mechanisms.
+**Levels 6-9** name additional safety dimensions. The examples in the L7-L9
+sections are design sketches, not accepted VCL-UT source syntax. The current
+AST predicates have narrower scopes, stated at the start of each section and
+in the progression summary below.
 
 **Level 10, `EpistemicSafe`, is a separate structural predicate over a
 `Statement`.** The current predicate requires a populated epistemic clause,
 declared agents, references only to declared agents, and an acyclic `ENTAILS`
 graph. It does not establish whether the engine is entitled to believe or give
 an answer, whether modalities agree, or whether an authority is competent. That
-scope is distinct from the structural and operational checks at Levels 0-9; it
-is the reason this ladder has eleven rungs and not ten.
+scope is distinct from the AST predicates at Levels 0-9, including the
+presence/annotation checks at L7-L9; it is the reason this ladder has eleven
+rungs and not ten.
 
 == The Progression at a Glance
 
@@ -115,19 +117,19 @@ is the reason this ladder has eleven rungs and not ten.
 | Code assumes one row, gets zero or thousands
 
 | 7 -- Effects
-| Does this query read, write, or modify structure?
-| Compile time
-| Read-only functions accidentally delete data
+| Does a constructed statement contain an effect declaration?
+| AST predicate; not operation enforcement
+| A missing effect declaration fails L7
 
 | 8 -- Temporal
-| Is the data fresh enough for the intended use?
-| Compile time (bounds in types)
-| Stale data treated as current
+| Does a constructed statement contain a version constraint?
+| AST predicate; not freshness validation
+| A missing version constraint fails L8
 
 | 9 -- Linearity
-| Are resources used exactly once?
-| Compile time (via QTT)
-| Connection leaks, use-after-close
+| Does a constructed statement contain a supported bounded-use annotation?
+| AST predicate; not runtime resource tracking
+| A missing or unsupported annotation fails L9
 |===
 
 == Level 0: Parse-Time Safety
@@ -429,27 +431,30 @@ processes only the first of many results, silently ignoring the rest.
 [NOTE]
 ====
 The `EFFECTS` forms shown in this section are illustrative design syntax and
-are not accepted by the current VCL-UT source parser.
+are not accepted by the current VCL-UT source parser. The current L7 AST
+predicate checks only that an effect declaration is present; it does not
+compare operations with the declared effects or enforce read-only behavior.
 ====
 
 === What It Checks
 
-Every query is classified by its effects:
+The intended effect system classifies queries by their effects:
 
 - **Read** -- retrieves data without modification
 - **Write** -- inserts, updates, or deletes data
 - **DDL** -- modifies schema structure (create table, alter column)
 
-A function that only has `Read` permission _cannot_ perform writes. This is
-enforced at compile time, not by convention.
+A complete effect checker could reject writes in a read-only context. The
+current L7 predicate does not provide that enforcement.
 
 === When It Checks
 
-At **compile time**, using an effect system encoded in Idris2.
+The L7 predicate checks the `effect_decl` field on an already-constructed
+`Statement`; it is not a compile-time source check in the current parser.
 
-=== How VCL-total Implements It
+=== VCL-total Design Sketch
 
-This level uses the **effect system** extension from TypeQL-Experimental:
+The syntax table below sketches a proposed effect-system extension:
 
 [cols="1,2"]
 |===
@@ -476,9 +481,9 @@ RETRACT users WHERE users.expired = true EFFECTS { Read, Write }
 -- OK: Write effect is available.
 ----
 
-=== TypeQL-Experimental Encoding
+=== Illustrative TypeQL-Experimental Encoding
 
-Effects are tracked using an effect set with subsumption proofs in Idris2:
+A full effect checker could track an effect set with subsumption proofs in Idris2:
 
 ----
 data Effect = Read | Write | DDL
@@ -490,8 +495,10 @@ data Effect = Read | Write | DDL
 
 === What You Lose Without It
 
-A "reporting" function accidentally executes a DELETE. A monitoring dashboard
-triggers a write. An analytics query modifies production data.
+Without effect enforcement in a complete implementation, a "reporting"
+function could accidentally execute a DELETE, a monitoring dashboard could
+trigger a write, or an analytics query could modify production data. The
+current L7 predicate alone does not prevent these outcomes.
 
 ---
 
@@ -499,28 +506,33 @@ triggers a write. An analytics query modifies production data.
 
 [NOTE]
 ====
-The `AS OF` forms shown in this section are illustrative design syntax and are
-not accepted by the current VCL-UT source parser.
+The temporal forms shown in this section, including `AS OF`, are illustrative
+design syntax and are not accepted by the current VCL-UT source parser. The
+current L8 AST predicate
+checks only that a version constraint is present; it does not establish
+freshness or validate temporal bounds.
 ====
 
 === What It Checks
 
-Queries that involve time carry their temporal bounds in the type system.
-The compiler ensures:
+A complete temporal type system could carry bounds and validate:
 
-- Historical queries actually get historical data
-- Freshness guarantees are met (data is not staler than claimed)
-- Bi-temporal queries correctly distinguish between "when it happened" (valid
+- Whether historical queries actually get historical data
+- Whether freshness guarantees are met (data is not staler than claimed)
+- Whether bi-temporal queries distinguish between "when it happened" (valid
   time) and "when we recorded it" (transaction time)
+
+The current L8 predicate checks the `version_const` field only; it does not
+perform those temporal validations.
 
 === When It Checks
 
-At **compile time**, using temporal type annotations.
+The L8 predicate checks `version_const` on an already-constructed `Statement`;
+it is not a compile-time temporal analysis in the current source parser.
 
-=== How VCL-total Implements It
+=== VCL-total Design Sketch
 
-This level uses the **modal type** and **session type** extensions from
-TypeQL-Experimental:
+The syntax table below sketches proposed modal-type and session-type extensions:
 
 [cols="1,2"]
 |===
@@ -554,9 +566,9 @@ SELECT orders.status
 -- Every result carries a timestamp within the specified range.
 ----
 
-=== TypeQL-Experimental Encoding
+=== Illustrative TypeQL-Experimental Encoding
 
-Temporal safety uses box types indexed by world/scope:
+A complete temporal checker could use box types indexed by world/scope:
 
 ----
 -- Modal type: data tagged with its temporal context
@@ -566,9 +578,10 @@ data Temporal : Type -> TemporalBound -> Type where
 
 === What You Lose Without It
 
-Code treats yesterday's cached data as if it were live. Financial decisions
-are made on stale price data. Medical records show a patient's old medication
-list instead of the current one.
+Without temporal validation in a complete implementation, code could treat
+yesterday's cached data as live, financial decisions could use stale prices,
+and medical records could show an old medication list. The current L8
+predicate alone does not rule out these cases.
 
 ---
 
@@ -576,30 +589,28 @@ list instead of the current one.
 
 [NOTE]
 ====
-The `CONSUME` and `USAGE` forms shown in this section are illustrative design
-syntax and are not accepted by the current VCL-UT source parser.
+The `CONSUME`, `USAGE`, and `WITH SESSION` forms shown in this section are
+illustrative design syntax and are not accepted by the current VCL-UT source
+parser. The current L9 AST predicate accepts a `LinUseOnce` or `LinBounded`
+annotation; it does not
+inspect or prove actual runtime resource consumption or session behavior.
 ====
 
 === What It Checks
 
-Resources that must be used exactly once -- database connections, transaction
-handles, cursor positions -- are tracked by the type system. You cannot:
-
-- **Forget** to close a connection (it would be unused -- the compiler rejects it)
-- **Use** a connection after closing it (it has been consumed -- the compiler
-  rejects it)
-- **Share** a transaction handle between two threads (it is linear -- only one
-  owner at a time)
+A complete linear-use checker could track resources such as database
+connections, transaction handles, and cursor positions, preventing forgotten,
+reused, or improperly shared resources. The current L9 predicate only
+recognizes the bounded-use annotation on a constructed `Statement`.
 
 === When It Checks
 
-At **compile time**, using Quantitative Type Theory (QTT) -- the same
-theoretical foundation that powers Idris2's resource tracking.
+The L9 predicate checks `linear_annot` on an already-constructed `Statement`;
+it does not track resource use at runtime or in the current source parser.
 
-=== How VCL-total Implements It
+=== VCL-total Design Sketch
 
-This level uses the **linear type** and **QTT** extensions from
-TypeQL-Experimental:
+The syntax table below sketches proposed linear-type and QTT extensions:
 
 [cols="1,2"]
 |===
@@ -630,9 +641,9 @@ COMMIT txn
 -- It cannot be used again. It cannot be forgotten (unused linear resource).
 ----
 
-=== TypeQL-Experimental Encoding
+=== Illustrative Idris2/QTT Encoding
 
-Linearity is encoded using Idris2's native QTT support:
+A complete linear-use checker could encode the resource constraints using Idris2's native QTT support:
 
 ----
 -- Connection with quantity 1 (must be used exactly once)
@@ -644,9 +655,9 @@ close : (1 _ : Connection) -> IO ()
 -- If you close twice, the compiler rejects your code.
 ----
 
-=== Session Types for Protocol Safety
+=== Illustrative Session Types for Protocol Safety
 
-Session types enforce a communication protocol between client and database:
+In a complete implementation, session types could enforce a communication protocol between client and database:
 
 ----
 data SessionState = Ready | InTransaction | Closed
@@ -667,9 +678,10 @@ close : Session Ready -> Session Closed
 
 === What You Lose Without It
 
-Connection leaks exhaust the connection pool. Use-after-close corrupts data.
-Double-commits create duplicate transactions. Forgotten rollbacks leave locks
-held indefinitely.
+Without linear-use enforcement in a complete implementation, connection leaks
+could exhaust the pool, use-after-close could corrupt data, double-commits could
+create duplicate transactions, and forgotten rollbacks could leave locks held.
+The current L9 predicate alone does not prevent these outcomes.
 
 ---
 
@@ -818,21 +830,25 @@ link:audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc[audit].
 | Wrong assumptions about how many results a query returns
 
 | 7 -- Effects
-| Accidental data modification by read-only code
+| Missing effect declaration; this predicate does not block writes
 
 | 8 -- Temporal
-| Stale data treated as current, mixed time contexts
+| Missing version constraint; this predicate does not validate freshness
 
 | 9 -- Linearity
-| Connection leaks, use-after-close, double-commit
+| Missing supported bounded-use annotation; this predicate does not track runtime use
 
 | 10 -- Epistemic
 | A populated epistemic clause with declared agents and no `ENTAILS` cycles
 |===
 
-Levels 0-9 cover the vast majority of database bugs that have caused
-real-world catastrophes, and the goal is to eliminate them at compile time
-with zero runtime overhead.
+The level names describe distinct safety dimensions, but they do not by
+themselves establish that each dimension is enforced by the source parser or at
+runtime. In particular, the current L7-L9 predicates inspect fields on an
+already-constructed `Statement`: effect-declaration presence, version-constraint
+presence, and a supported bounded-use annotation, respectively. They do not
+implement the operational effect, freshness, or resource-use guarantees sketched
+in those sections.
 
 Level 10 is a separate *structural* predicate over an already-constructed
 `Statement`. It requires a populated epistemic clause, at least one declared

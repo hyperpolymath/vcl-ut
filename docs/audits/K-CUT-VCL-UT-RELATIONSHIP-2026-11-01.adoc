@@ -47,10 +47,11 @@ and no such blocker should be stated absent a new explicit artefact.
 Keep these two statements separate:
 
 . **Specified/proved:** the L0–L10 level constructors and proof predicates
-  exist over the Idris `Statement` representation. A certificate can be
-  constructed for an already-built statement satisfying the relevant
-  predicate. The L10 predicate is the structural condition described above;
-  it is not equivalent to invoking the standalone Kripke semantics.
+  exist over the Idris `Statement` representation. A cumulative certificate
+  at level N requires every predicate through N to hold; satisfying only the
+  named upper-level predicate is not sufficient. The L10 predicate is the
+  structural condition described above; it is not equivalent to invoking the
+  standalone Kripke semantics.
 . **Expressible from source:** the trusted Rust source parser currently reaches
   at most L6 `CardinalitySafe`. Its AST mirrors the extension fields, but
   `parse_statement` initializes `proof_clause`, `effect_decl`,

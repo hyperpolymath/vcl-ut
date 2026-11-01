@@ -207,20 +207,14 @@ consonance state_.
 
 == Lineage
 
-The 10 type safety levels originate in **TypeLL** (the core type theory),
-flow into **PanLL** (panel framework type safety), and are now applied to
-consonance statements as **VCL-UT**.
-
-[source]
-----
-TypeLL (type theory core — defines the 10 levels)
-   │
-   ├──→ PanLL (panel framework type safety)
-   │
-   └──→ VCL-UT (consonance-statement type safety)
-             │
-             └──→ Verisim (8-modal octad consonance engine)
-----
+Earlier editions of this README described the levels as originating in
+**TypeLL** and flowing through **PanLL** into **VCL-UT**. That is an unverified
+historical/design attribution, not an established implementation dependency or
+a verified one-to-one mapping. VCL-UT's canonical eleven tags (L0–L10) and
+predicates are specified by local Rust and Idris artefacts; do not infer
+cross-project correspondence or deployment dependencies from shared names. See
+`docs/architecture/ARCHITECTURE.adoc` and
+`docs/audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc` for the current scope.
 
 === The Two-Tier Model
 

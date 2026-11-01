@@ -146,13 +146,23 @@ These are ordered by value, not by version number.
 
 == Dependencies
 
-* **TypeLL** type theory must stabilise for L6-L9. Note that L10 does *not*
-  depend on TypeLL: `EpistemicSafe` originates here, in the shift from
-  querying a store to addressing a consonance engine.
-* **VeriSimDB** statement router must support VCL-UT as a third path alongside
-  Slipstream (VCL) and VCL-DT.
-* **ReScript evangeliser** must prove concept first — VCL-UT and AffineScript
-  are the two showcase languages that follow.
+The TypeLL item below is a historical planning assumption, not an established
+build or deployment dependency. The current repository does not contain a
+versioned interface, import, theorem, or enforced rule establishing a TypeLL
+mapping for VCL-UT L6-L9. VCL-UT's local predicates and certificates are
+specified in its Rust and Idris sources; revise this planning assumption only
+if an explicit integration artefact establishes the relationship.
+
+* **TypeLL (unverified planning assumption):** Earlier roadmap text listed
+  TypeLL stabilization as a prerequisite for L6-L9. That prerequisite is not
+  established by the current local implementation. L10 is also defined here as
+  a VCL-UT predicate; this is not a claim that it has a cross-project mapping.
+* **VeriSimDB:** The statement router is planned to support VCL-UT as a third
+  path alongside Slipstream (VCL) and VCL-DT; consumer integration remains
+  outstanding.
+* **ReScript evangeliser:** A proof of concept is listed as a planning
+  prerequisite for the proposed VCL-UT and AffineScript showcase languages;
+  this is not a VCL-UT build dependency.
 
 == Future Directions
 
