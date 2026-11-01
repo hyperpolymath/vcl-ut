@@ -88,9 +88,11 @@ These are ordered by value, not by version number.
 . *Close the remaining L10 boundary gaps.* Proposition well-typedness of
   requirement expressions against the schema remains owed. Also align the
   Rust decider's direct reciprocal-cycle check with the Idris predicate's
-  transitive-cycle check before relying on non-source (wire/programmatic) L10
-  statements. The Idris transitive-cycle proof is already implemented; do not
-  track it as outstanding.
+  transitive-cycle detection before relying on non-source (wire/programmatic)
+  L10 statements. Idris implements a finite-fuel transitive-closure check, but
+  the corpus does not prove that this helper is equivalent to a formal
+  graph-reachability/acyclicity definition; that correctness theorem remains
+  outstanding, as does Rust/Idris alignment.
 . *Optional syntax cleanup: retire the legacy `HEXAD` spelling* when all
   supported frontends can do so compatibly. The current Rust parser accepts
   both `OCTAD` and `HEXAD` as the same `Source::Octad`; this is a source-name
@@ -118,10 +120,12 @@ These are ordered by value, not by version number.
 * [x] Property-based tests (`tests/property_test.rs`, `tests/fuzz_test.rs`)
 
 === v0.3.0 — Research Levels (L6-L9)
-* [x] Cardinality annotations and inference (reachable: `LIMIT` ⇒ L6)
-* [ ] Effect system (Read/Write/DDL) — proved; *no surface syntax*
-* [ ] Temporal type annotations — proved; *no surface syntax*
-* [ ] Linear types via Idris2 QTT — proved; *no surface syntax*
+* [x] `CardinalitySafe` LIMIT-presence predicate (source reachable; no exact
+  result-count inference)
+* [ ] Effect-declaration predicate (AST only; no surface syntax or operation
+  enforcement)
+* [ ] Version-constraint presence predicate and proof over AST — no surface syntax or freshness validation
+* [ ] L9 bounded-use annotation predicate and proof — no surface syntax or runtime resource enforcement
 * [ ] Integrate TypeQL-Experimental mechanisms
 
 === v0.4.0 — Consonance Level (L10)
@@ -129,7 +133,8 @@ These are ordered by value, not by version number.
 * [x] S2 transitions MERGE / SPLIT / NORMALISE, with NORMALISE fail-closed
   without an explicit justification
 * [ ] Surface syntax for epistemic clauses
-* [x] Transitive `ENTAILS`-cycle detection in the Idris proof predicate
+* [x] Finite-fuel transitive `ENTAILS`-cycle detection implemented in the Idris predicate
+* [ ] Prove the detector equivalent to a formal graph-reachability/acyclicity definition
 * [ ] Proposition well-typedness against the schema
 * [ ] Align the Rust L10 cycle check with the Idris transitive predicate
 

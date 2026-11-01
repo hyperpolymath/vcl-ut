@@ -32,7 +32,9 @@ for level names, proof scope, and source expressibility.
 [source]
 ----
 Runtime gate:
-  VCL source -> Rust lexer/parser -> AST -> Rust `certified_level` -> verdict
+  VCL source -> Rust `parse_op` -> `VclOp`
+    Query(Statement) -> `certified_level` -> query verdict
+    Transit(Transition) -> `certified_transition_level` -> transition verdict (L4 ceiling)
 
 Offline verification:
   Idris proof corpus checks corresponding predicates over the mirrored AST
@@ -40,11 +42,13 @@ Offline verification:
 
 The source parser is syntax-only and fail-closed on unsupported L7–L10
 clauses. Schema resolution happens in the Rust decider for ordinary field
-references. The runtime `vclt-gate` calls the Rust `certified_level` decider;
-it does not invoke or link the Idris proof corpus. Idris checks the corresponding
-predicate and certificate claims offline over the mirrored AST. The VeriSimDB
-consumer-side gate integration is a separate outstanding item; this repository
-does not currently establish a full parse-to-execution path.
+references. For `VclOp::Query`, `vclt-gate` calls the Rust
+`certified_level` decider; `VclOp::Transit` is routed separately through
+`certified_transition_level`, with an L4 ceiling and a transition-shaped
+response. Neither runtime path invokes or links the Idris proof corpus. Idris
+checks corresponding predicate and certificate claims offline over the mirrored
+AST. The VeriSimDB consumer-side gate integration remains outstanding; this
+repository does not establish a full parse-to-execution path.
 
 == The 11 Safety Levels
 
@@ -71,7 +75,7 @@ expressibility remains bounded by the parser's L6 ceiling.
 
 |L2
 |`TypeCompat`
-|Compared expression types are compatible
+|Types are compatible for comparisons in the `WHERE` clause
 |`Core.Decide`, `Core.Checker`
 |Type check
 
@@ -113,16 +117,19 @@ expressibility remains bounded by the parser's L6 ceiling.
 
 |L9
 |`LinearSafe`
-|A `UseOnce` or bounded linear annotation is present
+|A `LinUseOnce` or `LinBounded` annotation is present
 |`Core.Decide`, `Core.Checker`
 |Check
 
 |L10
 |`EpistemicSafe`
-|Epistemic clause has declared agents and passes the implemented `ENTAILS`-cycle condition
+|Populated clause has declared agents and no cycle reported by the implemented `ENTAILS` detector
 |`Core.Decide`, `Core.Checker`, `Core.Levels`
 |Check
 |===
+
+NOTE: The L10 row names the implemented Boolean cycle check; it is not a theorem
+that the finite-fuel helper computes formal graph acyclicity. See the audit.
 
 NOTE: These are the canonical L0–L10 tags, not the obsolete L1–L11 ladder
 in older architecture prose. The proof predicates apply to an already-built
@@ -183,15 +190,14 @@ diagram that previously appeared here:
 [source]
 ----
 Runtime gate request (VCL source text)
-  -> Rust `parse_op` (`src/interface/parse`)
-  -> `Statement` AST
-  -> Rust `certified_level` decider
-  -> runtime gate verdict
+  -> Rust `parse_op` (`src/interface/parse`) -> `VclOp`
+       -> `Query(Statement)` -> `certified_level` -> query verdict
+       -> `Transit(Transition)` -> `certified_transition_level` -> transition verdict (L4 ceiling)
 
 Separately, the Idris proof corpus checks corresponding predicates over the
-mirrored AST offline; it does not feed the runtime gate verdict. The versioned
+mirrored AST offline; it does not feed either runtime verdict. The versioned
 wire codec is a separate interface and is not an intermediate step in this
-`vclt-gate` runtime path.
+`vclt-gate` request path.
 ----
 
 The parser establishes syntax, not schema-bound types or a full certificate.

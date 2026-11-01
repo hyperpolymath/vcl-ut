@@ -61,15 +61,16 @@ floor without the second, and you cannot build the second without the first.
 **Levels 0-5** are well-established in the academic literature and implemented
 in various real-world systems (though rarely all six together).
 
-**Levels 6-9** name additional safety dimensions. The examples in the L7-L9
-sections are design sketches, not accepted VCL-UT source syntax. The current
-AST predicates have narrower scopes, stated at the start of each section and
-in the progression summary below.
+**Levels 6-9** name additional safety dimensions. The L6 `SELECT UNIQUE` and
+`SELECT OPTIONAL` examples and the L7-L9 forms are design sketches, not
+accepted VCL-UT source syntax (the parser does accept `LIMIT`). The current AST
+predicates have narrower scopes, stated at the start of those sections and in
+the progression summary below.
 
 **Level 10, `EpistemicSafe`, is a separate structural predicate over a
 `Statement`.** The current predicate requires a populated epistemic clause,
-declared agents, references only to declared agents, and an acyclic `ENTAILS`
-graph. It does not establish whether the engine is entitled to believe or give
+declared agents, references only to declared agents, and no cycle detected by
+the implemented `ENTAILS` check. It does not establish whether the engine is entitled to believe or give
 an answer, whether modalities agree, or whether an authority is competent. That
 scope is distinct from the AST predicates at Levels 0-9, including the
 presence/annotation checks at L7-L9; it is the reason this ladder has eleven
@@ -112,9 +113,9 @@ rungs and not ten.
 | Runtime crashes on unexpected data shapes
 
 | 6 -- Cardinality
-| How many results will the query return?
-| Compile time
-| Code assumes one row, gets zero or thousands
+| Does a constructed statement contain a `LIMIT`?
+| AST predicate; not exact cardinality inference
+| A missing `LIMIT` fails L6
 
 | 7 -- Effects
 | Does a constructed statement contain an effect declaration?
@@ -364,23 +365,30 @@ when the code is compiled.
 
 == Level 6: Cardinality Safety
 
+[NOTE]
+====
+The current L6 AST predicate checks only that a `LIMIT` is present. It does
+not infer `ExactlyOne`, `AtMostOne`, or any other exact result cardinality from
+a schema or query. The parser accepts `LIMIT`; the `SELECT UNIQUE` and
+`SELECT OPTIONAL` forms in the design sketch below are not established parser
+features.
+====
+
 === What It Checks
 
-The number of results a query returns is part of the return type:
-
-- `ExactlyOne<T>` -- guaranteed to return exactly one result
-- `AtMostOne<T>` -- returns zero or one result
-- `NonEmpty<T>` -- returns at least one result
-- `List<T>` -- returns zero or more results
+The current predicate checks for a `limit` value on an already-constructed
+`Statement`. A present limit bounds a query syntactically; it does not prove
+how many rows the query will return.
 
 === When It Checks
 
-At **compile time**, using schema constraints (unique keys, NOT NULL) and query
-structure (LIMIT, DISTINCT, aggregation).
+The L6 predicate checks the AST field; it does not perform compile-time
+cardinality inference from schema constraints or query semantics.
 
-=== How VCL-total Implements It
+=== VCL-total Design Sketch
 
-This level uses the **TypeQL-Experimental** extension mechanisms:
+The table below sketches stronger result-cardinality types beyond the current
+L6 predicate:
 
 [cols="1,2"]
 |===
@@ -409,9 +417,9 @@ SELECT OPTIONAL users WHERE users.email = ?email
 -- The caller MUST pattern-match on Some/None.
 ----
 
-=== TypeQL-Experimental Encoding
+=== Illustrative Cardinality Encoding
 
-Cardinality is encoded in Idris2 using dependent types:
+A full cardinality analysis could encode result bounds using dependent types:
 
 ----
 data Cardinality = ExactlyOne | AtMostOne | NonEmpty | Many
@@ -421,8 +429,9 @@ Query : (card : Cardinality) -> Schema -> Type -> Type
 
 === What You Lose Without It
 
-Code assumes a query returns one row and crashes when it returns zero. Or code
-processes only the first of many results, silently ignoring the rest.
+Without other query limits, a request can return zero or many rows when the
+caller assumed one. The current L6 presence check rejects an absent `LIMIT`,
+but does not establish an exact result count or prevent an overly large limit.
 
 ---
 
@@ -724,21 +733,27 @@ The Idris certificate `L10_EpistemicSafe` is witnessed by
 . an epistemic clause is present;
 . at least one agent is declared;
 . every agent referenced by a requirement is among the declared agents;
-. the `ENTAILS` graph is acyclic (including transitive cycles).
+. the implemented finite-fuel transitive-cycle predicate reports no cycle; its
+  equivalence to a formal graph-acyclicity definition is not yet proved.
 
-The Idris proof corpus now checks transitive cycles using
-`Decide.hasTransitiveCycle`, and `Checker.checkLevel10Sound` proves soundness
-for that implemented structural predicate. This is not semantic soundness of
-the standalone Kripke model, and not a factive-warrant theorem.
+The Idris decider implements transitive-cycle detection using
+`Decide.hasTransitiveCycle`. `Checker.checkLevel10Sound` proves that checker
+acceptance implies the Boolean structural predicate; it does not prove that
+the finite-fuel helper is equivalent to formal graph reachability or acyclicity.
+This is not semantic soundness of the standalone Kripke model, and not a
+factive-warrant theorem.
 
 === Disclosed Residual
 
 * **Proposition well-typedness.** The `Expr` carried by an epistemic
   requirement is not yet checked against the schema.
-* **Rust/Idris cycle-check alignment.** The Idris predicate detects
-  transitive cycles; the Rust mirror in `src/interface/parse/src/decider.rs`
-  currently detects direct reciprocal `ENTAILS` pairs only. Preserve this
-  cross-implementation difference when describing the certified path; it
+* **Cycle-detector correctness.** The Idris implementation uses finite-fuel
+  transitive closure, but no theorem establishes equivalence with a formal
+  graph-reachability/acyclicity definition.
+* **Rust/Idris cycle-check alignment.** The Idris implementation attempts to
+  detect transitive cycles; the Rust mirror in
+  `src/interface/parse/src/decider.rs` currently detects direct reciprocal
+  `ENTAILS` pairs only. Preserve this difference when describing the gate; it
   does not change the fact that source syntax cannot currently request L10.
 
 The L10 soundness theorem is real but has a defined scope: it proves the
@@ -827,7 +842,7 @@ link:audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc[audit].
 | Runtime type mismatches when processing query results
 
 | 6 -- Cardinality
-| Wrong assumptions about how many results a query returns
+| Missing `LIMIT`; the predicate does not establish result cardinality
 
 | 7 -- Effects
 | Missing effect declaration; this predicate does not block writes
@@ -839,22 +854,25 @@ link:audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc[audit].
 | Missing supported bounded-use annotation; this predicate does not track runtime use
 
 | 10 -- Epistemic
-| A populated epistemic clause with declared agents and no `ENTAILS` cycles
+| Populated clause, declared agents, and no cycle reported by the current detector
 |===
 
 The level names describe distinct safety dimensions, but they do not by
 themselves establish that each dimension is enforced by the source parser or at
-runtime. In particular, the current L7-L9 predicates inspect fields on an
-already-constructed `Statement`: effect-declaration presence, version-constraint
-presence, and a supported bounded-use annotation, respectively. They do not
-implement the operational effect, freshness, or resource-use guarantees sketched
-in those sections.
+runtime. In particular, the current L6-L9 predicates inspect fields on an
+already-constructed `Statement`: a `LIMIT`, effect-declaration presence,
+version-constraint presence, and a supported bounded-use annotation,
+respectively. They do not infer exact result cardinality or implement the
+operational effect, freshness, or resource-use guarantees sketched in those
+sections.
 
 Level 10 is a separate *structural* predicate over an already-constructed
 `Statement`. It requires a populated epistemic clause, at least one declared
-agent, references only to declared agents, and an acyclic `ENTAILS` graph. It
-does not establish whether the engine is entitled to believe or give an answer;
-in particular, it does not prove modal witnesses agree or an authority is
-competent. The Idris predicate is proved over the AST, while the Rust mirror
-currently checks direct reciprocal entailment pairs only. The ladder therefore
-has eleven distinct predicates, not a theorem of epistemic warrant.
+agent, references only to declared agents, and no cycle reported by the
+implemented finite-fuel `ENTAILS` detector. No theorem proves that detector
+matches formal graph acyclicity. L10 does not establish whether the engine is
+entitled to believe or give an answer; in particular, it does not prove modal
+witnesses agree or an authority is competent. The Idris predicate is proved
+over the AST, while the Rust mirror currently checks direct reciprocal
+entailment pairs only. The ladder therefore has eleven distinct predicates,
+not a theorem of epistemic warrant.

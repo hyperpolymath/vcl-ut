@@ -34,10 +34,12 @@ the dependency).
   and epistemic operators). That is real local formal content, but the
   deployment-facing L10 checker does not import or invoke this module.
 * L10's local `Checker.checkLevel10` / `Decide.epistemicConsistentStmt` path
-  checks a populated `EpistemicClause` structurally (declared agents and
-  `ENTAILS`-cycle conditions). The L10 soundness theorem is about that
-  predicate over a `Statement`; it does not establish a bridge to the Kripke
-  model, choreographic K-CUT, or any deployment requirement.
+  checks a populated `EpistemicClause` structurally (declared agents and the
+  implemented finite-fuel `ENTAILS`-cycle detector). The L10 soundness theorem
+  proves checker acceptance implies that Boolean predicate; it does not prove
+  the helper equivalent to formal graph reachability/acyclicity, nor establish
+  a bridge to the Kripke model, choreographic K-CUT, or any deployment
+  requirement.
 
 Therefore the Kripke module is not evidence of a K-CUT deployment dependency,
 and no such blocker should be stated absent a new explicit artefact.

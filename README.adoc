@@ -20,9 +20,9 @@ rename scope. The GitHub repository URL is unchanged.
 NOTE: Two superseded expansions of "UT" are still in circulation and should
 not be used: "Ubiquitous Type-safe" (which appeared in this README) and
 "-total". *Usage-Tracked* is the canonical name and design direction. The
-current L9 `LinearSafe` predicate checks an AST annotation (`UseOnce` or
-`Bounded`); that annotation is not yet expressible from source and is not a
-runtime resource-use proof. "-total" survives in the crate name `vcl-total`
+current L9 `LinearSafe` predicate accepts a `LinUseOnce` or `LinBounded` AST
+annotation; it is not yet expressible from source and is not a runtime
+resource-use proof. "-total" survives in the crate name `vcl-total`
 and the Idris namespace `VclTotal`; renaming those is a separate, invasive
 change and is deliberately not bundled here.
 
@@ -111,7 +111,9 @@ an actively maintained identity-consonance system.
 
 VCL-UT does not prove the entire database is globally correct. It checks
 whether a particular VCL statement or transition is _admissible_. A transition
-may require obligations such as:
+may require obligations such as those listed below; this design-level catalogue
+does not imply that each obligation is implemented by the current parser or
+gate. The current predicate scopes are in the canonical-level table below.
 
 [source]
 ----
@@ -161,19 +163,14 @@ contract].
 
 [source]
 ----
-User / system writes VCL
-        |
-        v
-VCL parser and binder
-        |
-        v
-VCL-UT safety pipeline    (11 levels, L0-L10)
-        |
-        v
-verified transition plan
-        |
-        v
-VeriSimDB consonance engine (octad of modal witnesses)
+Runtime gate request (VCL source text)
+  -> Rust `parse_op` -> `VclOp`
+       -> `Query(Statement)` -> `certified_level` -> query verdict
+       -> `Transit(Transition)` -> `certified_transition_level` -> transition verdict (L4 ceiling)
+
+Idris proof predicates and cumulative certificates are checked offline; they do
+not feed the Rust runtime verdict. VeriSimDB consumer integration remains
+outstanding.
 ----
 
 == Important Distinctions
@@ -239,134 +236,83 @@ claim proof-type validation or automatic L9/L10 execution from that syntax.
 See the level walkthrough and the
 link:docs/audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc[parser and K-CUT audit].
 
-=== Adoption Strategy
+== Canonical Safety Levels (L0-L10)
 
-The type safety story unfolds in three phases:
-
-1. **ReScript evangeliser** proves the concept first — demonstrate the value of these type safety levels in ReScript itself, where the developer community can experience them firsthand
-2. Once proven, **VCL-UT** and **AffineScript** become the two showcase languages for teaching people the 10 levels of type safety
-3. VCL-UT handles the database-interaction domain; AffineScript handles general-purpose programming
-
-== The 10 Levels of Type Safety
-
-=== Established (IO-Covered) — 6 Levels
+The Idris predicates and cumulative `SafetyCertificate` values apply to an
+already-constructed `Statement`. Each certificate at level N requires all
+predicates through N. The trusted Rust source parser currently reaches L6;
+L7-L10 source clauses fail closed. The table records implemented predicate
+scope, not the stronger design semantics sketched in older material.
 
 [cols="1,2,3"]
 |===
-| Level | Name | Description
+| Tag | Canonical name | Current predicate scope
 
-| L1 | Syntactic parsability | Parser accepts the input.
-| L2 | Well-formedness | Structure matches the grammar.
-| L3 | Schema conformance | References resolve to declared entities.
-| L4 | Type compatibility | Operator arities and types align.
-| L5 | Nullability tracking | `NULL` propagates explicitly through joins.
-| L6 | Injection resistance | Parameterisation and escaping are type-level invariants.
+| L0 | `ParseSafe` | Statement is in the represented AST
+| L1 | `SchemaBound` | Ordinary field references resolve against `OctadSchema`
+| L2 | `TypeCompat` | Type compatibility of comparisons in `WHERE`
+| L3 | `NullSafe` | Implemented null-safety predicate holds
+| L4 | `InjectionProof` | Implemented raw-string-literal predicate holds
+| L5 | `ResultTyped` | Selected expressions satisfy the result-type predicate
+| L6 | `CardinalitySafe` | A `LIMIT` is present; no exact result count is inferred
+| L7 | `EffectTracked` | An effect declaration is present
+| L8 | `TemporalSafe` | A version constraint is present
+| L9 | `LinearSafe` | A `LinUseOnce` or `LinBounded` annotation is present
+| L10 | `EpistemicSafe` | Populated clause; declared agents; no cycle reported by implemented detector
 |===
 
-=== TypeQL-Experimental Extension Mechanisms (Levels 7-10)
+L7-L9 are AST predicates, not operational enforcement of effects, freshness,
+or resource use. L10 does not establish epistemic warrant. The Idris L10
+predicate calls a transitive-cycle detection implementation, but the corpus
+does not prove that its finite-fuel closure is equivalent to a formal graph
+reachability/acyclicity definition. The Rust mirror currently checks direct
+reciprocal `ENTAILS` pairs only. See
+`docs/THE-10-LEVELS-EXPLAINED.adoc` and
+`docs/audits/K-CUT-VCL-UT-RELATIONSHIP-2026-11-01.adoc` for detailed scope.
 
-The https://github.com/hyperpolymath/nextgen-databases[typeql-experimental]
-sub-project within nextgen-databases prototyped 6 mechanisms that map to
-levels 7-10:
-
-[cols="1,2,2"]
-|===
-| Mechanism | VCL-UT Syntax | Idris2 Encoding
-
-| Linear types | `CONSUME AFTER N USE` | QTT quantity `1` on `Connection`
-| Session types | `WITH SESSION protocol` | `Session : SessionState -> Type` indexed type
-| Effect systems | `EFFECTS { Read, Write }` | Effect set with subsumption proofs
-| Modal types | `IN TRANSACTION` | Box types indexed by world/scope
-| Proof-carrying code | `PROOF ATTACHED theorem` | `ProvedResult` sigma type
-| Quantitative type theory | `USAGE LIMIT n` | Bounded resource tracking via QTT
-|===
-
-== Architecture
+== Current Architecture
 
 [source]
 ----
-                        +---------------+
-                        |  VCL Source   |
-                        |  (.vcltotal)  |
-                        +-------+-------+
-                                |
-                    +-----------v-----------+
-                    |  Parser (Level 1)     |  ReScript — extends Verisim VCL parser
-                    +-----------+-----------+
-                                |
-                    +-----------v-----------+
-                    |  Schema Binder (2)    |  Idris2 — dependent types on schema
-                    +-----------+-----------+
-                                |
-                    +-----------v-----------+
-                    |  Type Checker (3-6)   |  Idris2 — nullability, injection, results
-                    +-----------+-----------+
-                                |
-                    +-----------v-----------+
-                    |  Safety Checker (7-10)|  Idris2 — linear, session, effects, proofs
-                    +-----------+-----------+
-                                |
-                    +-----------v-----------+
-                    |  FFI Bridge           |  Zig — C-ABI, zero-copy plan emission
-                    +-----------+-----------+
-                                |
-                    +-----------v-----------+
-                    |  Verisim              |  8-modal octad storage engine
-                    +-----------------------+
+Runtime gate request (VCL source text)
+  -> Rust `parse_op` -> `VclOp`
+       -> `Query(Statement)` -> Rust `certified_level` -> query verdict
+       -> `Transit(Transition)` -> `certified_transition_level` -> transition verdict (L4 ceiling)
+
+Offline: Idris checks the mirrored AST predicates and dependent certificates;
+it does not feed or run inside the Rust runtime verdict path.
 ----
+
+The versioned wire codec is a separate interface, not an intermediate step in
+the `vclt-gate` request path. VeriSimDB consumer integration remains outstanding.
 
 == Technology Stack
 
-[cols="1,1,2"]
+[cols="1,2"]
 |===
-| Layer | Language | Purpose
+| Component | Current role
 
-| Core type system | Idris2 | Dependent types for all 10 safety levels. `%default total`.
-| FFI bridge | Zig | C-ABI plan compilation. Zero-copy result sets.
-| Parser | ReScript | Surface syntax parsing, extending Verisim's VCL parser.
-| API layer | zig | REST/gRPC/GraphQL endpoints for statement submission.
-| Verisim integration | Elixir | 8-modal octad storage connection via NIFs.
+| Rust (`src/interface/parse`)
+| Source parser, AST/wire codec, independent decider, and `vclt-gate` producer.
+
+| Idris2 (`src/core`, `verification/proofs`)
+| Predicates, soundness proofs, and cumulative dependent certificates over the AST.
+
+| VeriSimDB consumer
+| Planned integration target; it does not yet invoke the gate producer.
 |===
 
 == Roadmap
 
-=== Phase 1 — Foundation (Levels 1-3)
-- [ ] VCL-UT grammar specification (EBNF, extending VCL v3.0)
-- [ ] Idris2 parser with totality proof
-- [ ] Schema representation as dependent types
-- [ ] Type-compatible operation checker
-- [ ] Zig FFI for plan emission
-- [ ] Basic test suite against Verisim
-
-=== Phase 2 — Safety Core (Levels 4-6)
-- [ ] Null-tracking through join algebra
-- [ ] Injection-resistant parameterisation
-- [ ] Integration with Verisim's 8-modal execution
-
-=== Phase 3 — Advanced Safety (Levels 7-10)
-- [ ] Linear resource tracking (QTT)
-- [ ] Session-typed protocols
-- [ ] Effect inference
-- [ ] Proof-attached statement execution
+See `ROADMAP.adoc` for staged work. Its TypeLL entry is explicitly an
+unverified planning assumption, not an established build or deployment
+dependency. Do not infer a cross-project level mapping from shared names.
 
 == Related Projects
 
-[cols="1,2"]
-|===
-| Project | Relationship
-
-| https://github.com/hyperpolymath/verisimdb[verisimdb]
-| Target consonance engine (8-modal octad storage)
-
-| verisimdb/docs/VCL-SPEC.adoc
-| Base VCL grammar specification (EBNF appendix)
-
-| nextgen-databases/typeql-experimental
-| 6 extension mechanisms for levels 7-10 (Idris2 kernel + ReScript parser)
-
-| https://github.com/hyperpolymath/typell[typell]
-| Core type theory — the 10 levels originate here
-
-| https://github.com/hyperpolymath/panll[panll]
-| Panel framework applying the same 10 levels to UI type safety
-|===
+* VeriSimDB is the planned consumer of the VCL-UT gate; integration is not yet
+  implemented.
+* TypeLL and PanLL are related projects. This repository establishes no
+  one-to-one level mapping or deployment dependency on them.
+* TypeQL-Experimental examples in the level walkthrough are design sketches,
+  not accepted VCL-UT syntax or an implementation dependency.
