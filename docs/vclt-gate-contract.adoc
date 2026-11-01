@@ -54,14 +54,17 @@ The gate handles two variants of parsed VCL operations:
   evidence-comparison type compatibility. It does not establish provenance
   descent, engine liveness, modality presence, or identity-versus-location.
 
-For query statements, the Rust decider is the runtime recompute tier and the
-Idris `checkLevelNSound` lemmas establish agreement between checker acceptance
-and the corresponding Boolean predicates (machine-checked in
-`verification/proofs/corpus/VclTotal/Core/Checker.idr`). This does not extend
-the predicates' semantic scope; for example, no theorem currently proves that
-the finite-fuel L10 cycle helper is equivalent to formal graph acyclicity.
-Both runtime variants are structurally decided from parsed input and schema;
-the gate needs *no* theorem prover and *no* live engine state.
+For query statements, the Rust decider is the runtime recompute tier. The
+Idris `checkLevelNSound` lemmas separately establish checker acceptance
+implies the Idris-side Boolean predicates over `Statement` values
+(machine-checked in `verification/proofs/corpus/VclTotal/Core/Checker.idr`).
+The runtime binary does not invoke or link that corpus; these lemmas do not by
+themselves prove Rust correctness or Rust/Idris refinement. In particular,
+Idris uses a finite-fuel transitive L10 cycle detector, while Rust currently
+checks direct reciprocal `ENTAILS` pairs only. No theorem proves the Idris
+detector equivalent to formal graph acyclicity. Both runtime variants are
+structurally decided from parsed input and schema; the gate needs *no* theorem
+prover and *no* live engine state.
 
 The gate explicitly does **NOT**:
 
@@ -117,13 +120,7 @@ not understand with exit code 2 and `error.kind = "unsupported_version"`.
 
 |`statement` |yes |VCL query or transition *source text*. The binary lexes and parses it with `parse_op`; a parse failure is rendered as an inadmissible parse verdict (L0 `ParseSafe`), *not* a gate error. Parsed queries and transitions follow their separate verdict variants below.
 
-|`schema` |no |The octad schema the query's schema-dependent levels (L1/L2/L3/L5)
-recompute against, in the JSON form of §"Schema payload". If omitted, the
-binary uses the empty schema; schema-dependent query levels then fail closed
-(an unknown field cannot be certified type-compatible). Schema-independent
-query levels (L4, L6–L10) are unaffected. Transition verdicts also use the
-schema for evidence type compatibility; omitting it can therefore affect a
-transition verdict.
+|`schema` |no |The octad schema used by schema-dependent query predicates (L1/L2/L3/L5), in the JSON form of §"Schema payload". If omitted, the binary uses the empty schema and unknown fields fail closed. Although the individual L4 and L6–L10 query predicates do not inspect the schema, certification at a requested level still evaluates every preceding level; missing schema metadata can therefore make the overall verdict inadmissible at an earlier level. Transition verdicts also use the schema for evidence type compatibility, so omitting it can affect that verdict too.
 |===
 
 Unknown request fields MUST be ignored (forward-compat).
@@ -225,17 +222,19 @@ documented above. The gate MUST use these names and numbers verbatim:
 |7 |EffectTracked |`effect_decl.is_some()` — an effect declaration is present
 |8 |TemporalSafe |`version_const.is_some()` — a version constraint is present
 |9 |LinearSafe |`linear_enforced` — linear-resource annotation satisfied
-|10 |EpistemicSafe |`epistemic_consistent_stmt` — populated clause and declared agents; the finite-fuel cycle detector reports no `ENTAILS` cycle
+|10 |EpistemicSafe |Rust `epistemic_consistent_stmt` — populated clause, declared agents, and no direct reciprocal `ENTAILS` pair; not a general transitive-cycle check
 |===
 
 *Subsumption* (proved in `Core/Levels.idr`): a query certificate at level N
 requires levels `1..N` to pass. The consumer therefore needs only
 `admissible` + `certified_level`; the `levels` array is diagnostic.
 
-For L10, `checkLevel10Sound` proves checker acceptance implies the Boolean
-`epistemic_consistent_stmt` predicate. It does not prove that the finite-fuel
-cycle detector is equivalent to a formal graph-reachability/acyclicity
-definition; that correctness obligation remains outstanding.
+The Idris `checkLevel10Sound` theorem proves Idris checker acceptance implies
+its Boolean `epistemicConsistentStmt` predicate, whose implementation uses a
+finite-fuel transitive cycle detector. It does not prove that detector
+is equivalent to a formal graph-reachability/acyclicity definition. The Rust
+gate implementation differs: it rejects direct reciprocal `ENTAILS` pairs
+only, and no theorem here proves Rust/Idris alignment.
 
 The producer binary MUST obtain query verdicts by calling
 `decider::certified_level` and transition verdicts by calling

@@ -407,11 +407,11 @@ L6 predicate:
 |===
 | VCL-total Syntax | Meaning
 
-| `SELECT UNIQUE ...`
-| Returns `ExactlyOne<T>` -- compile error if uniqueness cannot be proved
+| `SELECT UNIQUE ...` (illustrative unique-key lookup)
+| Returns `AtMostOne<T>` -- a uniqueness proof bounds matches to one, but does not prove a match exists
 
-| `SELECT OPTIONAL ...`
-| Returns `AtMostOne<T>` -- caller must handle the empty case
+| `SELECT ... LIMIT 1`
+| Returns `AtMostOne<T>` -- the caller must handle the empty case
 
 | `SELECT ...`
 | Returns `List<T>` -- zero or more results
@@ -421,13 +421,13 @@ L6 predicate:
 -- Schema: users.id has UNIQUE constraint
 
 SELECT UNIQUE users WHERE users.id = ?id
--- Return type: ExactlyOne<User>
--- The compiler proves this from the UNIQUE constraint on users.id.
-
-SELECT OPTIONAL users WHERE users.email = ?email
 -- Return type: AtMostOne<User>
--- Email is not unique, so we might get zero results.
--- The caller MUST pattern-match on Some/None.
+-- The UNIQUE constraint proves at most one match, not that the id exists.
+-- The caller MUST handle the zero-result case.
+
+SELECT users WHERE users.email = ?email
+-- Return type: List<User>
+-- Email is not unique, so this may return multiple rows.
 ----
 
 === Illustrative Cardinality Encoding
