@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= VCL-UT proof reconciliation (initial inventory)
+:revdate: 2026-11-01
+
+Status: *OPEN* — these are porting and correspondence obligations, not
+a claim that VCL-UT has an Agda proof corpus.
+
+== The existing gate remains authoritative for engineering claims
+
+`idris2 --build verification/proofs/vclut-core.ipkg` is still the
+13-module, source-grounded Idris2 proof check. The separate
+`SafetyL4Model.idr` check and `scripts/honesty-guard.sh` remain in
+`.github/workflows/proof-corpus.yml`. Do not retire them or replace
+them with a disconnected Agda model. See
+`verification/proofs/VERIFICATION-STANCE.adoc` for exact existing
+theorem scope and unproved runtime/FFI assumptions.
+
+== Theory candidate ledger (no reconciliation certified yet)
+
+[cols="1,3,2,3",options="header"]
+|===
+|ID |Source and intended theory statement |Agda |Lean/Coq + bridge
+|VCL-L4 |The proof of `NoRawUserInput` preservation under the specified statement join in `src/core/Composition.idr`; inspect actual definition of `joinWhere` and literal recognition rather than replacing it with a toy Boolean |OPEN |OPEN — exact proposition and source/target correspondence not yet compared
+|VCL-L6–L10 |Composition closure for the actual indexed level predicates in `Composition.idr` |OPEN |OPEN — do not presume universal level monotonicity
+|VCL-EP |The specified epistemic evidence and transition properties in `Epistemic.idr` and `Transition.idr` |OPEN |OPEN — external truth, authority and liveness are separate premises
+|VCL-WIRE |The interface/ABI and wire decoder conformance in `WireDecode.idr` / `WireConformance.idr` |NOT A THEORY PORT BY DEFAULT |Existing Idris2 engineering gate must remain
+|===
+
+When a statement genuinely has implementation-independent content,
+port or reprove its exact theorem first in Agda:
+
+[source,shell]
+----
+agda --safe --without-K --cubical-compatible <module.agda>
+----
+
+Then separately inspect the equivalent claim in Coq/Rocq and Lean.
+A compiler success, matching theorem name, or translated type without
+a statement correspondence proof is not a reconciled witness. Record
+prover/library versions, source revisions, stated assumptions and
+the correspondence receipt in the owning proof status.
+
+The canonical cross-estate policy lives in
+`metadatastician/standards/3-practice/PROOF-POLICY.adoc`.
+Mathesis is an index, and ECHIDNA is a future automation route,
+not dependencies of VCL-UT's own soundness.
