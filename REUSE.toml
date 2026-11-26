@@ -85,7 +85,6 @@ path = [
   "package.json",
   "bun.lock",
   "deno.lock",
-  "pnpm-lock.yaml",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
