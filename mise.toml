@@ -9,7 +9,6 @@ rust = "latest"
 # let a Zig release break the FFI build without any diff.
 zig = "0.16.0"
 bun = "1.4"
-denojs = "latest"
 
 # Package managers
 cargo = "latest"
