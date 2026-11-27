@@ -81,6 +81,10 @@ path = [
   "ROADMAP.adoc",
   "arcvix-10-level-query-safety.bib",
   "arcvix-10-level-query-safety.tex",
+  ".prettierignore",
+  "package.json",
+  "bun.lock",
+  "deno.lock",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>"
