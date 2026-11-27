@@ -8,7 +8,7 @@ rust = "latest"
 # that version (.github/workflows/zig-shim-gate.yml). "latest" would
 # let a Zig release break the FFI build without any diff.
 zig = "0.16.0"
-bun = "latest"
+bun = "1.4"
 denojs = "latest"
 
 # Package managers
@@ -43,10 +43,10 @@ description = "Install pinned JS dev tools (Prettier) from bun.lock"
 run = "bun install --frozen-lockfile"
 
 [tasks.build]
-run = "cargo build --release"
+run = "cargo build --release --workspace"
 
 [tasks.test]
-run = "cargo test"
+run = "cargo test --workspace"
 
 [tasks.lint]
 depends = ["setup"]
